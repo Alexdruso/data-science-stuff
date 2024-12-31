@@ -37,7 +37,7 @@ def find_frequent_singletons(
     :return: the set of all frequent singletons
     """
 
-    item_to_support = defaultdict(int)
+    item_to_support: dict[FrozenSet[int], int] = defaultdict(int)
 
     for basket in baskets:
         for item in basket:

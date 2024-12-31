@@ -1,4 +1,4 @@
-from typing import Callable, Set, DefaultDict, FrozenSet
+from typing import Callable, Set, DefaultDict, FrozenSet, Union
 from collections import defaultdict
 from scipy.stats import bernoulli
 from functools import reduce
@@ -28,8 +28,8 @@ class Triest:
         self.verbose = verbose
         self.S: Set[FrozenSet[int]] = set()
         self.t: int = 0
-        self.tau_vertices: DefaultDict[int, int] = defaultdict(int)
-        self.tau: int = 0
+        self.tau_vertices: DefaultDict[int, Union[int, float]] = defaultdict(float)
+        self.tau: Union[float, int] = 0.0
 
     @property
     def xi(self) -> float:

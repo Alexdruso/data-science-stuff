@@ -1,5 +1,5 @@
 from math import ceil
-from typing import Tuple, Dict, Set
+from typing import Tuple, Dict, Set, Any, cast
 
 import numpy as np
 
@@ -8,16 +8,16 @@ from data_mining.lab1.src.compare_signatures import compare_signatures
 from itertools import combinations
 
 
-def hash_band(band: np.ndarray) -> np.ndarray:
+def hash_band(band: np.ndarray[Any, Any]) -> np.ndarray[Any, Any]:
     """
     This function might be changed later to improve performance. It is meant to hash the band of each document.
     :param band: the matrix of shape (band_length, documents_number)
     :return: an array of shape (1, documents_number) containing the hashed band for each document
     """
-    return np.sum(a=band, axis=0)
+    return cast(np.ndarray[Any, Any], np.sum(a=band, axis=0))
 
 
-def lsh(M: np.ndarray, t: float, b: int = 1) -> Set[Tuple[int, int]]:
+def lsh(M: np.ndarray[Any, Any], t: float, b: int = 1) -> Set[Tuple[int, int]]:
     """
     This function takes as input the minhash signatures of M.shape[1] documents and returns all the pairs of documents
     with estimated similarity larger than t.
