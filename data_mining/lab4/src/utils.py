@@ -1,4 +1,5 @@
 import networkx as nx
+from typing import cast
 
 
 def load_graph(file: str, weight: bool = False) -> nx.Graph:
@@ -11,10 +12,12 @@ def load_graph(file: str, weight: bool = False) -> nx.Graph:
     :return: a nx.Graph instance representing the graph
     """
 
-    if weight:
-        return nx.read_weighted_edgelist(path=file, delimiter=",")
-    else:
-        return nx.read_edgelist(path=file, delimiter=",")
+    return cast(
+        nx.Graph,
+        nx.read_weighted_edgelist(path=file, delimiter=",")
+        if weight
+        else nx.read_edgelist(path=file, delimiter=","),
+    )
 
 
 if __name__ == "__main__":

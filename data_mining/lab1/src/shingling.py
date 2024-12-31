@@ -4,7 +4,7 @@ from typing import Set
 
 class Shingling:
     def __init__(self) -> None:
-        self._shingling_to_int = {}
+        self._shingling_to_int: dict[str, int] = {}
         self._shingling_number = 0
         super().__init__()
 
