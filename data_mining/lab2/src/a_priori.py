@@ -14,7 +14,10 @@ def read_dataset(file: str) -> List[Set[int]]:
     """
 
     with open(file, "r") as f:
-        baskets: List[Set[int]] = [{int(item_id) for item_id in basket.split()} for basket in f.read().splitlines()]
+        baskets: List[Set[int]] = [
+            {int(item_id) for item_id in basket.split()}
+            for basket in f.read().splitlines()
+        ]
     f.close()
 
     return baskets
