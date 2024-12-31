@@ -26,10 +26,9 @@ jobs:
           pip install .[development]
 
       - name: Run Ruff (Linter)
-        run: ruff check .
-
-      - name: Run Ruff (Linter)
-        run: ruff format --check
+        run: |
+          ruff check .
+          ruff format --check .
 
       - name: Run MyPy (Static Type Checker)
         run: mypy .
