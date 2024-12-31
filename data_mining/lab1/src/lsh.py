@@ -3,7 +3,7 @@ from typing import Tuple, Dict, Set
 
 import numpy as np
 
-from compare_signatures import compare_signatures
+from data_mining.lab1.src.compare_signatures import compare_signatures
 
 from itertools import combinations
 

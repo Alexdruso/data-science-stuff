@@ -38,6 +38,8 @@ development = [
     "pytest-cov",
     "mypy",
     "pre-commit",
+    "scipy-stubs",
+    "networkx-stubs"
 ]
 
 [project.urls]
