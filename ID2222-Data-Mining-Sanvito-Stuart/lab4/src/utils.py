@@ -12,18 +12,12 @@ def load_graph(file: str, weight: bool = False) -> nx.Graph:
     """
 
     if weight:
-        return nx.read_weighted_edgelist(
-            path=file,
-            delimiter=','
-        )
+        return nx.read_weighted_edgelist(path=file, delimiter=",")
     else:
-        return nx.read_edgelist(
-            path=file,
-            delimiter=','
-        )
+        return nx.read_edgelist(path=file, delimiter=",")
 
 
-if __name__ == '__main__':
-    G = load_graph('../data/example1.dat')
+if __name__ == "__main__":
+    G = load_graph("../data/example1.dat")
 
-    print('The size of the graph is {}.'.format(G.size()))
+    print("The size of the graph is {}.".format(G.size()))

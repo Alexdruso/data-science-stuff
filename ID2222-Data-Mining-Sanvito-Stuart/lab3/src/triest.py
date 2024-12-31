@@ -1,4 +1,4 @@
-from typing import Tuple, Callable, Set, DefaultDict, FrozenSet
+from typing import Callable, Set, DefaultDict, FrozenSet
 from collections import defaultdict
 from scipy.stats import bernoulli
 from functools import reduce
@@ -35,8 +35,8 @@ class Triest:
     def xi(self) -> float:
         return max(
             1.0,
-            (self.t * (self.t - 1) * (self.t - 2)) /
-            (self.M * (self.M - 1) * (self.M - 2))
+            (self.t * (self.t - 1) * (self.t - 2))
+            / (self.M * (self.M - 1) * (self.M - 2)),
         )
 
     def _sample_edge(self, t: int) -> bool:
@@ -58,7 +58,9 @@ class Triest:
         else:
             return False
 
-    def _update_counters(self, operator: Callable[[int, int], int], edge: FrozenSet[int]) -> None:
+    def _update_counters(
+        self, operator: Callable[[int, int], int], edge: FrozenSet[int]
+    ) -> None:
         """
         This function updates the counters related to estimating the number of triangles. The update happens through
         the operator lambda and involves the edge and its neighbours.
@@ -72,11 +74,13 @@ class Triest:
             [
                 {
                     node
-                    for link in self.S if vertex in link
-                    for node in link if node != vertex
+                    for link in self.S
+                    if vertex in link
+                    for node in link
+                    if node != vertex
                 }
                 for vertex in edge
-            ]
+            ],
         )
 
         for vertex in common_neighbourhood:
@@ -89,13 +93,13 @@ class Triest:
 
 class TriestBase(Triest):
     """
-        This class implements the algorithm Triest base presented in the paper
+    This class implements the algorithm Triest base presented in the paper
 
-        'L. De Stefani, A. Epasto, M. Riondato, and E. Upfal, TRIÈST: Counting Local and Global Triangles in Fully-Dynamic
-        Streams with Fixed Memory Size, KDD'16.'
+    'L. De Stefani, A. Epasto, M. Riondato, and E. Upfal, TRIÈST: Counting Local and Global Triangles in Fully-Dynamic
+    Streams with Fixed Memory Size, KDD'16.'
 
-        The algorithm provides an estimate of the number of triangles in a graph in a streaming environment,
-        where the stream represent a series of edges.
+    The algorithm provides an estimate of the number of triangles in a graph in a streaming environment,
+    where the stream represent a series of edges.
     """
 
     def run(self) -> float:
@@ -108,7 +112,7 @@ class TriestBase(Triest):
         if self.verbose:
             print("Running the algorithm with M = {}.".format(self.M))
 
-        with open(self.file, 'r') as f:
+        with open(self.file, "r") as f:
             if self.verbose:
                 print("File opened, processing the stream...")
 
@@ -124,8 +128,10 @@ class TriestBase(Triest):
                     self._update_counters(lambda x, y: x + y, edge)
 
                 if self.verbose and self.t % 1000 == 0:
-                    print("The current estimate for the number of triangles is {}.".format(
-                        self.xi * self.tau)
+                    print(
+                        "The current estimate for the number of triangles is {}.".format(
+                            self.xi * self.tau
+                        )
                     )
 
             return self.xi * self.tau
@@ -133,23 +139,22 @@ class TriestBase(Triest):
 
 class TriestImproved(Triest):
     """
-        This class implements the algorithm Triest improved presented in the paper
+    This class implements the algorithm Triest improved presented in the paper
 
-        'L. De Stefani, A. Epasto, M. Riondato, and E. Upfal, TRIÈST: Counting Local and Global Triangles in Fully-Dynamic
-        Streams with Fixed Memory Size, KDD'16.'
+    'L. De Stefani, A. Epasto, M. Riondato, and E. Upfal, TRIÈST: Counting Local and Global Triangles in Fully-Dynamic
+    Streams with Fixed Memory Size, KDD'16.'
 
-        The algorithm provides an estimate of the number of triangles in a graph in a streaming environment,
-        where the stream represent a series of edges.
+    The algorithm provides an estimate of the number of triangles in a graph in a streaming environment,
+    where the stream represent a series of edges.
     """
 
     @property
     def eta(self) -> float:
-        return max(
-            1.0,
-            ((self.t - 1) * (self.t - 2)) / (self.M * (self.M - 1))
-        )
+        return max(1.0, ((self.t - 1) * (self.t - 2)) / (self.M * (self.M - 1)))
 
-    def _update_counters(self, operator: Callable[[int, int], int], edge: FrozenSet[int]) -> None:
+    def _update_counters(
+        self, operator: Callable[[int, int], int], edge: FrozenSet[int]
+    ) -> None:
         """
         This function updates the counters related to estimating the number of triangles. The update happens through
         the operator lambda and involves the edge and its neighbours.
@@ -163,11 +168,13 @@ class TriestImproved(Triest):
             [
                 {
                     node
-                    for link in self.S if vertex in link
-                    for node in link if node != vertex
+                    for link in self.S
+                    if vertex in link
+                    for node in link
+                    if node != vertex
                 }
                 for vertex in edge
-            ]
+            ],
         )
 
         for vertex in common_neighbourhood:
@@ -206,7 +213,7 @@ class TriestImproved(Triest):
         if self.verbose:
             print("Running the algorithm with M = {}.".format(self.M))
 
-        with open(self.file, 'r') as f:
+        with open(self.file, "r") as f:
             if self.verbose:
                 print("File opened, processing the stream...")
 
@@ -224,15 +231,13 @@ class TriestImproved(Triest):
 
                 if self.verbose and self.t % 1000 == 0:
                     print(
-                        "The current estimate for the number of triangles is {}.".format(self.tau)
+                        "The current estimate for the number of triangles is {}.".format(
+                            self.tau
+                        )
                     )
 
             return self.tau
 
 
 if __name__ == "__main__":
-    TriestImproved(
-        file='../data/facebook_combined.txt',
-        M=1000,
-        verbose=True
-    ).run()
+    TriestImproved(file="../data/facebook_combined.txt", M=1000, verbose=True).run()

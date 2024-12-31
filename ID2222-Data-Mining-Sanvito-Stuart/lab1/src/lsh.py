@@ -35,7 +35,7 @@ def lsh(M: np.ndarray, t: float, b: int = 1) -> Set[Tuple[int, int]]:
         collision_hashmap: Dict[int, Set[int]] = {}
 
         # shape (band_length, documents_number)
-        band = M[band_index: min(band_index + band_length, hash_length), :]
+        band = M[band_index : min(band_index + band_length, hash_length), :]
 
         # shape (1, documents_number)
         hashed_band = hash_band(band=band)
@@ -54,7 +54,7 @@ def lsh(M: np.ndarray, t: float, b: int = 1) -> Set[Tuple[int, int]]:
     return set(
         filter(
             lambda pair: compare_signatures(M[:, pair[0]], M[:, pair[1]]) >= t,
-            candidates
+            candidates,
         )
     )
 

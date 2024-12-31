@@ -13,27 +13,18 @@ def min_hash(A: Set[int], hash_length: int = 100, seed: int = 0) -> np.ndarray:
     :return: a vector representation of the document, with len=hash_len
     """
     generator = np.random.default_rng(seed=seed)
-    min_value = -2 ** 31
-    max_value = 2 ** 31 - 1
+    min_value = -(2**31)
+    max_value = 2**31 - 1
 
     hash_parameters = generator.choice(
-        a=generator.integers(
-            low=min_value,
-            high=max_value,
-            size=hash_length * 2
-        ),
+        a=generator.integers(low=min_value, high=max_value, size=hash_length * 2),
         size=(hash_length, 2),
-        replace=False
+        replace=False,
     )
 
     return np.asarray(
         [
-            min(
-                map(
-                    lambda x: (x * parameters[0] + parameters[1]) % max_value,
-                    A
-                )
-            )
+            min(((x * parameters[0] + parameters[1]) % max_value for x in A))
             for parameters in hash_parameters
         ]
     )

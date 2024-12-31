@@ -3,9 +3,8 @@ from typing import Set
 
 
 class Shingling:
-
     def __init__(self) -> None:
-        self._shingling_to_int = dict()
+        self._shingling_to_int = {}
         self._shingling_number = 0
         super().__init__()
 
@@ -23,6 +22,6 @@ class Shingling:
         document_length = len(document)
 
         for start in range(document_length - k):
-            result.add(self.hash(document[start:start + k]))
+            result.add(self.hash(document[start : start + k]))
 
         return result
