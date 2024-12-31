@@ -1,9 +1,9 @@
-from typing import Set
+from typing import Set, Any
 
 import numpy as np
 
 
-def min_hash(A: Set[int], hash_length: int = 100, seed: int = 0) -> np.ndarray:
+def min_hash(A: Set[int], hash_length: int = 100, seed: int = 0) -> np.ndarray[Any, int]:
     """
     The function takes as input the set of hashed shingling in a document and returns a vector representation of the
     document hashed through min hashing.
