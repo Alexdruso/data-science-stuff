@@ -42,7 +42,8 @@ development = [
     "mypy",
     "pre-commit",
     "scipy-stubs",
-    "networkx-stubs"
+    "networkx-stubs",
+    "git+https://github.com/microsoft/python-type-stubs.git"
 ]
 
 [project.urls]
