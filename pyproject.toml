@@ -32,7 +32,8 @@ dependencies = [
     "seaborn",
     "kaggle",
     "pycaret",
-    "polars"
+    "polars",
+    "pyarrow"
 ]
 
 [project.optional-dependencies]
