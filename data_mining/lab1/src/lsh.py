@@ -3,7 +3,7 @@ from typing import Tuple, Dict, Set, Any, cast
 
 import numpy as np
 
-from compare_signatures import compare_signatures
+from .compare_signatures import compare_signatures
 
 from itertools import combinations
 
