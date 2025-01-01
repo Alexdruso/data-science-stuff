@@ -43,3 +43,7 @@ def load_data(
         )
 
     return data.to_pandas()
+
+
+if __name__ == "__main__":
+    print(load_data("playground_series_s5e1/data", train_set=True, multi_target=True))
