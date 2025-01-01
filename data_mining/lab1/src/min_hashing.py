@@ -1,4 +1,4 @@
-from typing import Set, Any
+from typing import Set, Any, cast
 
 from matplotlib.pylab import Generator
 import numpy as np
@@ -25,11 +25,14 @@ def min_hash(
         replace=False,
     )
 
-    return np.asarray(
-        a=[
-            min(((x * parameters[0] + parameters[1]) % max_value for x in A))
-            for parameters in hash_parameters
-        ]
+    return cast(
+        np.ndarray[Any, Any],
+        np.asarray(
+            a=[
+                min(((x * parameters[0] + parameters[1]) % max_value for x in A))
+                for parameters in hash_parameters
+            ]
+        ),
     )
 
 
