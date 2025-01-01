@@ -1,14 +1,16 @@
 from pathlib import Path
 import pandas as pd
 import polars as pl
+from typing import Union
+
 
 def load_data(
-    path: str | Path,
+    path: Union[str, Path],
     *,
     multi_target: bool,
     train_set: bool,
 ) -> pd.DataFrame:
-    path: Path = Path(path)
+    path = Path(path)
     file_name: str = "train.csv" if train_set else "test.csv"
     path = path / file_name
 
@@ -24,7 +26,9 @@ def load_data(
 
     if multi_target:
         data = data.with_columns(
-            (data["country"] + "_" + data["store"] + "_" + data["product"]).alias("identifier")
+            (data["country"] + "_" + data["store"] + "_" + data["product"]).alias(
+                "identifier"
+            )
         )
 
         # Drop the original columns before pivoting
@@ -34,8 +38,8 @@ def load_data(
         data = data.pivot(
             values=[col for col in data.columns if col not in ["date", "identifier"]],
             index=["date"],
-            columns="identifier",
-            aggregate_function=None
+            on="identifier",
+            aggregate_function=None,
         )
 
     return data.to_pandas()
