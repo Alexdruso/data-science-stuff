@@ -45,7 +45,7 @@ development = [
     "pre-commit",
     "scipy-stubs",
     "networkx-stubs",
-    "git+https://github.com/microsoft/python-type-stubs.git"
+    "python-type-stubs@git+https://github.com/microsoft/python-type-stubs.git"
 ]
 
 [project.urls]
@@ -82,3 +82,6 @@ omit = [
     "setup.py",
 ]
 precision = 2
+
+[tool.setuptools]
+packages = { find = { include = ["data_mining*", "playground_series_s5e1*"] } }
