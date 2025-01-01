@@ -41,7 +41,7 @@ def lsh(M: np.ndarray[Any, Any], t: float, b: int = 1) -> Set[Tuple[int, int]]:
         hashed_band = hash_band(band=band)
 
         for document_index in range(documents_number):
-            document_band_hash: int = cast(int, hashed_band[document_index])
+            document_band_hash = cast(int, hashed_band[document_index])
 
             if document_band_hash in collision_hashmap:
                 collision_hashmap[document_band_hash].add(document_index)

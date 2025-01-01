@@ -59,7 +59,9 @@ class Triest:
             return False
 
     def _update_counters(
-        self, operator: Callable[[int, int], int], edge: FrozenSet[int]
+        self,
+        operator: Callable[[Union[float, int], Union[float, int]], Union[float, int]],
+        edge: FrozenSet[int],
     ) -> None:
         """
         This function updates the counters related to estimating the number of triangles. The update happens through
@@ -153,7 +155,9 @@ class TriestImproved(Triest):
         return max(1.0, ((self.t - 1) * (self.t - 2)) / (self.M * (self.M - 1)))
 
     def _update_counters(
-        self, operator: Callable[[int, int], int], edge: FrozenSet[int]
+        self,
+        operator: Callable[[Union[float, int], Union[float, int]], Union[float, int]],
+        edge: FrozenSet[int],
     ) -> None:
         """
         This function updates the counters related to estimating the number of triangles. The update happens through
