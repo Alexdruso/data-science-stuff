@@ -2,6 +2,17 @@ from pathlib import Path
 import pandas as pd
 import polars as pl
 from typing import Union
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class TimeSeriesKey:
+    country: str
+    store: str
+    product: str
+
+    def to_index(self) -> tuple[str, str, str]:
+        return (self.country, self.store, self.product)
 
 
 def load_data(

@@ -1,6 +1,6 @@
 import pandas as pd
 import argparse
-from pycaret.time_series import setup, compare_models
+from pycaret.time_series import setup, compare_models, finalize_model
 from utils.data import load_data
 
 
@@ -21,15 +21,15 @@ def main(data_path: str) -> None:
         for store in stores:
             for product in products:
                 print(f"Learning to predict: {country=} {store=} {product=}")
-
-                experiment = setup(
+                setup(
                     data=train_set.loc[(country, store, product)],
                     target="num_sold",
                     index="date",
                     ignore_features=["id"],
+                    use_gpu=True,
                 )
-
-                best_model = compare_models()
+                best_model = compare_models(sort="MAPE")
+                finalize_model(estimator=best_model)
 
 
 if __name__ == "__main__":
