@@ -162,3 +162,4 @@ cython_debug/
 #.idea/
 
 data_science_stuff/_version.py
+.python-version
