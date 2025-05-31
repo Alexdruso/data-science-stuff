@@ -1,0 +1,60 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Data Science & Kaggle Best Practices
+
+## Core Principles
+- Prioritize robust, interpretable solutions over complex black-box models
+- Start with simple but effective approaches before moving to more sophisticated solutions
+- Maintain high code quality standards while delivering competitive results
+- Focus on both model performance and code maintainability
+
+## Technical Stack Preferences
+- Use Polars for data manipulation and preprocessing instead of Pandas
+- Leverage PyCaret for rapid prototyping and initial solutions
+- Focus on efficient data processing and feature engineering
+- Maintain reproducible experiments and clear documentation
+
+## Problem-Solving Approach
+1. Begin with thorough exploratory data analysis
+2. Start with baseline models using PyCaret
+3. Gradually iterate towards more complex solutions
+4. Always consider model interpretability and business impact
+5. Validate results with proper cross-validation and holdout sets
+
+## Code Quality Standards
+- Write clean, well-documented code
+- Follow best practices for reproducibility
+- Ensure proper model evaluation and validation
+- Use type hints and docstrings for better code maintainability
+- Structure projects with clear organization and modularity
+
+## Model Development Strategy
+1. Start with simple models (linear models, decision trees)
+2. Establish strong baselines before moving to complex solutions
+3. Focus on feature engineering and data preprocessing
+4. Use ensemble methods when appropriate
+5. Always validate model assumptions and performance
+
+## Best Practices for Kaggle Competitions
+- Begin with quick iterations using PyCaret
+- Focus on robust cross-validation strategies
+- Pay attention to data leakage prevention
+- Document all experiments and their results
+- Consider both public and private leaderboard implications
+
+## Data Processing Guidelines
+- Use Polars for efficient data manipulation
+- Implement proper data validation and cleaning
+- Handle missing values appropriately
+- Create reproducible data pipelines
+- Document all data transformations
+
+## Experimentation Framework
+- Maintain clear experiment tracking
+- Document all hyperparameters and configurations
+- Use version control for code and data
+- Keep track of model performance metrics
+- Document insights and learnings from each iteration
