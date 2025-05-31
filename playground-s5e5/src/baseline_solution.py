@@ -29,15 +29,10 @@ def setup_pycaret_experiment(train_df):
     # Initialize PyCaret experiment
     exp = setup(
         data=train_pd,
-        target='target',  # Replace with actual target column name
+        target='Calories',  # Replace with actual target column name
         session_id=RANDOM_SEED,
         normalize=True,
         feature_selection=True,
-        feature_selection_threshold=0.8,
-        remove_outliers=True,
-        outliers_threshold=0.05,
-        silent=True,
-        verbose=False
     )
     
     return exp
