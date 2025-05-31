@@ -5,25 +5,48 @@ on:
     branches:
       - main
   pull_request:
+    branches:
+      - main
 
 jobs:
   lint-and-test:
     name: Lint, Test, and Type Check
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11"]
+        os: [ubuntu-latest]
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/checkout@v4
         with:
-          python-version: 3.9
+          fetch-depth: 0  # For better versioning
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'uv'
+
+      - name: Install uv
+        run: |
+          python -m pip install --upgrade pip
+          pip install uv
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            .venv
+            .uv
+          key: ${{ runner.os }}-uv-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install .[development]
+          uv pip install -e ".[development,docs]"
 
       - name: Run Ruff (Linter)
         run: |
@@ -33,15 +56,36 @@ jobs:
       - name: Run MyPy (Static Type Checker)
         run: mypy .
 
+      - name: Run Bandit (Security Checker)
+        run: bandit -r .
+
+      - name: Run Safety (Dependency Checker)
+        run: safety check
+
       - name: Run Tests with Coverage
         run: |
-          pytest --cov=data_science_stuff --cov-report=xml
+          pytest --cov=data_science_stuff --cov-report=xml --cov-report=term-missing
           coverage report -m
 
       - name: Upload Coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.xml
           flags: unittests
           name: codecov-umbrella
+          fail_ci_if_error: true
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/python@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
