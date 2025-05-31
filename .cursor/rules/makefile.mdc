@@ -1,0 +1,45 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Makefile Commands
+
+## Development Setup
+- Command: `make dev-setup`
+- Purpose: Creates and configures the development environment
+- Actions:
+  1. Creates a Python virtual environment in `.venv` if it doesn't exist
+  2. Installs `uv` package manager in the venv
+  3. Installs all project dependencies using uv
+  4. Installs both development and documentation dependencies
+
+## Code Formatting
+- Command: `make py-fmt`
+- Purpose: Formats and fixes code style issues
+- Actions:
+  1. Runs `ruff format` to format code according to project standards
+  2. Runs `ruff check --fix` to automatically fix linting issues
+- Note: Uses Ruff for both formatting and linting, configured in pyproject.toml
+
+## Type Checking
+- Command: `make py-static`
+- Purpose: Performs static type checking
+- Actions:
+  1. Runs `mypy` to check type annotations
+  2. Uses strict type checking configuration from pyproject.toml
+
+## Cleanup
+- Command: `make clean`
+- Purpose: Removes generated files and caches
+- Actions:
+  1. Removes the virtual environment directory
+  2. Removes all `__pycache__` directories
+  3. Removes `.mypy_cache` directories
+  4. Removes `.ruff_cache` directories
+  5. Removes all `.pyc` files
+
+## Help
+- Command: `make help`
+- Purpose: Shows available commands and their descriptions
+- Note: This is the default target when running `make` without arguments

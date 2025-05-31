@@ -1,0 +1,49 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Development Workflow
+
+## Initial Setup
+1. Clone the repository
+2. Run `make dev-setup` to create the virtual environment and install dependencies
+3. The setup will:
+   - Create a `.venv` directory with a Python virtual environment
+   - Install `uv` package manager
+   - Install all project dependencies using uv
+   - Install development and documentation dependencies
+
+## Daily Development Workflow
+1. Activate the virtual environment:
+   ```bash
+   source .venv/bin/activate
+   ```
+
+2. Before committing changes:
+   - Run `make py-fmt` to format and fix code style issues
+   - Run `make py-static` to check for type errors
+   - Fix any issues reported by the type checker
+
+3. If you need to clean up:
+   - Run `make clean` to remove all generated files and caches
+   - Run `make dev-setup` again to recreate the environment
+
+## Code Style
+- The project uses Ruff for both formatting and linting
+- Configuration is in `pyproject.toml`
+- Line length is set to 88 characters
+- Double quotes are used for strings
+- Type hints are required and strictly checked
+
+## Dependencies
+- Main dependencies are listed in `pyproject.toml`
+- Development dependencies are installed with `[development]` extra
+- Documentation dependencies are installed with `[docs]` extra
+- All dependencies are managed using `uv` instead of `pip`
+
+## Type Checking
+- Strict type checking is enabled
+- All functions must have type annotations
+- Test files are exempt from strict type checking
+- Configuration is in `pyproject.toml`
