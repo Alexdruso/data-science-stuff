@@ -2,7 +2,7 @@
 VENV_DIR = .venv
 VENV_BIN = $(VENV_DIR)/bin
 PYTHON = $(VENV_BIN)/python
-UV = $(VENV_BIN)/uv
+UV = uv
 
 # Default target
 .PHONY: help
@@ -16,11 +16,13 @@ help:
 # Ensure virtual environment exists
 $(VENV_DIR):
 	python3 -m venv $(VENV_DIR)
+	$(PYTHON) -m pip install --upgrade pip
 	$(PYTHON) -m pip install uv
 
 # Install dependencies using uv
 .PHONY: dev-setup
 dev-setup: $(VENV_DIR)
+	$(PYTHON) -m pip install --upgrade pip
 	$(UV) pip install -e ".[development,docs]"
 
 # Format code using ruff
