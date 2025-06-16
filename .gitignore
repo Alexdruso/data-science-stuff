@@ -163,3 +163,5 @@ cython_debug/
 
 data_science_stuff/_version.py
 .python-version
+
+*.csv
