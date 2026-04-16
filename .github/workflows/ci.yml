@@ -27,7 +27,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'uv'
 
       - name: Install uv
         run: |
@@ -46,7 +45,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          uv pip install -e ".[development,docs]"
+          uv pip install --system -e ".[development,docs]"
 
       - name: Run Ruff (Linter)
         run: |
