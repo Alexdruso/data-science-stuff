@@ -55,9 +55,7 @@ development = [
     "scipy-stubs>=1.0.0,<2.0.0",
     "networkx-stubs>=0.0.1,<1.0.0",
     "microsoft-python-type-stubs@git+https://github.com/microsoft/python-type-stubs.git",
-    "isort>=5.0.0,<6.0.0",
     "bandit>=1.7.0,<2.0.0",  # For security checks
-    "safety>=2.0.0,<3.0.0",  # For dependency security checks
 ]
 
 docs = [
@@ -76,9 +74,6 @@ Changelog = "https://github.com/alexdruso/data-science-stuff/blob/main/CHANGELOG
 # Basic configuration
 target-version = "py39"
 line-length = 88
-
-# Enable Ruff's formatter
-extend-select = ["F"]  # Enable Ruff's formatter
 
 # Linting rules
 select = [
@@ -145,7 +140,7 @@ disallow_untyped_defs = false
 
 [tool.pytest.ini_options]
 minversion = "7.0"
-addopts = "-ra -q --doctest-modules --cov=data_science_stuff --cov-report=xml --cov-report=term-missing"
+addopts = "-ra -q --doctest-modules --cov=data_science_stuff --cov-report=xml --cov-report=term-missing --cov-fail-under=80"
 testpaths = [
     "tests",
 ]
@@ -183,7 +178,7 @@ precision = 2
 fail_under = 80
 
 [tool.setuptools]
-packages = { find = { include = ["data_mining*", "playground_series_s5e1*"] } }
+packages = { find = { include = ["data_science_stuff*", "data_mining*", "playground_series_s5e1*"] } }
 package-data = { "data_science_stuff" = ["py.typed"] }
 
 [tool.setuptools_scm]
