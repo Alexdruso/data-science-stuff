@@ -45,7 +45,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          uv pip install -e ".[development,docs]"
+          uv pip install --system -e ".[development,docs]"
 
       - name: Run Ruff (Linter)
         run: |
