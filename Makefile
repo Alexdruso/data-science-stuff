@@ -11,6 +11,9 @@ help:
 	@echo "  make dev-setup  - Create virtualenv and install all dependencies with uv"
 	@echo "  make py-fmt     - Format code with ruff"
 	@echo "  make py-static  - Run static type checking with mypy"
+	@echo "  make test       - Run test suite with coverage"
+	@echo "  make lint       - Check formatting and linting without fixing"
+	@echo "  make check      - Run pre-commit hooks on all files"
 	@echo "  make clean      - Remove virtual environment and cache files"
 
 # Ensure virtual environment exists
@@ -35,6 +38,22 @@ py-fmt: $(VENV_DIR)
 .PHONY: py-static
 py-static: $(VENV_DIR)
 	$(VENV_BIN)/mypy .
+
+# Run tests with coverage
+.PHONY: test
+test: $(VENV_DIR)
+	$(VENV_BIN)/pytest
+
+# Check formatting and linting (no auto-fix)
+.PHONY: lint
+lint: $(VENV_DIR)
+	$(VENV_BIN)/ruff format --check .
+	$(VENV_BIN)/ruff check .
+
+# Run pre-commit hooks on all files
+.PHONY: check
+check: $(VENV_DIR)
+	$(VENV_BIN)/pre-commit run --all-files
 
 # Clean up
 .PHONY: clean
