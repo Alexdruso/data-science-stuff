@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wait)",
+      "Bash(unzip -t /home/alexdruso/Desktop/data-science-stuff/playground-series-s6e4/data/playground-series-s6e4.zip)",
+      "Bash(unzip -o /home/alexdruso/Desktop/data-science-stuff/playground-series-s6e4/data/playground-series-s6e4.zip -d /home/alexdruso/Desktop/data-science-stuff/playground-series-s6e4/data/)"
+    ]
+  }
+}
