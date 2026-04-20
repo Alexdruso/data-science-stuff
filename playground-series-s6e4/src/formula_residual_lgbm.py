@@ -10,9 +10,11 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import LabelEncoder
 
 from formula import CLASSES, COEFS, INTERCEPTS, build_features
+from cv_results import save_cv_result
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
+RESULTS_DIR = Path(__file__).parent.parent / "results"
 
 TARGET = "Irrigation_Need"
 N_FOLDS = 5
@@ -79,6 +81,7 @@ def main() -> None:
     skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=42)
     oof_proba = np.zeros((len(X), len(le.classes_)))
     test_proba = np.zeros((len(X_test), len(le.classes_)))
+    fold_accs: list[float] = []
 
     cat_feature_names = [c for c in DEOTTE_FEATURES if c in CAT_COLS]
 
@@ -124,10 +127,11 @@ def main() -> None:
         oof_proba[val_idx] = softmax(raw_val)
         test_proba += softmax(raw_test) / N_FOLDS
 
-        fold_acc = (oof_proba[val_idx].argmax(1) == y_val).mean()
+        fold_acc = float((oof_proba[val_idx].argmax(1) == y_val).mean())
+        fold_accs.append(fold_acc)
         print(f"  Fold {fold} accuracy: {fold_acc:.4f}")
 
-    oof_acc = (oof_proba.argmax(1) == y).mean()
+    oof_acc = float((oof_proba.argmax(1) == y).mean())
     print(f"\nOOF accuracy: {oof_acc:.4f}")
 
     predictions = le.inverse_transform(test_proba.argmax(1))
@@ -135,6 +139,8 @@ def main() -> None:
     out_path = SUBMISSIONS_DIR / "formula_residual_lgbm.csv"
     pd.DataFrame({"id": test_ids, TARGET: predictions}).to_csv(out_path, index=False)
     print(f"Submission saved → {out_path}")
+
+    save_cv_result(RESULTS_DIR, "formula_residual_lgbm", fold_accs, oof_acc)
 
 
 if __name__ == "__main__":
