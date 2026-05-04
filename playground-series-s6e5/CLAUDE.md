@@ -139,6 +139,27 @@ match to within <1 percentage point.
 - `LapTime_Delta` rolling mean (smooth out noise)
 - `Cumulative_Degradation / TyreLife` ratio (degradation rate)
 
+### Tried & flat (v2 + v3)
+- v2 polynomial/interaction transforms: −0.0001 delta. LightGBM finds these internally.
+- v3 group aggregates (driver/race/compound pit rates + median TyreLife at pit): −0.0002.
+  Even with 887 drivers and Laplace smoothing, no gain.
+
+**Plateau diagnosis**: Three versions stall at 0.9431–0.9433. The likely culprit is the
+2023 anomaly — 31% of training rows (136k) carry near-zero pit rates. Even with `is_2023`
+flagging, the model trains on misleading signal for over a quarter of its data.
+
+**Dropping 2023 result (v4)**: OOF AUC crashed to 0.9147 (−0.029). Confirmed —
+2023 must stay in training. The `is_2023` flag lets the model *use* the 2023 rows
+constructively: it learns "when is_2023=1, predict near-zero", freeing the rest of the
+model to focus on genuine pit patterns. Removing those rows also removes feature-space
+coverage and the calibration signal from 136k clean negative examples.
+
+**Revised diagnosis**: The plateau at 0.9431–0.9433 is not caused by 2023 noise.
+The model has likely hit the ceiling of what row-level features can provide.
+Next levers to try: (1) LightGBM hyperparameter tuning (num_leaves, min_data_in_leaf,
+lambda), (2) within-stint rolling features (cumulative lap time relative to stint start),
+(3) XGBoost / CatBoost comparison. **v3 remains best submission**.
+
 ---
 
 ## Modelling Notes
@@ -154,4 +175,7 @@ match to within <1 percentage point.
 
 | Date | Script | Description | OOF AUC |
 |---|---|---|---|
-| — | baseline_lgbm | LightGBM baseline, raw features | TBD |
+| 2026-05-04 | baseline_lgbm_v1 | LightGBM 5-fold, raw features + `is_2023` + `TyreLife_sq` | **0.9433** |
+| 2026-05-04 | baseline_lgbm_v2 | v1 + `TyreLife_log`, `compound_ord`, `tyre_life_x_compound`, `race_progress_x_stint`, `degradation_rate`, `lap_time_delta_roll3` | **0.9432** (flat) |
+| 2026-05-04 | baseline_lgbm_v3 | v2 + 5 group aggregates: `driver_pit_rate`, `driver_compound_pit_rate`, `race_compound_pit_rate`, `driver/race_compound_median_tyre_life_at_pit` (α=20 smoothing, excl. 2023) | **0.9431** (flat) |
+| 2026-05-04 | baseline_lgbm_v4 | v3 but DROP 2023 from training entirely | **0.9147** (−0.029 — worse!) |

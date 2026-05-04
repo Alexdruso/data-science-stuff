@@ -26,10 +26,10 @@ N_FOLDS = 10
 
 # Search grid — centred on Deotte originals, wider for Rainfall_mm
 # (error analysis showed it has the highest boundary-error rate)
-SOIL_GRID = np.arange(18.0, 33.0, 1.0)      # 15 values  [18 .. 32]
-TEMP_GRID = np.arange(26.0, 36.0, 1.0)      # 10 values  [26 .. 35]
-RAIN_GRID = np.arange(200.0, 410.0, 10.0)   # 21 values  [200 .. 400]
-WIND_GRID = np.arange(6.0, 16.0, 1.0)       # 10 values  [6 .. 15]
+SOIL_GRID = np.arange(18.0, 33.0, 1.0)  # 15 values  [18 .. 32]
+TEMP_GRID = np.arange(26.0, 36.0, 1.0)  # 10 values  [26 .. 35]
+RAIN_GRID = np.arange(200.0, 410.0, 10.0)  # 21 values  [200 .. 400]
+WIND_GRID = np.arange(6.0, 16.0, 1.0)  # 10 values  [6 .. 15]
 
 TOTAL_COMBOS = len(SOIL_GRID) * len(TEMP_GRID) * len(RAIN_GRID) * len(WIND_GRID)
 
@@ -47,19 +47,23 @@ def main() -> None:
 
     # Target — encode to match CLASSES order: Low=0, Medium=1, High=2
     cls_to_idx = {c: i for i, c in enumerate(CLASSES)}
-    y = np.array([cls_to_idx[v] for v in train["Irrigation_Need"].to_list()], dtype=np.int8)
+    y = np.array(
+        [cls_to_idx[v] for v in train["Irrigation_Need"].to_list()], dtype=np.int8
+    )
 
     # Precompute fixed (categorical) binary columns — these never change
     cgs = train["Crop_Growth_Stage"].to_numpy()
     mulch = train["Mulching_Used"].to_numpy()
-    fixed_cols = np.column_stack([
-        (cgs == "Flowering").astype(np.int8),
-        (cgs == "Harvest").astype(np.int8),
-        (cgs == "Sowing").astype(np.int8),
-        (cgs == "Vegetative").astype(np.int8),
-        (mulch == "No").astype(np.int8),
-        (mulch == "Yes").astype(np.int8),
-    ])  # shape (n, 6)
+    fixed_cols = np.column_stack(
+        [
+            (cgs == "Flowering").astype(np.int8),
+            (cgs == "Harvest").astype(np.int8),
+            (cgs == "Sowing").astype(np.int8),
+            (cgs == "Vegetative").astype(np.int8),
+            (mulch == "No").astype(np.int8),
+            (mulch == "Yes").astype(np.int8),
+        ]
+    )  # shape (n, 6)
 
     # Precompute raw numeric arrays (avoid repeated .to_numpy() in loop)
     soil_raw = train["Soil_Moisture"].to_numpy()
@@ -72,13 +76,15 @@ def main() -> None:
     folds = list(skf.split(np.zeros(n), y))
 
     # Baseline (Deotte originals)
-    baseline_X = np.column_stack([
-        (soil_raw < 25).astype(np.int8),
-        (temp_raw > 30).astype(np.int8),
-        (rain_raw < 300).astype(np.int8),
-        (wind_raw > 10).astype(np.int8),
-        fixed_cols,
-    ])
+    baseline_X = np.column_stack(
+        [
+            (soil_raw < 25).astype(np.int8),
+            (temp_raw > 30).astype(np.int8),
+            (rain_raw < 300).astype(np.int8),
+            (wind_raw > 10).astype(np.int8),
+            fixed_cols,
+        ]
+    )
     baseline_logits = INTERCEPTS + baseline_X @ COEFS
     baseline_preds = _softmax_argmax(baseline_logits)
     baseline_acc = float((baseline_preds == y).mean())
@@ -94,19 +100,20 @@ def main() -> None:
     for i, (soil_t, temp_t, rain_t, wind_t) in enumerate(
         itertools.product(SOIL_GRID, TEMP_GRID, RAIN_GRID, WIND_GRID), 1
     ):
-        X = np.column_stack([
-            (soil_raw < soil_t).astype(np.int8),
-            (temp_raw > temp_t).astype(np.int8),
-            (rain_raw < rain_t).astype(np.int8),
-            (wind_raw > wind_t).astype(np.int8),
-            fixed_cols,
-        ])
+        X = np.column_stack(
+            [
+                (soil_raw < soil_t).astype(np.int8),
+                (temp_raw > temp_t).astype(np.int8),
+                (rain_raw < rain_t).astype(np.int8),
+                (wind_raw > wind_t).astype(np.int8),
+                fixed_cols,
+            ]
+        )
         logits = INTERCEPTS + X @ COEFS
         preds = _softmax_argmax(logits)
 
         fold_accs = [
-            float((preds[val_idx] == y[val_idx]).mean())
-            for _, val_idx in folds
+            float((preds[val_idx] == y[val_idx]).mean()) for _, val_idx in folds
         ]
         oof_acc = float(np.mean(fold_accs))
         results.append((oof_acc, soil_t, temp_t, rain_t, wind_t))
@@ -129,14 +136,18 @@ def main() -> None:
 
     # Sort and print top 10
     results.sort(reverse=True)
-    print(f"\n{'Rank':<5} {'OOF Acc':>10} {'Soil<':>7} {'Temp>':>7} {'Rain<':>7} {'Wind>':>7}")
+    print(
+        f"\n{'Rank':<5} {'OOF Acc':>10} {'Soil<':>7} {'Temp>':>7} {'Rain<':>7} {'Wind>':>7}"
+    )
     for rank, (acc, s, t, r, w) in enumerate(results[:10], 1):
         marker = " ← best" if rank == 1 else ""
         print(f"{rank:<5} {acc:>10.6f} {s:>7.1f} {t:>7.1f} {r:>7.1f} {w:>7.1f}{marker}")
 
     soil_t, temp_t, rain_t, wind_t = best_params
     delta = best_acc - baseline_acc
-    print(f"\nBest thresholds : Soil_Moisture < {soil_t}  |  Temperature_C > {temp_t}  |  Rainfall_mm < {rain_t}  |  Wind_Speed_kmh > {wind_t}")
+    print(
+        f"\nBest thresholds : Soil_Moisture < {soil_t}  |  Temperature_C > {temp_t}  |  Rainfall_mm < {rain_t}  |  Wind_Speed_kmh > {wind_t}"
+    )
     print(f"Best OOF acc    : {best_acc:.6f}  (Δ {delta:+.6f} vs Deotte baseline)")
 
     # Save to cv_scores
@@ -144,7 +155,11 @@ def main() -> None:
 
     # Save full results table
     import pandas as pd
-    df_out = pd.DataFrame(results, columns=["oof_acc", "soil_thresh", "temp_thresh", "rain_thresh", "wind_thresh"])
+
+    df_out = pd.DataFrame(
+        results,
+        columns=["oof_acc", "soil_thresh", "temp_thresh", "rain_thresh", "wind_thresh"],
+    )
     out_path = RESULTS_DIR / "threshold_search.csv"
     df_out.to_csv(out_path, index=False)
     print(f"Full results saved → {out_path}")

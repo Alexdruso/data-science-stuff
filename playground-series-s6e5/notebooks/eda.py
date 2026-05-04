@@ -49,10 +49,7 @@ print(train.select(NUM_FEATURES + [TARGET]).describe())
 
 # %% Target distribution
 target_counts = (
-    train.group_by(TARGET)
-    .agg(pl.len().alias("count"))
-    .sort(TARGET)
-    .to_pandas()
+    train.group_by(TARGET).agg(pl.len().alias("count")).sort(TARGET).to_pandas()
 )
 total = target_counts["count"].sum()
 target_counts["pct"] = target_counts["count"] / total * 100
@@ -78,6 +75,7 @@ ax.set_title("Target Distribution")
 ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"{int(x):,}"))
 plt.tight_layout()
 plt.show()
+
 
 # %% Categorical features — count + pit rate
 def plot_cat_pit_rate(
@@ -107,7 +105,9 @@ def plot_cat_pit_rate(
     ax1.set_xticklabels(agg[col].astype(str), rotation=45, ha="right")
 
     ax2 = ax1.twinx()
-    ax2.plot(x, agg["pit_rate"], color="#d65f5f", marker="o", linewidth=2, label="Pit rate")
+    ax2.plot(
+        x, agg["pit_rate"], color="#d65f5f", marker="o", linewidth=2, label="Pit rate"
+    )
     ax2.set_ylabel("Pit Rate", color="#d65f5f")
     ax2.tick_params(axis="y", labelcolor="#d65f5f")
     ax2.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1, decimals=1))
@@ -119,7 +119,9 @@ def plot_cat_pit_rate(
 
 plot_cat_pit_rate(train, "Compound", top_n=4, title="Compound — count & pit rate")
 plot_cat_pit_rate(train, "Year", top_n=10, title="Year — count & pit rate")
-plot_cat_pit_rate(train, "Driver", top_n=20, title="Driver — top 20 by count & pit rate")
+plot_cat_pit_rate(
+    train, "Driver", top_n=20, title="Driver — top 20 by count & pit rate"
+)
 plot_cat_pit_rate(train, "Race", top_n=20, title="Race — top 20 by count & pit rate")
 
 # %% Numeric feature distributions — by target
@@ -177,6 +179,7 @@ ax.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1, decimals=1))
 plt.tight_layout()
 plt.show()
 
+
 # %% TyreLife & RaceProgress vs pit rate
 def plot_binned_pit_rate(
     df: pl.DataFrame,
@@ -184,24 +187,47 @@ def plot_binned_pit_rate(
     n_bins: int = 20,
 ) -> None:
     pdf = df.select([col, TARGET]).to_pandas()
-    pdf["bin"] = pl.Series(
-        (df[col] - df[col].min()) / (df[col].max() - df[col].min()) * n_bins
-    ).cast(pl.Int32).clip(0, n_bins - 1).to_pandas()
+    pdf["bin"] = (
+        pl.Series((df[col] - df[col].min()) / (df[col].max() - df[col].min()) * n_bins)
+        .cast(pl.Int32)
+        .clip(0, n_bins - 1)
+        .to_pandas()
+    )
 
-    binned = pdf.groupby("bin", observed=True).agg(
-        pit_rate=(TARGET, "mean"),
-        count=(TARGET, "count"),
-        bin_mid=(col, "mean"),
-    ).sort_values("bin")
+    binned = (
+        pdf.groupby("bin", observed=True)
+        .agg(
+            pit_rate=(TARGET, "mean"),
+            count=(TARGET, "count"),
+            bin_mid=(col, "mean"),
+        )
+        .sort_values("bin")
+    )
 
     fig, ax1 = plt.subplots(figsize=(10, 4))
-    ax1.bar(binned["bin_mid"], binned["count"], width=(binned["bin_mid"].iloc[1] - binned["bin_mid"].iloc[0]) * 0.8 if len(binned) > 1 else 1, alpha=0.4, color="#4878cf", label="Count")
+    ax1.bar(
+        binned["bin_mid"],
+        binned["count"],
+        width=(binned["bin_mid"].iloc[1] - binned["bin_mid"].iloc[0]) * 0.8
+        if len(binned) > 1
+        else 1,
+        alpha=0.4,
+        color="#4878cf",
+        label="Count",
+    )
     ax1.set_xlabel(col)
     ax1.set_ylabel("Count", color="#4878cf")
     ax1.tick_params(axis="y", labelcolor="#4878cf")
 
     ax2 = ax1.twinx()
-    ax2.plot(binned["bin_mid"], binned["pit_rate"], color="#d65f5f", marker="o", linewidth=2, label="Pit rate")
+    ax2.plot(
+        binned["bin_mid"],
+        binned["pit_rate"],
+        color="#d65f5f",
+        marker="o",
+        linewidth=2,
+        label="Pit rate",
+    )
     ax2.set_ylabel("Pit Rate", color="#d65f5f")
     ax2.tick_params(axis="y", labelcolor="#d65f5f")
     ax2.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1, decimals=1))
@@ -238,6 +264,7 @@ ax.set_title("Pearson Correlation Matrix (train)")
 plt.tight_layout()
 plt.show()
 
+
 # %% Train vs Test distribution check
 def plot_train_test_kde(
     train_df: pl.DataFrame,
@@ -254,8 +281,22 @@ def plot_train_test_kde(
 
     for i, feat in enumerate(features):
         ax = axes_flat[i]
-        ax.hist(train_pd[feat].dropna(), bins=40, alpha=0.5, density=True, color="#4878cf", label="Train")
-        ax.hist(test_pd[feat].dropna(), bins=40, alpha=0.5, density=True, color="#d65f5f", label="Test")
+        ax.hist(
+            train_pd[feat].dropna(),
+            bins=40,
+            alpha=0.5,
+            density=True,
+            color="#4878cf",
+            label="Train",
+        )
+        ax.hist(
+            test_pd[feat].dropna(),
+            bins=40,
+            alpha=0.5,
+            density=True,
+            color="#d65f5f",
+            label="Test",
+        )
         ax.set_title(feat)
         ax.legend(fontsize=8)
 
@@ -274,12 +315,16 @@ for col in ["Compound", "Year"]:
     train_vc = (
         train.group_by(col)
         .agg(pl.len().alias("train_count"))
-        .with_columns((pl.col("train_count") / pl.col("train_count").sum()).alias("train_pct"))
+        .with_columns(
+            (pl.col("train_count") / pl.col("train_count").sum()).alias("train_pct")
+        )
     )
     test_vc = (
         test.group_by(col)
         .agg(pl.len().alias("test_count"))
-        .with_columns((pl.col("test_count") / pl.col("test_count").sum()).alias("test_pct"))
+        .with_columns(
+            (pl.col("test_count") / pl.col("test_count").sum()).alias("test_pct")
+        )
     )
     joined = train_vc.join(test_vc, on=col, how="full").sort(col)
     print(f"\n{col} — train vs test proportions:")

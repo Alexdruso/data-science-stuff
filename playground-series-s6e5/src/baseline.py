@@ -1,5 +1,6 @@
 """Baseline LightGBM model for PS S6E5 - Predicting F1 Pit Stops."""
 
+import json
 import sys
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from sklearn.model_selection import StratifiedKFold
 
 sys.path.insert(0, str(Path(__file__).parent))
 from cv_results import save_cv_result
+from features import build_features, compute_group_features
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
@@ -33,6 +35,17 @@ LGBM_PARAMS: dict[str, object] = {
 }
 
 
+def load_params() -> dict[str, object]:
+    params_path = RESULTS_DIR / "best_params.json"
+    base: dict[str, object] = dict(LGBM_PARAMS)
+    if params_path.exists():
+        with params_path.open() as f:
+            tuned = json.load(f)
+        base.update(tuned)
+        print(f"Loaded tuned params from {params_path}")
+    return base
+
+
 def load_data() -> tuple[pl.DataFrame, pl.DataFrame]:
     train = pl.read_csv(DATA_DIR / "train.csv")
     test = pl.read_csv(DATA_DIR / "test.csv")
@@ -48,7 +61,11 @@ def to_pandas(df: pl.DataFrame, cat_cols: list[str]) -> pd.DataFrame:
 
 
 def main() -> None:
-    train_pl, test_pl = load_data()
+    train_pl_raw, test_pl = load_data()
+    train_pl = build_features(train_pl_raw)
+    test_pl = build_features(test_pl)
+    train_pl = compute_group_features(train_pl_raw, train_pl)
+    test_pl = compute_group_features(train_pl_raw, test_pl)
     print(f"Train: {train_pl.shape}, Test: {test_pl.shape}")
 
     cat_cols = [
@@ -66,6 +83,7 @@ def main() -> None:
     X_test = test[feature_cols]
     test_ids = test["id"].to_numpy()
 
+    params = load_params()
     skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=42)
     oof_proba = np.zeros(len(X))
     test_proba = np.zeros(len(X_test))
@@ -75,7 +93,7 @@ def main() -> None:
         X_tr, X_val = X.iloc[train_idx], X.iloc[val_idx]
         y_tr, y_val = y[train_idx], y[val_idx]
 
-        model = LGBMClassifier(**LGBM_PARAMS)
+        model = LGBMClassifier(**params)
         model.fit(
             X_tr,
             y_tr,
@@ -94,11 +112,11 @@ def main() -> None:
     oof_auc = float(roc_auc_score(y, oof_proba))
     print(f"\nOOF AUC: {oof_auc:.4f}")
 
-    save_cv_result(RESULTS_DIR, "baseline_lgbm", fold_aucs, oof_auc)
+    save_cv_result(RESULTS_DIR, "baseline_lgbm_v5", fold_aucs, oof_auc)
 
     SUBMISSIONS_DIR.mkdir(exist_ok=True)
     submission = pd.DataFrame({"id": test_ids, TARGET: test_proba})
-    out_path = SUBMISSIONS_DIR / "baseline_lgbm.csv"
+    out_path = SUBMISSIONS_DIR / "baseline_lgbm_v5.csv"
     submission.to_csv(out_path, index=False)
     print(f"Submission saved → {out_path}")
 

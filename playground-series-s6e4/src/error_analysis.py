@@ -95,7 +95,9 @@ def main() -> None:
     correct_df = train.filter(pl.Series(correct_mask))
 
     pred_series = pl.Series("pred", preds)
-    errors_df = errors_df.with_columns(pred_series.filter(pl.Series(error_mask)).alias("pred"))
+    errors_df = errors_df.with_columns(
+        pred_series.filter(pl.Series(error_mask)).alias("pred")
+    )
 
     # ------------------------------------------------------------------ #
     # 1. Which (true, pred) pairs are confused?
