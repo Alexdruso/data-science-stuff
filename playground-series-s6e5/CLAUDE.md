@@ -179,3 +179,4 @@ lambda), (2) within-stint rolling features (cumulative lap time relative to stin
 | 2026-05-04 | baseline_lgbm_v2 | v1 + `TyreLife_log`, `compound_ord`, `tyre_life_x_compound`, `race_progress_x_stint`, `degradation_rate`, `lap_time_delta_roll3` | **0.9432** (flat) |
 | 2026-05-04 | baseline_lgbm_v3 | v2 + 5 group aggregates: `driver_pit_rate`, `driver_compound_pit_rate`, `race_compound_pit_rate`, `driver/race_compound_median_tyre_life_at_pit` (α=20 smoothing, excl. 2023) | **0.9431** (flat) |
 | 2026-05-04 | baseline_lgbm_v4 | v3 but DROP 2023 from training entirely | **0.9147** (−0.029 — worse!) |
+| 2026-05-05 | baseline_lgbm_v5 | v1 features + Optuna-tuned params (50 trials, 3-fold): num_leaves=490, lr=0.023, min_child_samples=146, reg_lambda=4.5 | **0.9480** (+0.0047 — new best) |

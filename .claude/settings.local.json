@@ -10,7 +10,17 @@
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
-      "Bash(.venv/bin/uv pip *)"
+      "Bash(.venv/bin/uv pip *)",
+      "Bash(/home/alexdruso/Desktop/data-science-stuff/.venv/bin/python *)",
+      "Bash(pip --version)",
+      "Bash(pip3 --version)",
+      "Bash(uv --version)",
+      "Bash(python3 *)",
+      "Bash(apt list *)",
+      "Bash(dpkg -l python3-pip)",
+      "Bash(pip show *)",
+      "Bash(unzip -q playground-series-s6e5.zip)",
+      "Bash(rm playground-series-s6e5.zip)"
     ]
   }
 }
