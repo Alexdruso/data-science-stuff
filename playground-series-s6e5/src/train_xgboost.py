@@ -23,6 +23,7 @@ TARGET = "PitNextLap"
 N_FOLDS = 5
 FIXED_PARAMS: dict[str, object] = {
     "n_estimators": 1000,
+    "device": "cuda",
     "tree_method": "hist",
     "enable_categorical": True,
     "eval_metric": "auc",
@@ -31,17 +32,28 @@ FIXED_PARAMS: dict[str, object] = {
     "verbosity": 0,
     "random_state": 42,
 }
+# Sensible defaults used when best_params_xgboost.json is absent
+DEFAULT_PARAMS: dict[str, object] = {
+    "max_depth": 9,
+    "learning_rate": 0.05,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "reg_alpha": 0.1,
+    "reg_lambda": 5.0,
+    "min_child_weight": 10,
+    "gamma": 0.0,
+}
 
 
 def load_params() -> dict[str, object]:
     params_path = RESULTS_DIR / "best_params_xgboost.json"
-    base: dict[str, object] = dict(FIXED_PARAMS)
+    base: dict[str, object] = {**FIXED_PARAMS, **DEFAULT_PARAMS}
     if params_path.exists():
         with params_path.open() as f:
             base.update(json.load(f))
         print(f"Loaded tuned params from {params_path}")
     else:
-        print("No tuned params found — using defaults")
+        print("No tuned params found — using sensible defaults")
     return base
 
 

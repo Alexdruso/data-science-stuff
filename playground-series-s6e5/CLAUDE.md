@@ -216,6 +216,12 @@ Mexico City GP (0.9167, low pit rate 9.1%)
 3. **The real competition ceiling is ~0.922**, not 0.948 — improvements in Year 2022
    and fresh tyres are the highest-value targets
 
+### Ensemble findings (2026-05-05)
+- LGBM + CatBoost blend gives +0.0005–0.0007 OOF AUC over LGBM alone
+- XGBoost with default params adds no value (zeroed out by optimizer every time)
+- **Next step: GPU-tune CatBoost + XGBoost** (~1–2 min/trial on RTX 2060 vs 8–10 min on CPU)
+  — full 50-trial Optuna run now feasible in ~1 hour each
+
 ---
 
 ## Modelling Notes
@@ -237,3 +243,7 @@ Mexico City GP (0.9167, low pit rate 9.1%)
 | 2026-05-04 | baseline_lgbm_v4 | v3 but DROP 2023 from training entirely | **0.9147** (−0.029 — worse!) |
 | 2026-05-05 | baseline_lgbm_v5 | v1 features + Optuna-tuned params (50 trials, 3-fold): num_leaves=490, lr=0.023, min_child_samples=146, reg_lambda=4.5 | **0.9480** (+0.0047 — new best) |
 | 2026-05-05 | baseline_lgbm_v6 | v5 + 7 sequential features: lag1/2/3 of LapTime_Delta, roll7 LapTime_Delta, roll5 LapTime (s), pace anomaly (LapTime vs roll5) | **0.9477** (−0.0003 — flat) |
+| 2026-05-05 | baseline_lgbm_v7 | same as v5, adds npy saving for ensemble | **0.9477** |
+| 2026-05-05 | catboost_v1 | CatBoost GPU, sensible defaults (depth=8, lr=0.05, l2=5) | **0.9471** |
+| 2026-05-05 | xgboost_v1 | XGBoost GPU, sensible defaults (max_depth=9, lr=0.05, reg_lambda=5) | **0.9456** |
+| 2026-05-05 | ensemble_lgbm_catboost_xgboost_v1 | Optimized blend: LGBM 56.5% + CatBoost 43.5% + XGBoost 0% | **0.9485** (+0.0005 vs LGBM) |

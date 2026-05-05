@@ -11,6 +11,7 @@ from sklearn.metrics import roc_auc_score
 
 sys.path.insert(0, str(Path(__file__).parent))
 from cv_results import save_cv_result
+from features import build_features, compute_group_features
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
@@ -32,7 +33,9 @@ def neg_ensemble_auc(
 
 
 def main() -> None:
-    train = pl.read_csv(DATA_DIR / "train.csv")
+    train_raw = pl.read_csv(DATA_DIR / "train.csv")
+    train = build_features(train_raw)
+    train = compute_group_features(train_raw, train)
     y = train[TARGET].to_numpy()
     test_ids = pl.read_csv(DATA_DIR / "test.csv")["id"].to_numpy()
 

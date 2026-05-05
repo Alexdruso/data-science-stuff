@@ -26,20 +26,30 @@ FIXED_PARAMS: dict[str, object] = {
     "eval_metric": "AUC",
     "use_best_model": True,
     "early_stopping_rounds": 50,
+    "task_type": "GPU",
     "verbose": 0,
     "random_seed": 42,
+}
+# Sensible defaults used when best_params_catboost.json is absent
+DEFAULT_PARAMS: dict[str, object] = {
+    "depth": 8,
+    "learning_rate": 0.05,
+    "l2_leaf_reg": 5.0,
+    "bagging_temperature": 0.5,
+    "random_strength": 1.0,
+    "min_data_in_leaf": 50,
 }
 
 
 def load_params() -> dict[str, object]:
     params_path = RESULTS_DIR / "best_params_catboost.json"
-    base: dict[str, object] = dict(FIXED_PARAMS)
+    base: dict[str, object] = {**FIXED_PARAMS, **DEFAULT_PARAMS}
     if params_path.exists():
         with params_path.open() as f:
             base.update(json.load(f))
         print(f"Loaded tuned params from {params_path}")
     else:
-        print("No tuned params found — using defaults")
+        print("No tuned params found — using sensible defaults")
     return base
 
 

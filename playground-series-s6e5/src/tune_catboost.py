@@ -26,6 +26,7 @@ FIXED_PARAMS: dict[str, object] = {
     "eval_metric": "AUC",
     "use_best_model": True,
     "early_stopping_rounds": 50,
+    "task_type": "GPU",
     "verbose": 0,
     "random_seed": 42,
 }

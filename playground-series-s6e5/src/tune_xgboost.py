@@ -23,6 +23,7 @@ N_FOLDS = 3
 N_TRIALS = 50
 FIXED_PARAMS: dict[str, object] = {
     "n_estimators": 1000,
+    "device": "cuda",
     "tree_method": "hist",
     "enable_categorical": True,
     "eval_metric": "auc",
