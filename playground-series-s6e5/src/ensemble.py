@@ -1,4 +1,4 @@
-"""Blend LGBM + CatBoost + XGBoost OOF predictions and build final submission."""
+"""Blend LGBM + CatBoost + XGBoost + MLP OOF predictions and build final submission."""
 
 import sys
 from pathlib import Path
@@ -18,7 +18,7 @@ SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
 RESULTS_DIR = Path(__file__).parent.parent / "results"
 TARGET = "PitNextLap"
 
-MODELS = ["lgbm", "catboost", "xgboost"]
+MODELS = ["lgbm", "catboost", "xgboost", "mlp"]
 
 
 def neg_ensemble_auc(

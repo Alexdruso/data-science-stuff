@@ -127,6 +127,9 @@ def compute_group_features(
     race_compound_tyre = pit_rows.group_by(["Race", "Compound"]).agg(
         pl.col("TyreLife").median().alias("race_compound_median_tyre_life_at_pit")
     )
+    compound_tyre = pit_rows.group_by("Compound").agg(
+        pl.col("TyreLife").median().alias("compound_typical_life")
+    )
 
     return (
         df.join(driver_rate, on="Driver", how="left")
@@ -134,6 +137,7 @@ def compute_group_features(
         .join(race_compound_rate, on=["Race", "Compound"], how="left")
         .join(driver_tyre, on="Driver", how="left")
         .join(race_compound_tyre, on=["Race", "Compound"], how="left")
+        .join(compound_tyre, on="Compound", how="left")
         .with_columns(
             [
                 pl.col("driver_pit_rate").fill_null(global_rate),
@@ -143,6 +147,11 @@ def compute_group_features(
                 pl.col("race_compound_median_tyre_life_at_pit").fill_null(
                     global_tyre_median
                 ),
+                pl.col("compound_typical_life").fill_null(global_tyre_median),
             ]
         )
+        .with_columns(
+            (pl.col("TyreLife") / pl.col("compound_typical_life")).alias("TyreLife_frac")
+        )
+        .drop("compound_typical_life")
     )

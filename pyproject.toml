@@ -46,6 +46,7 @@ dependencies = [
     "catboost>=1.2.0",
     "optuna>=3.0.0",
     "shap>=0.44.0",
+    "torch>=2.4.0",
 ]
 
 [project.optional-dependencies]
