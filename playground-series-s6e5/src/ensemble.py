@@ -37,7 +37,9 @@ def main() -> None:
     train = build_features(train_raw)
     train = compute_group_features(train_raw, train)
     y = train[TARGET].to_numpy()
-    test_ids = pl.read_csv(DATA_DIR / "test.csv")["id"].to_numpy()
+    # Must go through build_features so IDs are in the same sorted order
+    # as the test_{model}.npy prediction arrays.
+    test_ids = build_features(pl.read_csv(DATA_DIR / "test.csv"))["id"].to_numpy()
 
     oofs, tests = [], []
     for model in MODELS:

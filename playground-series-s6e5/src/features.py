@@ -36,6 +36,11 @@ def build_features(df: pl.DataFrame) -> pl.DataFrame:
             (pl.col("Cumulative_Degradation") / (pl.col("TyreLife") + 1)).alias(
                 "degradation_rate"
             ),
+            (
+                pl.col("LapNumber")
+                * (1 - pl.col("RaceProgress"))
+                / pl.col("RaceProgress").clip(lower_bound=0.01)
+            ).alias("est_laps_remaining"),
         ]
     ).with_columns(
         [
@@ -69,6 +74,8 @@ def build_features(df: pl.DataFrame) -> pl.DataFrame:
             pl.col("lap_time_delta_lag2").fill_null(0),
             pl.col("lap_time_delta_lag3").fill_null(0),
         ]
+    ).with_columns(
+        (pl.col("lap_time_vs_roll5") / pl.col("lap_time_s_roll5")).alias("pace_anomaly_pct"),
     )
 
 
@@ -154,4 +161,15 @@ def compute_group_features(
             (pl.col("TyreLife") / pl.col("compound_typical_life")).alias("TyreLife_frac")
         )
         .drop("compound_typical_life")
+        .with_columns(
+            [
+                (
+                    pl.col("race_compound_median_tyre_life_at_pit") - pl.col("TyreLife")
+                ).alias("window_gap"),
+                (
+                    (pl.col("TyreLife") - pl.col("race_compound_median_tyre_life_at_pit"))
+                    .clip(lower_bound=0.0)
+                ).alias("laps_past_window"),
+            ]
+        )
     )

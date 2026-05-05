@@ -1,5 +1,6 @@
 """PyTorch MLP 5-fold CV training for PS S6E5 — F1 Pit Stop Prediction."""
 
+import json
 import sys
 from pathlib import Path
 
@@ -24,29 +25,60 @@ TARGET = "PitNextLap"
 N_FOLDS = 5
 BATCH_SIZE = 8192
 EPOCHS = 100
-LR = 1e-3
 PATIENCE = 10
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+DEFAULT_PARAMS: dict[str, object] = {
+    "n_layers": 3,
+    "first_size": 512,
+    "shrink": 0.5,
+    "dropout": 0.2,
+    "lr": 1e-3,
+    "weight_decay": 1e-4,
+    "activation": "relu",
+}
+
+
+def load_params() -> dict[str, object]:
+    p = RESULTS_DIR / "best_params_mlp.json"
+    if p.exists():
+        with p.open() as f:
+            return json.load(f)  # type: ignore[no-any-return]
+    return DEFAULT_PARAMS
+
+
+def build_layer_sizes(params: dict[str, object]) -> list[int]:
+    n = int(params["n_layers"])  # type: ignore[arg-type]
+    first = int(params["first_size"])  # type: ignore[arg-type]
+    shrink = float(params["shrink"])  # type: ignore[arg-type]
+    sizes = [first]
+    for _ in range(n - 1):
+        sizes.append(max(32, int(sizes[-1] * shrink)))
+    return sizes
+
 
 class MLP(nn.Module):
-    def __init__(self, n_features: int) -> None:
+    def __init__(
+        self,
+        n_features: int,
+        layer_sizes: list[int],
+        dropout: float,
+        use_gelu: bool,
+    ) -> None:
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(n_features, 512),
-            nn.BatchNorm1d(512),
-            nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(512, 256),
-            nn.BatchNorm1d(256),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(256, 128),
-            nn.BatchNorm1d(128),
-            nn.ReLU(),
-            nn.Dropout(0.1),
-            nn.Linear(128, 1),
-        )
+        act_cls: type[nn.Module] = nn.GELU if use_gelu else nn.ReLU
+        layers: list[nn.Module] = []
+        in_size = n_features
+        for size in layer_sizes:
+            layers += [
+                nn.Linear(in_size, size),
+                nn.BatchNorm1d(size),
+                act_cls(),
+                nn.Dropout(dropout),
+            ]
+            in_size = size
+        layers.append(nn.Linear(in_size, 1))
+        self.net = nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.net(x).squeeze(1)
@@ -65,7 +97,6 @@ def prepare_arrays(
     train_pd = train_pl.to_pandas()
     test_pd = test_pl.to_pandas()
 
-    # Label-encode categoricals (consistent across train+test)
     for col in cat_cols:
         le = LabelEncoder()
         combined = pd.concat([train_pd[col], test_pd[col]], ignore_index=True)
@@ -88,6 +119,7 @@ def train_fold(
     X_test: np.ndarray,
     num_idx: list[int],
     cat_idx: list[int],
+    params: dict[str, object],
 ) -> tuple[np.ndarray, np.ndarray]:
     pt = PowerTransformer(method="yeo-johnson", standardize=True)
     sc = StandardScaler()
@@ -106,8 +138,14 @@ def train_fold(
 
     X_tr, X_val = X_tr_s, X_val_s
 
-    model = MLP(X_tr.shape[1]).to(DEVICE)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=LR, weight_decay=1e-4)
+    layer_sizes = build_layer_sizes(params)
+    dropout = float(params["dropout"])  # type: ignore[arg-type]
+    use_gelu = params["activation"] == "gelu"
+    lr = float(params["lr"])  # type: ignore[arg-type]
+    weight_decay = float(params["weight_decay"])  # type: ignore[arg-type]
+
+    model = MLP(X_tr.shape[1], layer_sizes, dropout, use_gelu).to(DEVICE)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)
     criterion = nn.BCEWithLogitsLoss()
 
@@ -122,7 +160,7 @@ def train_fold(
     patience_counter = 0
 
     n = len(X_tr_t)
-    for epoch in range(EPOCHS):
+    for _epoch in range(EPOCHS):
         model.train()
         perm = torch.randperm(n, device=DEVICE)
         for i in range(0, n, BATCH_SIZE):
@@ -156,6 +194,9 @@ def train_fold(
 
 def main() -> None:
     print(f"Device: {DEVICE}")
+    params = load_params()
+    print(f"MLP params: {params}")
+
     train_raw, test_raw = load_data()
     train_pl = build_features(train_raw)
     test_pl = build_features(test_raw)
@@ -183,8 +224,14 @@ def main() -> None:
 
     for fold, (train_idx, val_idx) in enumerate(skf.split(X, y), 1):
         val_pred, test_pred = train_fold(
-            X[train_idx], y[train_idx], X[val_idx], y[val_idx], X_test,
-            num_idx, cat_idx,
+            X[train_idx],
+            y[train_idx],
+            X[val_idx],
+            y[val_idx],
+            X_test,
+            num_idx,
+            cat_idx,
+            params,
         )
         oof_proba[val_idx] = val_pred
         test_proba += test_pred / N_FOLDS
@@ -196,7 +243,7 @@ def main() -> None:
     oof_auc = float(roc_auc_score(y, oof_proba))
     print(f"\nOOF AUC: {oof_auc:.4f}")
 
-    save_cv_result(RESULTS_DIR, "mlp_v2", fold_aucs, oof_auc)
+    save_cv_result(RESULTS_DIR, "mlp_v3", fold_aucs, oof_auc)
 
     np.save(RESULTS_DIR / "oof_mlp.npy", oof_proba)
     np.save(RESULTS_DIR / "test_mlp.npy", test_proba)
@@ -204,7 +251,7 @@ def main() -> None:
 
     SUBMISSIONS_DIR.mkdir(exist_ok=True)
     submission = pd.DataFrame({"id": test_ids, TARGET: test_proba})
-    out_path = SUBMISSIONS_DIR / "mlp_v2.csv"
+    out_path = SUBMISSIONS_DIR / "mlp_v3.csv"
     submission.to_csv(out_path, index=False)
     print(f"Submission saved → {out_path}")
 

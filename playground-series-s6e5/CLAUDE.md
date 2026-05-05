@@ -8,6 +8,29 @@
 > engineering, or model runs under the relevant section. This is the single
 > source of truth for what we know about this competition.
 
+## ⚠️ CRITICAL: Row-order invariant — always use build_features() to load labels and IDs
+
+`features.py::build_features()` sorts every dataframe by `["Driver", "Race", "Year", "LapNumber"]`.
+All model scripts call `build_features()` before generating `oof_{model}.npy` and
+`test_{model}.npy`, so those arrays are in **sorted order**, not original CSV order.
+
+**Rule**: any script that loads `y` (train labels) or `test_ids` and compares/combines
+them with npy arrays **must** go through `build_features()`:
+
+```python
+# CORRECT
+y = build_features(pl.read_csv(DATA_DIR / "train.csv"))[TARGET].to_numpy()
+test_ids = build_features(pl.read_csv(DATA_DIR / "test.csv"))["id"].to_numpy()
+
+# WRONG — silently misaligns predictions → 0.5 AUC on Kaggle
+y = pl.read_csv(DATA_DIR / "train.csv")[TARGET].to_numpy()
+test_ids = pl.read_csv(DATA_DIR / "test.csv")["id"].to_numpy()
+```
+
+This bug caused a 0.5 AUC submission from `ensemble.py` and was also found in
+`stacking.py`. Individual model submissions were never affected because they extract
+IDs from their already-sorted feature-engineered frames.
+
 ---
 
 ## Dataset
@@ -139,7 +162,35 @@ match to within <1 percentage point.
 - `LapTime_Delta` rolling mean (smooth out noise)
 - `Cumulative_Degradation / TyreLife` ratio (degradation rate)
 
-### Tried & flat (v2, v3, v6)
+### Future: autoregressive "overdue" feature
+
+**Idea**: Add a feature = cumulative pit probability predicted by a first-pass model for
+the current stint, up to the current lap. If the model has been assigning P=0.7 for 3
+consecutive laps but the driver hasn't pitted, something strategic is suppressing the pit
+(track position, safety car window, undercut defence). This residual isn't captured by
+TyreLife alone.
+
+**Note**: `TyreLife` already encodes "time since last pit" perfectly (TyreLife = N means
+pitted N laps ago). The novel part is the *model-predicted probability residual* — not the
+raw tyre age.
+
+**Implementation**: Run a first-pass model to generate OOF pit probabilities, then for
+each driver/race sequence compute `cumulative_prob_no_pit = product(1 - P_i)` or
+`sum_overdue_prob = sum(P_i for laps in current stint where no pit happened)`.
+At test time: predict rows in lap-order within each driver/race, feed running prediction
+back as a feature for the next lap. Requires sequential inference, not batch.
+
+**Complexity**: High — needs two model passes and sequential test-time inference. Worth
+attempting if we hit a hard ceiling with batch approaches.
+
+### LGBM GPU — not compatible
+
+LightGBM GPU (OpenCL) has a hard bin limit of 256. The `Driver` categorical has 887
+unique values → `bin size 525 cannot run on GPU`. No workaround without degrading
+model quality. LGBM must stay on CPU. XGBoost and CatBoost use `device="cuda"` /
+`task_type="GPU"` which have no such categorical bin restriction.
+
+### Tried & flat (v2, v3, v6, v8)
 - v2 polynomial/interaction transforms: −0.0001 delta. LightGBM finds these internally.
 - v3 group aggregates (driver/race/compound pit rates + median TyreLife at pit): −0.0002.
   Even with 887 drivers and Laplace smoothing, no gain.
@@ -226,6 +277,8 @@ Mexico City GP (0.9167, low pit rate 9.1%)
   because its errors are decorrelated from all three GBDT models
 - **4-model best: 0.9499** (XGBoost 48.1% + MLP 22.9% + CatBoost 19.8% + LGBM 9.2%), +0.0004 vs 3-model
 - Simple average of 4 models (0.9498) nearly matches optimized blend — models well-calibrated
+- **MLP Optuna tuning (50 trials, 3-fold)**: best params = 4-layer [1024→683→456→304], dropout=0.35, lr=4.8e-3, wd=1.9e-3; 3-fold best 0.9442, 5-fold retrain 0.9457 (+0.0005 vs v2)
+- **4-model best (mlp_v3): 0.9500** (XGBoost 46.4% + MLP 26.6% + CatBoost 18.1% + LGBM 8.9%) — crossed 0.95 threshold
 
 ---
 
@@ -235,6 +288,19 @@ Mexico City GP (0.9167, low pit rate 9.1%)
 - **CV scores**: logged to `results/cv_scores.csv`
 - Categorical columns: `Driver`, `Compound`, `Race` — passed as `category` dtype to LightGBM
 - `Year` is currently treated as numeric — consider ordinal or one-hot given the 2023 anomaly
+
+---
+
+## ⚠️ Bug Fixed: ensemble.py test ID ordering
+
+`features.py::build_features()` sorts all rows by `["Driver", "Race", "Year", "LapNumber"]`.
+All model scripts call `build_features()` on test data, so `test_{model}.npy` predictions
+are in **sorted order**. But `ensemble.py` was loading test IDs directly from the raw CSV
+(original order), causing a complete ID/prediction mismatch → 0.5 AUC on Kaggle.
+
+**Fix**: `ensemble.py` now loads test IDs via `build_features(...)["id"]` so the ID order
+matches the npy arrays. Individual model submission CSVs were never affected — they extract
+IDs from the feature-engineered frame. Re-run `ensemble.py` before any future submission.
 
 ---
 
@@ -260,3 +326,7 @@ Mexico City GP (0.9167, low pit rate 9.1%)
 | 2026-05-05 | ensemble_lgbm_catboost_xgboost_mlp_v1 | 4-model blend: XGBoost 48.1% + MLP 22.9% + CatBoost 19.8% + LGBM 9.2% | **0.9499** (+0.0004 — new best) |
 | 2026-05-05 | mlp_v2 | mlp_v1 + Yeo-Johnson on numeric cols, StandardScaler on label-encoded cats | **0.9452** (+0.0004 vs v1) |
 | 2026-05-05 | ensemble w/ mlp_v2 | XGBoost 47.7% + MLP 24.6% + CatBoost 18.9% + LGBM 8.7% | **0.9499** (flat — MLP gain too small) |
+| 2026-05-05 | mlp_v3 | mlp_v2 + Optuna 50-trial tune: 4-layer [1024→683→456→304], dropout=0.35, lr=4.8e-3, wd=1.9e-3 | **0.9457** (+0.0005 vs v2) |
+| 2026-05-05 | ensemble w/ mlp_v3 | XGBoost 46.4% + MLP 26.6% + CatBoost 18.1% + LGBM 8.9% | **0.9500** (+0.0001 — new best, crossed 0.95) |
+| 2026-05-05 | stacking_v1 | Logistic regression meta-learner (logit inputs, nested 10-fold/5-fold CV, L2 tuned) | **0.9500** (flat — converged to same weights as Nelder-Mead; models well-calibrated) |
+| 2026-05-05 | baseline_lgbm_v8 | v7 + 4 sequential features: `window_gap`, `laps_past_window`, `est_laps_remaining`, `pace_anomaly_pct` | **0.9474** (flat, −0.0001 — trees already learn these internally) |
