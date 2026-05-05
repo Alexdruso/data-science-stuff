@@ -217,10 +217,12 @@ Mexico City GP (0.9167, low pit rate 9.1%)
    and fresh tyres are the highest-value targets
 
 ### Ensemble findings (2026-05-05)
-- LGBM + CatBoost blend gives +0.0005–0.0007 OOF AUC over LGBM alone
-- XGBoost with default params adds no value (zeroed out by optimizer every time)
-- **Next step: GPU-tune CatBoost + XGBoost** (~1–2 min/trial on RTX 2060 vs 8–10 min on CPU)
-  — full 50-trial Optuna run now feasible in ~1 hour each
+- LGBM + CatBoost blend (defaults) gives +0.0005 OOF AUC over LGBM alone; XGBoost defaults zeroed out
+- **After GPU tuning**: XGBoost jumped from 0.9456 → 0.9489 and became the dominant model (50.4% weight)
+- CatBoost tuning: 0.9471 → 0.9479 (+0.0008); smaller gain — CatBoost less sensitive to HPO here
+- **New best ensemble: 0.9495** (XGBoost 50.4% + CatBoost 31.6% + LGBM 17.9%), +0.0010 vs default blend
+- XGBoost GPU tuning was ~10–30s/trial (vs CatBoost ~90–150s/trial) — much faster on RTX 2060
+- Simple average (0.9494) nearly matched optimized blend (0.9495) — models are well-calibrated
 
 ---
 
@@ -247,3 +249,6 @@ Mexico City GP (0.9167, low pit rate 9.1%)
 | 2026-05-05 | catboost_v1 | CatBoost GPU, sensible defaults (depth=8, lr=0.05, l2=5) | **0.9471** |
 | 2026-05-05 | xgboost_v1 | XGBoost GPU, sensible defaults (max_depth=9, lr=0.05, reg_lambda=5) | **0.9456** |
 | 2026-05-05 | ensemble_lgbm_catboost_xgboost_v1 | Optimized blend: LGBM 56.5% + CatBoost 43.5% + XGBoost 0% | **0.9485** (+0.0005 vs LGBM) |
+| 2026-05-05 | catboost_v1 (tuned) | GPU Optuna 50-trial tune: depth=9, lr=0.060, l2=2.43, bagging_temp=0.10, rand_strength=0.010, min_leaf=41 | **0.9479** (+0.0008 vs default) |
+| 2026-05-05 | xgboost_v1 (tuned) | GPU Optuna 50-trial tune (best at trial 33, AUC 0.9486): now strongest individual model | **0.9489** (+0.0033 vs default) |
+| 2026-05-05 | ensemble_lgbm_catboost_xgboost_v2 | Tuned blend: XGBoost 50.4% + CatBoost 31.6% + LGBM 17.9% | **0.9495** (+0.0010 vs v1 — new best) |
