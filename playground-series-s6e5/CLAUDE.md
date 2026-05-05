@@ -162,6 +162,60 @@ lambda), (2) within-stint rolling features (cumulative lap time relative to stin
 
 ---
 
+## SHAP + Error Analysis (v5 model, 2026-05-05)
+
+Full analysis in `notebooks/analysis.py`, PNGs in `results/analysis/`.
+
+### SHAP Feature Importance (top features)
+1. `is_2023` (0.794) — dominates; model spends most capacity on the 2023 anomaly
+2. `Stint` (0.576)
+3. `LapTime_Delta` (0.396) — **beats raw TyreLife** — lap-to-lap pace change is key
+4. `TyreLife` (0.369)
+5. `Year` (0.342) — partly a proxy for 2023
+6. `race_progress_x_stint` (0.203), `TyreLife_sq` (0.202), `race_compound_pit_rate` (0.200)
+
+### Calibration
+Near-perfect across all bins. No value in post-hoc calibration (isotonic/Platt).
+
+### AUC by Year — CRITICAL: headline AUC is inflated
+| Year | AUC | Pit rate | N |
+|---|---|---|---|
+| 2022 | **0.9099** | 26.7% | 82,989 |
+| 2023 | 0.9391 | 1.0% | 136,147 |
+| 2024 | 0.9251 | 29.5% | 127,110 |
+| 2025 | 0.9251 | 28.4% | 92,894 |
+
+OOF AUC of 0.9480 is inflated by the easy 2023 prediction. **Effective real-world AUC
+(non-2023 rows weighted) ≈ 0.922**. The model's biggest lever (`is_2023`) is irrelevant
+at test time if test rows are all non-2023.
+
+Year 2022 is the hardest year — first season of major regulation changes, more strategy
+variance. Worth investigating separately.
+
+### AUC by TyreLife decile — monotone degradation
+| TyreLife | AUC |
+|---|---|
+| 1–3 laps (fresh) | **0.8918** — hardest; undercuts, safety cars, pure strategy |
+| 28–77 laps (old) | **0.9509** — easiest; obvious necessity |
+
+### AUC by Compound
+- WET: 0.8620 (n=1355 — too small to learn)
+- SOFT: 0.9260, HARD: 0.9288, INTERMEDIATE: 0.9334, MEDIUM: 0.9503
+
+### Hardest Races
+Spanish GP (0.9071), Emilia Romagna GP (0.9090), Bahrain GP (0.9132),
+Mexico City GP (0.9167, low pit rate 9.1%)
+
+### Implications for next steps
+1. **Ensemble (CatBoost/XGBoost)** — most reliable improvement; different handling of
+   categoricals (Race, Driver) may improve 2022/HARD/fresh-tyre failure zones
+2. **Longer LapTime_Delta rolling windows** — #3 feature; 3-lap window exists, try 5/7
+   or exponential weighting — specifically targets fresh-tyre regime
+3. **The real competition ceiling is ~0.922**, not 0.948 — improvements in Year 2022
+   and fresh tyres are the highest-value targets
+
+---
+
 ## Modelling Notes
 
 - **Baseline**: LightGBM 5-fold stratified CV (`src/baseline.py`)
