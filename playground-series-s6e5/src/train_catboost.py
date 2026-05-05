@@ -1,4 +1,4 @@
-"""Baseline LightGBM model for PS S6E5 - Predicting F1 Pit Stops."""
+"""CatBoost 5-fold CV training for PS S6E5 — F1 Pit Stop Prediction."""
 
 import json
 import sys
@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import polars as pl
-from lightgbm import LGBMClassifier, early_stopping, log_evaluation
+from catboost import CatBoostClassifier
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedKFold
 
@@ -21,51 +21,38 @@ RESULTS_DIR = Path(__file__).parent.parent / "results"
 
 TARGET = "PitNextLap"
 N_FOLDS = 5
-LGBM_PARAMS: dict[str, object] = {
-    "objective": "binary",
-    "metric": "auc",
-    "n_estimators": 1000,
-    "learning_rate": 0.05,
-    "num_leaves": 127,
-    "subsample": 0.8,
-    "colsample_bytree": 0.8,
-    "random_state": 42,
-    "verbose": -1,
-    "n_jobs": -1,
+FIXED_PARAMS: dict[str, object] = {
+    "iterations": 1000,
+    "eval_metric": "AUC",
+    "use_best_model": True,
+    "early_stopping_rounds": 50,
+    "verbose": 0,
+    "random_seed": 42,
 }
 
 
 def load_params() -> dict[str, object]:
-    params_path = RESULTS_DIR / "best_params.json"
-    base: dict[str, object] = dict(LGBM_PARAMS)
+    params_path = RESULTS_DIR / "best_params_catboost.json"
+    base: dict[str, object] = dict(FIXED_PARAMS)
     if params_path.exists():
         with params_path.open() as f:
-            tuned = json.load(f)
-        base.update(tuned)
+            base.update(json.load(f))
         print(f"Loaded tuned params from {params_path}")
+    else:
+        print("No tuned params found — using defaults")
     return base
 
 
 def load_data() -> tuple[pl.DataFrame, pl.DataFrame]:
-    train = pl.read_csv(DATA_DIR / "train.csv")
-    test = pl.read_csv(DATA_DIR / "test.csv")
-    return train, test
-
-
-def to_pandas(df: pl.DataFrame, cat_cols: list[str]) -> pd.DataFrame:
-    pdf = df.to_pandas()
-    for col in cat_cols:
-        if col in pdf.columns:
-            pdf[col] = pdf[col].astype("category")
-    return pdf
+    return pl.read_csv(DATA_DIR / "train.csv"), pl.read_csv(DATA_DIR / "test.csv")
 
 
 def main() -> None:
-    train_pl_raw, test_pl = load_data()
-    train_pl = build_features(train_pl_raw)
+    train_raw, test_pl = load_data()
+    train_pl = build_features(train_raw)
     test_pl = build_features(test_pl)
-    train_pl = compute_group_features(train_pl_raw, train_pl)
-    test_pl = compute_group_features(train_pl_raw, test_pl)
+    train_pl = compute_group_features(train_raw, train_pl)
+    test_pl = compute_group_features(train_raw, test_pl)
     print(f"Train: {train_pl.shape}, Test: {test_pl.shape}")
 
     cat_cols = [
@@ -75,8 +62,9 @@ def main() -> None:
     ]
     feature_cols = [c for c in train_pl.columns if c not in ("id", TARGET)]
 
-    train = to_pandas(train_pl, cat_cols)
-    test = to_pandas(test_pl, cat_cols)
+    # CatBoost takes string columns as-is — no category dtype needed
+    train = train_pl.to_pandas()
+    test = test_pl.to_pandas()
 
     X = train[feature_cols]
     y = train[TARGET].to_numpy()
@@ -84,6 +72,8 @@ def main() -> None:
     test_ids = test["id"].to_numpy()
 
     params = load_params()
+    params["cat_features"] = cat_cols
+
     skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=42)
     oof_proba = np.zeros(len(X))
     test_proba = np.zeros(len(X_test))
@@ -93,13 +83,8 @@ def main() -> None:
         X_tr, X_val = X.iloc[train_idx], X.iloc[val_idx]
         y_tr, y_val = y[train_idx], y[val_idx]
 
-        model = LGBMClassifier(**params)
-        model.fit(
-            X_tr,
-            y_tr,
-            eval_set=[(X_val, y_val)],
-            callbacks=[early_stopping(50, verbose=False), log_evaluation(0)],
-        )
+        model = CatBoostClassifier(**params)
+        model.fit(X_tr, y_tr, eval_set=(X_val, y_val))
 
         val_pred = model.predict_proba(X_val)[:, 1]
         oof_proba[val_idx] = val_pred
@@ -112,15 +97,15 @@ def main() -> None:
     oof_auc = float(roc_auc_score(y, oof_proba))
     print(f"\nOOF AUC: {oof_auc:.4f}")
 
-    save_cv_result(RESULTS_DIR, "baseline_lgbm_v7", fold_aucs, oof_auc)
+    save_cv_result(RESULTS_DIR, "catboost_v1", fold_aucs, oof_auc)
 
-    np.save(RESULTS_DIR / "oof_lgbm.npy", oof_proba)
-    np.save(RESULTS_DIR / "test_lgbm.npy", test_proba)
+    np.save(RESULTS_DIR / "oof_catboost.npy", oof_proba)
+    np.save(RESULTS_DIR / "test_catboost.npy", test_proba)
     print(f"OOF/test arrays saved → {RESULTS_DIR}")
 
     SUBMISSIONS_DIR.mkdir(exist_ok=True)
     submission = pd.DataFrame({"id": test_ids, TARGET: test_proba})
-    out_path = SUBMISSIONS_DIR / "baseline_lgbm_v7.csv"
+    out_path = SUBMISSIONS_DIR / "catboost_v1.csv"
     submission.to_csv(out_path, index=False)
     print(f"Submission saved → {out_path}")
 
