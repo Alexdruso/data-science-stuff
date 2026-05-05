@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedKFold
-from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.preprocessing import LabelEncoder, PowerTransformer, StandardScaler
 
 sys.path.insert(0, str(Path(__file__).parent))
 from cv_results import save_cv_result
@@ -86,11 +86,25 @@ def train_fold(
     X_val: np.ndarray,
     y_val: np.ndarray,
     X_test: np.ndarray,
+    num_idx: list[int],
+    cat_idx: list[int],
 ) -> tuple[np.ndarray, np.ndarray]:
-    scaler = StandardScaler()
-    X_tr = scaler.fit_transform(X_tr)
-    X_val = scaler.transform(X_val)
-    X_test_scaled = scaler.transform(X_test)
+    pt = PowerTransformer(method="yeo-johnson", standardize=True)
+    sc = StandardScaler()
+
+    X_tr_s = np.empty_like(X_tr)
+    X_val_s = np.empty_like(X_val)
+    X_test_scaled = np.empty_like(X_test)
+
+    X_tr_s[:, num_idx] = pt.fit_transform(X_tr[:, num_idx])
+    X_val_s[:, num_idx] = pt.transform(X_val[:, num_idx])
+    X_test_scaled[:, num_idx] = pt.transform(X_test[:, num_idx])
+
+    X_tr_s[:, cat_idx] = sc.fit_transform(X_tr[:, cat_idx])
+    X_val_s[:, cat_idx] = sc.transform(X_val[:, cat_idx])
+    X_test_scaled[:, cat_idx] = sc.transform(X_test[:, cat_idx])
+
+    X_tr, X_val = X_tr_s, X_val_s
 
     model = MLP(X_tr.shape[1]).to(DEVICE)
     optimizer = torch.optim.AdamW(model.parameters(), lr=LR, weight_decay=1e-4)
@@ -156,6 +170,10 @@ def main() -> None:
     ]
     feature_cols = [c for c in train_pl.columns if c not in ("id", TARGET)]
 
+    cat_set = set(cat_cols)
+    cat_idx = [i for i, c in enumerate(feature_cols) if c in cat_set]
+    num_idx = [i for i, c in enumerate(feature_cols) if c not in cat_set]
+
     X, y, X_test, test_ids = prepare_arrays(train_pl, test_pl, cat_cols, feature_cols)
 
     skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=42)
@@ -165,7 +183,8 @@ def main() -> None:
 
     for fold, (train_idx, val_idx) in enumerate(skf.split(X, y), 1):
         val_pred, test_pred = train_fold(
-            X[train_idx], y[train_idx], X[val_idx], y[val_idx], X_test
+            X[train_idx], y[train_idx], X[val_idx], y[val_idx], X_test,
+            num_idx, cat_idx,
         )
         oof_proba[val_idx] = val_pred
         test_proba += test_pred / N_FOLDS
@@ -177,7 +196,7 @@ def main() -> None:
     oof_auc = float(roc_auc_score(y, oof_proba))
     print(f"\nOOF AUC: {oof_auc:.4f}")
 
-    save_cv_result(RESULTS_DIR, "mlp_v1", fold_aucs, oof_auc)
+    save_cv_result(RESULTS_DIR, "mlp_v2", fold_aucs, oof_auc)
 
     np.save(RESULTS_DIR / "oof_mlp.npy", oof_proba)
     np.save(RESULTS_DIR / "test_mlp.npy", test_proba)
@@ -185,7 +204,7 @@ def main() -> None:
 
     SUBMISSIONS_DIR.mkdir(exist_ok=True)
     submission = pd.DataFrame({"id": test_ids, TARGET: test_proba})
-    out_path = SUBMISSIONS_DIR / "mlp_v1.csv"
+    out_path = SUBMISSIONS_DIR / "mlp_v2.csv"
     submission.to_csv(out_path, index=False)
     print(f"Submission saved → {out_path}")
 

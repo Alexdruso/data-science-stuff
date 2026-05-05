@@ -258,3 +258,5 @@ Mexico City GP (0.9167, low pit rate 9.1%)
 | 2026-05-05 | baseline_lgbm_v7 (+TyreLife_frac) | Added `TyreLife_frac` = TyreLife / compound median TyreLife at pit | **0.9475** (−0.0002 — flat) |
 | 2026-05-05 | mlp_v1 | PyTorch GPU MLP (512→256→128, BN+Dropout, AdamW, cosine LR, early stop) | **0.9448** |
 | 2026-05-05 | ensemble_lgbm_catboost_xgboost_mlp_v1 | 4-model blend: XGBoost 48.1% + MLP 22.9% + CatBoost 19.8% + LGBM 9.2% | **0.9499** (+0.0004 — new best) |
+| 2026-05-05 | mlp_v2 | mlp_v1 + Yeo-Johnson on numeric cols, StandardScaler on label-encoded cats | **0.9452** (+0.0004 vs v1) |
+| 2026-05-05 | ensemble w/ mlp_v2 | XGBoost 47.7% + MLP 24.6% + CatBoost 18.9% + LGBM 8.7% | **0.9499** (flat — MLP gain too small) |
