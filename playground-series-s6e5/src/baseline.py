@@ -112,11 +112,11 @@ def main() -> None:
     oof_auc = float(roc_auc_score(y, oof_proba))
     print(f"\nOOF AUC: {oof_auc:.4f}")
 
-    save_cv_result(RESULTS_DIR, "baseline_lgbm_v5", fold_aucs, oof_auc)
+    save_cv_result(RESULTS_DIR, "baseline_lgbm_v6", fold_aucs, oof_auc)
 
     SUBMISSIONS_DIR.mkdir(exist_ok=True)
     submission = pd.DataFrame({"id": test_ids, TARGET: test_proba})
-    out_path = SUBMISSIONS_DIR / "baseline_lgbm_v5.csv"
+    out_path = SUBMISSIONS_DIR / "baseline_lgbm_v6.csv"
     submission.to_csv(out_path, index=False)
     print(f"Submission saved → {out_path}")
 

@@ -46,6 +46,28 @@ def build_features(df: pl.DataFrame) -> pl.DataFrame:
                 .over(["Driver", "Race", "Year"])
                 .alias("lap_time_delta_roll3")
             ),
+            (
+                pl.col("LapTime_Delta")
+                .rolling_mean(window_size=7, min_periods=1)
+                .over(["Driver", "Race", "Year"])
+                .alias("lap_time_delta_roll7")
+            ),
+            (
+                pl.col("LapTime (s)")
+                .rolling_mean(window_size=5, min_periods=1)
+                .over(["Driver", "Race", "Year"])
+                .alias("lap_time_s_roll5")
+            ),
+            pl.col("LapTime_Delta").shift(1).over(["Driver", "Race", "Year"]).alias("lap_time_delta_lag1"),
+            pl.col("LapTime_Delta").shift(2).over(["Driver", "Race", "Year"]).alias("lap_time_delta_lag2"),
+            pl.col("LapTime_Delta").shift(3).over(["Driver", "Race", "Year"]).alias("lap_time_delta_lag3"),
+        ]
+    ).with_columns(
+        [
+            (pl.col("LapTime (s)") - pl.col("lap_time_s_roll5")).alias("lap_time_vs_roll5"),
+            pl.col("lap_time_delta_lag1").fill_null(0),
+            pl.col("lap_time_delta_lag2").fill_null(0),
+            pl.col("lap_time_delta_lag3").fill_null(0),
         ]
     )
 

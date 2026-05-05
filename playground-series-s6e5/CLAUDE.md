@@ -139,10 +139,12 @@ match to within <1 percentage point.
 - `LapTime_Delta` rolling mean (smooth out noise)
 - `Cumulative_Degradation / TyreLife` ratio (degradation rate)
 
-### Tried & flat (v2 + v3)
+### Tried & flat (v2, v3, v6)
 - v2 polynomial/interaction transforms: −0.0001 delta. LightGBM finds these internally.
 - v3 group aggregates (driver/race/compound pit rates + median TyreLife at pit): −0.0002.
   Even with 887 drivers and Laplace smoothing, no gain.
+- v6 sequential features (lag1/2/3 LapTime_Delta, roll7 LapTime_Delta, roll5 LapTime (s),
+  pace anomaly): −0.0003. Deep trees (num_leaves=490) already capture this internally.
 
 **Plateau diagnosis**: Three versions stall at 0.9431–0.9433. The likely culprit is the
 2023 anomaly — 31% of training rows (136k) carry near-zero pit rates. Even with `is_2023`
@@ -234,3 +236,4 @@ Mexico City GP (0.9167, low pit rate 9.1%)
 | 2026-05-04 | baseline_lgbm_v3 | v2 + 5 group aggregates: `driver_pit_rate`, `driver_compound_pit_rate`, `race_compound_pit_rate`, `driver/race_compound_median_tyre_life_at_pit` (α=20 smoothing, excl. 2023) | **0.9431** (flat) |
 | 2026-05-04 | baseline_lgbm_v4 | v3 but DROP 2023 from training entirely | **0.9147** (−0.029 — worse!) |
 | 2026-05-05 | baseline_lgbm_v5 | v1 features + Optuna-tuned params (50 trials, 3-fold): num_leaves=490, lr=0.023, min_child_samples=146, reg_lambda=4.5 | **0.9480** (+0.0047 — new best) |
+| 2026-05-05 | baseline_lgbm_v6 | v5 + 7 sequential features: lag1/2/3 of LapTime_Delta, roll7 LapTime_Delta, roll5 LapTime (s), pace anomaly (LapTime vs roll5) | **0.9477** (−0.0003 — flat) |
