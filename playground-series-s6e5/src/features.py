@@ -5,6 +5,8 @@ import polars as pl
 TARGET = "PitNextLap"
 _SMOOTH_ALPHA = 20.0
 
+DRIVER_COLS: frozenset[str] = frozenset({"Driver"})
+
 # Domain-knowledge ordinal: SOFT degrades fastest, WET is off-scale
 COMPOUND_ORDINAL: dict[str, int] = {
     "SOFT": 3,

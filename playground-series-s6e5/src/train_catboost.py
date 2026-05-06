@@ -13,7 +13,7 @@ from sklearn.model_selection import StratifiedKFold
 
 sys.path.insert(0, str(Path(__file__).parent))
 from cv_results import save_cv_result
-from features import build_features, compute_group_features
+from features import DRIVER_COLS, build_features, compute_group_features
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
@@ -65,12 +65,13 @@ def main() -> None:
     test_pl = compute_group_features(train_raw, test_pl)
     print(f"Train: {train_pl.shape}, Test: {test_pl.shape}")
 
+    _exclude = {"id", TARGET} | DRIVER_COLS
     cat_cols = [
         c
         for c in train_pl.columns
-        if train_pl[c].dtype == pl.String and c not in ("id", TARGET)
+        if train_pl[c].dtype == pl.String and c not in _exclude
     ]
-    feature_cols = [c for c in train_pl.columns if c not in ("id", TARGET)]
+    feature_cols = [c for c in train_pl.columns if c not in _exclude]
 
     # CatBoost takes string columns as-is — no category dtype needed
     train = train_pl.to_pandas()
@@ -107,7 +108,7 @@ def main() -> None:
     oof_auc = float(roc_auc_score(y, oof_proba))
     print(f"\nOOF AUC: {oof_auc:.4f}")
 
-    save_cv_result(RESULTS_DIR, "catboost_v1", fold_aucs, oof_auc)
+    save_cv_result(RESULTS_DIR, "catboost_v3", fold_aucs, oof_auc)
 
     np.save(RESULTS_DIR / "oof_catboost.npy", oof_proba)
     np.save(RESULTS_DIR / "test_catboost.npy", test_proba)
@@ -115,7 +116,7 @@ def main() -> None:
 
     SUBMISSIONS_DIR.mkdir(exist_ok=True)
     submission = pd.DataFrame({"id": test_ids, TARGET: test_proba})
-    out_path = SUBMISSIONS_DIR / "catboost_v1.csv"
+    out_path = SUBMISSIONS_DIR / "catboost_v3.csv"
     submission.to_csv(out_path, index=False)
     print(f"Submission saved → {out_path}")
 

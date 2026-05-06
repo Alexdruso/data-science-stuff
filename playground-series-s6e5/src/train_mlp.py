@@ -11,11 +11,11 @@ import torch
 import torch.nn as nn
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedKFold
-from sklearn.preprocessing import LabelEncoder, PowerTransformer, StandardScaler
+from sklearn.preprocessing import PowerTransformer, StandardScaler
 
 sys.path.insert(0, str(Path(__file__).parent))
 from cv_results import save_cv_result
-from features import build_features, compute_group_features
+from features import DRIVER_COLS, build_features, compute_group_features
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
@@ -93,22 +93,33 @@ def prepare_arrays(
     test_pl: pl.DataFrame,
     cat_cols: list[str],
     feature_cols: list[str],
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, list[int], list[int]]:
     train_pd = train_pl.to_pandas()
     test_pd = test_pl.to_pandas()
 
-    for col in cat_cols:
-        le = LabelEncoder()
-        combined = pd.concat([train_pd[col], test_pd[col]], ignore_index=True)
-        le.fit(combined)
-        train_pd[col] = le.transform(train_pd[col]).astype(np.float32)
-        test_pd[col] = le.transform(test_pd[col]).astype(np.float32)
+    num_cols = [c for c in feature_cols if c not in set(cat_cols)]
 
-    X = train_pd[feature_cols].to_numpy(dtype=np.float32)
+    combined_cats = pd.concat(
+        [train_pd[cat_cols], test_pd[cat_cols]], ignore_index=True
+    )
+    ohe = pd.get_dummies(combined_cats, columns=cat_cols, dtype=np.float32)
+    n_train = len(train_pd)
+    train_ohe = ohe.iloc[:n_train].to_numpy(dtype=np.float32)
+    test_ohe = ohe.iloc[n_train:].to_numpy(dtype=np.float32)
+
+    X_num = train_pd[num_cols].to_numpy(dtype=np.float32)
+    X_test_num = test_pd[num_cols].to_numpy(dtype=np.float32)
+
+    X = np.hstack([X_num, train_ohe])
+    X_test = np.hstack([X_test_num, test_ohe])
     y = train_pd[TARGET].to_numpy(dtype=np.float32)
-    X_test = test_pd[feature_cols].to_numpy(dtype=np.float32)
     test_ids = test_pd["id"].to_numpy()
-    return X, y, X_test, test_ids
+
+    n_num = len(num_cols)
+    n_ohe = train_ohe.shape[1]
+    num_idx = list(range(n_num))
+    cat_idx = list(range(n_num, n_num + n_ohe))
+    return X, y, X_test, test_ids, num_idx, cat_idx
 
 
 def train_fold(
@@ -189,6 +200,7 @@ def train_fold(
             if patience_counter >= PATIENCE:
                 break
 
+    del model, optimizer, scheduler, X_tr_t, y_tr_t, X_val_t, X_test_t
     return best_val_pred, best_test_pred
 
 
@@ -204,18 +216,17 @@ def main() -> None:
     test_pl = compute_group_features(train_raw, test_pl)
     print(f"Train: {train_pl.shape}, Test: {test_pl.shape}")
 
+    _exclude = {"id", TARGET} | DRIVER_COLS
     cat_cols = [
         c
         for c in train_pl.columns
-        if train_pl[c].dtype == pl.String and c not in ("id", TARGET)
+        if train_pl[c].dtype == pl.String and c not in _exclude
     ]
-    feature_cols = [c for c in train_pl.columns if c not in ("id", TARGET)]
+    feature_cols = [c for c in train_pl.columns if c not in _exclude]
 
-    cat_set = set(cat_cols)
-    cat_idx = [i for i, c in enumerate(feature_cols) if c in cat_set]
-    num_idx = [i for i, c in enumerate(feature_cols) if c not in cat_set]
-
-    X, y, X_test, test_ids = prepare_arrays(train_pl, test_pl, cat_cols, feature_cols)
+    X, y, X_test, test_ids, num_idx, cat_idx = prepare_arrays(
+        train_pl, test_pl, cat_cols, feature_cols
+    )
 
     skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=42)
     oof_proba = np.zeros(len(X))
@@ -239,11 +250,13 @@ def main() -> None:
         fold_auc = float(roc_auc_score(y[val_idx], val_pred))
         fold_aucs.append(fold_auc)
         print(f"  Fold {fold} AUC: {fold_auc:.4f}")
+        if DEVICE.type == "cuda":
+            torch.cuda.empty_cache()
 
     oof_auc = float(roc_auc_score(y, oof_proba))
     print(f"\nOOF AUC: {oof_auc:.4f}")
 
-    save_cv_result(RESULTS_DIR, "mlp_v3", fold_aucs, oof_auc)
+    save_cv_result(RESULTS_DIR, "mlp_v6", fold_aucs, oof_auc)
 
     np.save(RESULTS_DIR / "oof_mlp.npy", oof_proba)
     np.save(RESULTS_DIR / "test_mlp.npy", test_proba)
@@ -251,7 +264,7 @@ def main() -> None:
 
     SUBMISSIONS_DIR.mkdir(exist_ok=True)
     submission = pd.DataFrame({"id": test_ids, TARGET: test_proba})
-    out_path = SUBMISSIONS_DIR / "mlp_v3.csv"
+    out_path = SUBMISSIONS_DIR / "mlp_v6.csv"
     submission.to_csv(out_path, index=False)
     print(f"Submission saved → {out_path}")
 

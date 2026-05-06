@@ -146,10 +146,25 @@ Negative correlation (−0.167) with the target is counterintuitive. Investigate
 whether this feature resets on a pit stop or is computed differently to TyreLife.
 Do not assume it is a direct proxy for tyre wear without verifying.
 
-### Train / Test Distribution
+### Train / Test Distribution — Confirmed No Shift (2026-05-06)
 
-No meaningful distributional shift across any feature. Year and Compound proportions
-match to within <1 percentage point.
+Adversarial validation AUC = **0.5013** (5-fold LGBM, all features) — distributions
+are statistically indistinguishable. Year proportions match to <0.1pp:
+
+| Year | Train% | Test% |
+|---|---|---|
+| 2022 | 18.9% | 18.8% |
+| 2023 | 31.0% | 30.9% |
+| 2024 | 28.9% | 29.0% |
+| 2025 | 21.2% | 21.3% |
+
+All 26 Races and all 104 (Race, Year) tuples present in both splits — no held-out
+race contexts. 86 drivers are train-only, 0 are test-only. However, **1,364 (Driver,
+Race, Year) tuples are test-only** (specific driver appearances at races not seen in
+that year's training data). These novel stints are where generalisation matters most.
+
+KS statistics for numeric features: all < 0.004, all p-values > 0.12 — no meaningful
+marginal shift. Full analysis in `notebooks/distribution_shift.py`.
 
 ---
 
@@ -189,6 +204,39 @@ LightGBM GPU (OpenCL) has a hard bin limit of 256. The `Driver` categorical has 
 unique values → `bin size 525 cannot run on GPU`. No workaround without degrading
 model quality. LGBM must stay on CPU. XGBoost and CatBoost use `device="cuda"` /
 `task_type="GPU"` which have no such categorical bin restriction.
+
+### ⚠️ Driver features — mixed result by model (2026-05-06)
+
+Ablation (`src/ablation_driver.py`) and full retrain without Driver-identity columns:
+
+| Model | With Driver | No Driver | Delta |
+|-------|-------------|-----------|-------|
+| LGBM | 0.9474 | **0.9494** | **+0.0020** |
+| XGBoost | 0.9489 | 0.9486 | −0.0003 (flat) |
+| CatBoost | 0.9479 | 0.9471 | −0.0008 |
+| MLP | 0.9457 | 0.9459 | +0.0002 (flat) |
+| **Ensemble** | **0.9500** | **0.9500** | flat |
+
+Dropped columns (now excluded via `DRIVER_COLS` constant in `features.py`):
+- `Driver` (raw categorical, 887 unique values)
+- `driver_pit_rate`, `driver_compound_pit_rate`, `driver_median_tyre_life_at_pit`
+
+**Why mixed**: LGBM was memorising per-driver patterns (overfitting); removing Driver
+frees its capacity. CatBoost uses ordered target statistics for categoricals — a
+fundamentally different (and more regularised) encoding that was extracting genuine
+signal from Driver rather than memorising. XGBoost and MLP are neutral.
+
+**Current state (2026-05-06)**: `DRIVER_COLS = frozenset({"Driver"})` — only the raw
+string Driver categorical is excluded. The numeric driver features (`driver_pit_rate`,
+`driver_compound_pit_rate`, `driver_median_tyre_life_at_pit`) are kept and contribute
+positively to all models.
+
+**Drop Driver string only result**: retrained all 4 models → ensemble **0.9506** (+0.0006
+vs previous best). LGBM 52.7% + XGBoost 23.9% + MLP 23.4% + CatBoost 0%.
+
+**Key insight**: dropping all driver features was wrong — the numeric driver statistics
+are computable on test and are useful. Only the raw Driver categorical (887 values, 86
+train-only drivers) should be excluded.
 
 ### Tried & flat (v2, v3, v6, v8)
 - v2 polynomial/interaction transforms: −0.0001 delta. LightGBM finds these internally.
@@ -231,16 +279,26 @@ Full analysis in `notebooks/analysis.py`, PNGs in `results/analysis/`.
 Near-perfect across all bins. No value in post-hoc calibration (isotonic/Platt).
 
 ### AUC by Year — CRITICAL: headline AUC is inflated
-| Year | AUC | Pit rate | N |
-|---|---|---|---|
-| 2022 | **0.9099** | 26.7% | 82,989 |
-| 2023 | 0.9391 | 1.0% | 136,147 |
-| 2024 | 0.9251 | 29.5% | 127,110 |
-| 2025 | 0.9251 | 28.4% | 92,894 |
+Full per-model per-year breakdown from `notebooks/distribution_shift.py` (2026-05-06):
 
-OOF AUC of 0.9480 is inflated by the easy 2023 prediction. **Effective real-world AUC
-(non-2023 rows weighted) ≈ 0.922**. The model's biggest lever (`is_2023`) is irrelevant
-at test time if test rows are all non-2023.
+| Year | N | pit% | LGBM | XGB | CatBoost | MLP | Ensemble |
+|---|---|---|---|---|---|---|---|
+| 2022 | 82,989 | 26.7% | 0.9090 | 0.9112 | 0.9109 | 0.9086 | 0.9139 |
+| 2023 | 136,147 | 1.0% | 0.9383 | **0.9428** | 0.9335 | **0.9126** | 0.9422 |
+| 2024 | 127,110 | 29.5% | 0.9244 | 0.9269 | 0.9255 | 0.9234 | 0.9284 |
+| 2025 | 92,894 | 28.4% | 0.9239 | 0.9261 | 0.9248 | 0.9220 | 0.9275 |
+| **Overall** | 439,140 | 19.9% | 0.9474 | 0.9489 | 0.9479 | 0.9457 | 0.9500 |
+
+OOF inflation (overall OOF − non-2023 weighted AUC): ~+0.027 across all models.
+**Expected LB ≈ 0.929 (ensemble)** given test has same year distribution as train.
+
+⚠️ **MLP on 2023**: AUC = 0.9126 vs trees 0.9335–0.9428. MLP is far weaker at exploiting
+the easy 2023 anomaly. This drags down MLP's overall OOF but may not matter on LB if
+the ensemble weight given to MLP on 2023 rows is sub-optimal. A conditional ensemble
+(higher MLP weight on non-2023 rows) could be worth exploring.
+
+⚠️ **Corrected prior**: "is_2023 irrelevant at test time" was WRONG — test has 30.9%
+2023 rows (same as train). The 2023 lever is equally useful at test time.
 
 Year 2022 is the hardest year — first season of major regulation changes, more strategy
 variance. Worth investigating separately.
@@ -264,8 +322,44 @@ Mexico City GP (0.9167, low pit rate 9.1%)
    categoricals (Race, Driver) may improve 2022/HARD/fresh-tyre failure zones
 2. **Longer LapTime_Delta rolling windows** — #3 feature; 3-lap window exists, try 5/7
    or exponential weighting — specifically targets fresh-tyre regime
-3. **The real competition ceiling is ~0.922**, not 0.948 — improvements in Year 2022
-   and fresh tyres are the highest-value targets
+3. **Expected LB ≈ 0.929 (ensemble)** — the realistic ceiling given test mirrors train's
+   year distribution. Improvements in Year 2022 and fresh-tyre regimes remain highest-value.
+4. **Conditional ensemble (is_2023 split)**: trees dominate on 2023 rows (AUC 0.9335–0.9428
+   vs MLP's 0.9126); on non-2023, all models within 0.003. Routing 2023 rows exclusively
+   to trees and non-2023 rows to the full ensemble could lift the final blended score.
+5. **Novel (Driver, Race, Year) stints in test (1,364 combos)**: trees risk memorising
+   driver/race patterns that don't transfer to these unseen combinations. MLP's heavy
+   regularisation is an advantage here — likely the main driver of MLP's relative LB
+   outperformance vs its OOF ranking.
+
+### Categorical encoding — MLP (2026-05-06)
+
+Tree models handle categoricals correctly:
+- LGBM: Pandas `category` dtype → native categorical splits
+- XGBoost: `enable_categorical=True` + `category` dtype → partition splits
+- CatBoost: `cat_features` + raw strings → ordered target statistics
+
+**MLP bug (now fixed)**: `Compound` and `Race` were label-encoded to integers then
+StandardScaled, treating them as continuous ordinal features. This is wrong (e.g. HARD=2
+implies "twice as much compound" as SOFT=1).
+
+**Fix applied in mlp_v6**: `pd.get_dummies()` replaces LabelEncoder → 5 Compound + 26
+Race binary columns (67 total features vs 38 before). StandardScaler still applied to OHE
+columns (centering binary features helps gradient flow).
+
+**Result**: mlp_v6 OOF 0.9455 vs v5 0.9458 — slightly worse because Optuna params were
+tuned on the old 38-feature setup. Encoding is now correct but **needs Optuna re-tuning**
+to benefit from the extra Race/Compound signal.
+
+**Train/test overlap confirmed**: Race (26), Compound (5), Year (4) are all fully present
+in both splits — no unseen categories at inference time. Only `Driver` had train-only values.
+
+### GPU memory fix — MLP (2026-05-06)
+
+`train_fold()` was not freeing GPU tensors between folds, causing CUDA memory fragmentation
+that could destabilise the driver under sustained training. Fix: added `del model,
+optimizer, scheduler, X_tr_t, y_tr_t, X_val_t, X_test_t` at the end of `train_fold()`
+and `torch.cuda.empty_cache()` after each fold in `main()`.
 
 ### Ensemble findings (2026-05-05)
 - LGBM + CatBoost blend (defaults) gives +0.0005 OOF AUC over LGBM alone; XGBoost defaults zeroed out
@@ -279,6 +373,7 @@ Mexico City GP (0.9167, low pit rate 9.1%)
 - Simple average of 4 models (0.9498) nearly matches optimized blend — models well-calibrated
 - **MLP Optuna tuning (50 trials, 3-fold)**: best params = 4-layer [1024→683→456→304], dropout=0.35, lr=4.8e-3, wd=1.9e-3; 3-fold best 0.9442, 5-fold retrain 0.9457 (+0.0005 vs v2)
 - **4-model best (mlp_v3): 0.9500** (XGBoost 46.4% + MLP 26.6% + CatBoost 18.1% + LGBM 8.9%) — crossed 0.95 threshold
+- **After dropping Driver (v9/v2/v2/v4): 0.9500** (LGBM 54.8% + MLP 25.4% + XGBoost 19.8% + CatBoost 0%) — OOF flat but LGBM now dominant; CatBoost zero-weighted
 
 ---
 
@@ -286,8 +381,8 @@ Mexico City GP (0.9167, low pit rate 9.1%)
 
 - **Baseline**: LightGBM 5-fold stratified CV (`src/baseline.py`)
 - **CV scores**: logged to `results/cv_scores.csv`
-- Categorical columns: `Driver`, `Compound`, `Race` — passed as `category` dtype to LightGBM
-- `Year` is currently treated as numeric — consider ordinal or one-hot given the 2023 anomaly
+- Categorical columns: `Compound`, `Race` — passed as `category` dtype to LGBM/XGBoost, as `cat_features` to CatBoost, as OHE to MLP (`Driver` excluded via `DRIVER_COLS`)
+- `Year` treated as numeric; `is_2023` flag handles the anomaly — this is sufficient
 
 ---
 
@@ -330,3 +425,11 @@ IDs from the feature-engineered frame. Re-run `ensemble.py` before any future su
 | 2026-05-05 | ensemble w/ mlp_v3 | XGBoost 46.4% + MLP 26.6% + CatBoost 18.1% + LGBM 8.9% | **0.9500** (+0.0001 — new best, crossed 0.95) |
 | 2026-05-05 | stacking_v1 | Logistic regression meta-learner (logit inputs, nested 10-fold/5-fold CV, L2 tuned) | **0.9500** (flat — converged to same weights as Nelder-Mead; models well-calibrated) |
 | 2026-05-05 | baseline_lgbm_v8 | v7 + 4 sequential features: `window_gap`, `laps_past_window`, `est_laps_remaining`, `pace_anomaly_pct` | **0.9474** (flat, −0.0001 — trees already learn these internally) |
+| 2026-05-06 | mlp_v4 | Ablation: drop ALL driver columns (Driver + driver_pit_rate + driver_compound_pit_rate + driver_median_tyre_life_at_pit) | **0.9459** (flat) |
+| 2026-05-06 | baseline_lgbm_v10 | Drop ONLY Driver string; keep driver numeric features | **0.9500** |
+| 2026-05-06 | xgboost_v3 | Drop ONLY Driver string; keep driver numeric features | **0.9493** |
+| 2026-05-06 | catboost_v3 | Drop ONLY Driver string; keep driver numeric features | **0.9476** |
+| 2026-05-06 | mlp_v5 | Drop ONLY Driver string (DRIVER_COLS = {"Driver"}); keep driver numeric features | **0.9458** (flat) |
+| 2026-05-06 | ensemble w/ mlp_v5 | LGBM 52.7% + XGBoost 23.9% + MLP 23.4% + CatBoost 0% | **0.9506** (+0.0006 — new best) |
+| 2026-05-06 | mlp_v6 | mlp_v5 + one-hot encoding for Compound (5) and Race (26); 38→67 features; params not re-tuned | **0.9455** (−0.0003 vs v5 — needs Optuna re-tune) |
+| 2026-05-06 | ensemble w/ mlp_v6 | LGBM 53.2% + XGBoost 22.6% + MLP 24.2% + CatBoost 0% | **0.9506** (flat) |
