@@ -177,6 +177,40 @@ Dropping all driver features (tried) left ensemble flat; dropping only the strin
 
 ---
 
+## Next Steps (remove each item when implemented)
+
+Priority order: A → B → E → D → C → F
+
+**A. Conditional ensemble split on is_2023** — change `ensemble.py` to fit separate weight
+vectors for 2023 vs non-2023 rows. MLP scores 0.9126 on 2023 vs trees at 0.9335–0.9428;
+flat blending penalises the ensemble. Expected +0.001–0.002. No retraining needed.
+
+**B. CatBoost with Driver string restored** — retrain `train_catboost.py` with Driver
+added back. CatBoost's ordered target statistics regularise high-cardinality categoricals;
+unlike LGBM it extracts signal rather than memorising. CB currently 0%-weighted; expected
+to recover 10–15% weight with Driver.
+
+**C. HPO re-run** — all models were tuned with Driver in feature set; params are now stale.
+MLP is most critical (38→67 features via OHE). Run `tune_mlp.py` first, then
+`tune.py` / `tune_xgboost.py` / `tune_catboost.py` as time permits.
+
+**D. Pace-based degradation rate** — add `degradation_rate_pace = LapTime_Delta / (TyreLife + 1)`
+to `features.py`. Captures lap-time loss per lap of tyre age — distinct from `TyreLife_frac`
+(age-based) and the unexplained `Cumulative_Degradation`. Also consider EWMA of
+`LapTime_Delta` (span=5) — `LapTime_Delta` is SHAP #3 so improvements here have leverage.
+Test in LGBM first (fast).
+
+**E. is_2022 flag** — add `(pl.col("Year") == 2022).cast(pl.Int8).alias("is_2022")` to
+`features.py::build_features()`. Year 2022 ensemble AUC is 0.9139 vs 0.9284+ for
+2024/2025; mirrors `is_2023` logic. One line, test in LGBM first.
+
+**F. Autoregressive "overdue" feature** — for each (Driver, Race, Year) stint, running sum
+of OOF pit probabilities on laps where no pit occurred. Requires two model passes +
+sequential test-time inference. Highest ceiling (+0.003–0.005 on fresh-tyre regime) but
+1–2 days effort. Attempt last.
+
+---
+
 ## Experiments Log
 
 | Date | Run | Description | OOF AUC |
