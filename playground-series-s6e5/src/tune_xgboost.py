@@ -13,7 +13,7 @@ from sklearn.model_selection import StratifiedKFold
 from xgboost import XGBClassifier
 
 sys.path.insert(0, str(Path(__file__).parent))
-from features import build_features, compute_group_features
+from features import DRIVER_COLS, build_features, compute_group_features
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 RESULTS_DIR = Path(__file__).parent.parent / "results"
@@ -39,12 +39,13 @@ def prepare_data() -> tuple[pd.DataFrame, np.ndarray]:
     train = build_features(train_raw)
     train = compute_group_features(train_raw, train)
 
+    _exclude = {"id", TARGET} | DRIVER_COLS
     cat_cols = [
         c
         for c in train.columns
-        if train[c].dtype == pl.String and c not in ("id", TARGET)
+        if train[c].dtype == pl.String and c not in _exclude
     ]
-    feature_cols = [c for c in train.columns if c not in ("id", TARGET)]
+    feature_cols = [c for c in train.columns if c not in _exclude]
 
     pdf = train.to_pandas()
     for col in cat_cols:

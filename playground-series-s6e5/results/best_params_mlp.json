@@ -1,9 +1,10 @@
 {
-  "n_layers": 4,
-  "first_size": 1024,
-  "shrink": 0.6667927450477253,
-  "dropout": 0.3532791766934781,
-  "lr": 0.004825204145606581,
-  "weight_decay": 0.0019524563202987584,
+  "n_layers": 3,
+  "first_size": 256,
+  "architecture": "fixed_width",
+  "use_skip": false,
+  "dropout": 0.20038325731708032,
+  "lr": 0.004155988266569057,
+  "weight_decay": 0.00034555199588966195,
   "activation": "relu"
 }

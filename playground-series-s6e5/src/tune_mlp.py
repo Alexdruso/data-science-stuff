@@ -1,5 +1,6 @@
 """Optuna hyperparameter search for PS S6E5 — MLP pit stop predictor."""
 
+import gc
 import json
 import sys
 from pathlib import Path
@@ -12,10 +13,10 @@ import torch
 import torch.nn as nn
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedKFold
-from sklearn.preprocessing import LabelEncoder, PowerTransformer, StandardScaler
+from sklearn.preprocessing import PowerTransformer, StandardScaler
 
 sys.path.insert(0, str(Path(__file__).parent))
-from features import build_features, compute_group_features
+from features import DRIVER_COLS, build_features, compute_group_features
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 RESULTS_DIR = Path(__file__).parent.parent / "results"
@@ -36,27 +37,47 @@ class MLP(nn.Module):
         layer_sizes: list[int],
         dropout: float,
         use_gelu: bool,
+        use_skip: bool = False,
     ) -> None:
         super().__init__()
         act_cls: type[nn.Module] = nn.GELU if use_gelu else nn.ReLU
-        layers: list[nn.Module] = []
+        self.use_skip = use_skip
+        self.blocks = nn.ModuleList()
+        self.projections = nn.ModuleList()
         in_size = n_features
         for size in layer_sizes:
-            layers += [
-                nn.Linear(in_size, size),
-                nn.BatchNorm1d(size),
-                act_cls(),
-                nn.Dropout(dropout),
-            ]
+            self.blocks.append(
+                nn.Sequential(
+                    nn.Linear(in_size, size),
+                    nn.BatchNorm1d(size),
+                    act_cls(),
+                    nn.Dropout(dropout),
+                )
+            )
+            if use_skip:
+                proj: nn.Module = (
+                    nn.Identity()
+                    if in_size == size
+                    else nn.Linear(in_size, size, bias=False)
+                )
+                self.projections.append(proj)
             in_size = size
-        layers.append(nn.Linear(in_size, 1))
-        self.net = nn.Sequential(*layers)
+        self.output_layer = nn.Linear(in_size, 1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.net(x).squeeze(1)
+        for i, block in enumerate(self.blocks):
+            if self.use_skip:
+                x = block(x) + self.projections[i](x)
+            else:
+                x = block(x)
+        return self.output_layer(x).squeeze(1)
 
 
-def build_layer_sizes(n_layers: int, first_size: int, shrink: float) -> list[int]:
+def build_layer_sizes(
+    n_layers: int, first_size: int, shrink: float, architecture: str
+) -> list[int]:
+    if architecture == "fixed_width":
+        return [first_size] * n_layers
     sizes = [first_size]
     for _ in range(n_layers - 1):
         sizes.append(max(32, int(sizes[-1] * shrink)))
@@ -65,18 +86,31 @@ def build_layer_sizes(n_layers: int, first_size: int, shrink: float) -> list[int
 
 def prepare_arrays(
     train_pl: pl.DataFrame,
+    test_pl: pl.DataFrame,
     cat_cols: list[str],
     feature_cols: list[str],
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, list[int], list[int]]:
     train_pd = train_pl.to_pandas()
-    for col in cat_cols:
-        le = LabelEncoder()
-        le.fit(train_pd[col])
-        train_pd[col] = le.transform(train_pd[col]).astype(np.float32)
+    test_pd = test_pl.to_pandas()
 
-    X = train_pd[feature_cols].to_numpy(dtype=np.float32)
+    num_cols = [c for c in feature_cols if c not in set(cat_cols)]
+
+    combined_cats = pd.concat(
+        [train_pd[cat_cols], test_pd[cat_cols]], ignore_index=True
+    )
+    ohe = pd.get_dummies(combined_cats, columns=cat_cols, dtype=np.float32)
+    n_train = len(train_pd)
+    train_ohe = ohe.iloc[:n_train].to_numpy(dtype=np.float32)
+
+    X_num = train_pd[num_cols].to_numpy(dtype=np.float32)
+    X = np.hstack([X_num, train_ohe])
     y = train_pd[TARGET].to_numpy(dtype=np.float32)
-    return X, y
+
+    n_num = len(num_cols)
+    n_ohe = train_ohe.shape[1]
+    num_idx = list(range(n_num))
+    cat_idx = list(range(n_num, n_num + n_ohe))
+    return X, y, num_idx, cat_idx
 
 
 def _train_fold_tune(
@@ -87,6 +121,7 @@ def _train_fold_tune(
     layer_sizes: list[int],
     dropout: float,
     use_gelu: bool,
+    use_skip: bool,
     lr: float,
     weight_decay: float,
     num_idx: list[int],
@@ -104,7 +139,7 @@ def _train_fold_tune(
     X_tr_s[:, cat_idx] = sc.fit_transform(X_tr[:, cat_idx])
     X_val_s[:, cat_idx] = sc.transform(X_val[:, cat_idx])
 
-    model = MLP(X_tr_s.shape[1], layer_sizes, dropout, use_gelu).to(DEVICE)
+    model = MLP(X_tr_s.shape[1], layer_sizes, dropout, use_gelu, use_skip).to(DEVICE)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)
     criterion = nn.BCEWithLogitsLoss()
@@ -144,6 +179,8 @@ def _train_fold_tune(
             if patience_counter >= PATIENCE:
                 break
 
+    del model, optimizer, scheduler, criterion, X_tr_t, y_tr_t, X_val_t, perm
+    del X_tr_s, X_val_s, pt, sc
     return float(roc_auc_score(y_val, best_val_pred))
 
 
@@ -156,13 +193,17 @@ def objective(
 ) -> float:
     n_layers = trial.suggest_int("n_layers", 2, 4)
     first_size = trial.suggest_categorical("first_size", [128, 256, 512, 1024])
-    shrink = trial.suggest_float("shrink", 0.3, 0.8)
+    architecture = trial.suggest_categorical("architecture", ["shrinking", "fixed_width"])
+    shrink = (
+        trial.suggest_float("shrink", 0.3, 0.8) if architecture == "shrinking" else 1.0
+    )
+    use_skip = trial.suggest_categorical("use_skip", [True, False])
     dropout = trial.suggest_float("dropout", 0.0, 0.5)
     lr = trial.suggest_float("lr", 1e-4, 5e-3, log=True)
     weight_decay = trial.suggest_float("weight_decay", 1e-5, 1e-2, log=True)
     activation = trial.suggest_categorical("activation", ["relu", "gelu"])
 
-    layer_sizes = build_layer_sizes(n_layers, int(first_size), shrink)
+    layer_sizes = build_layer_sizes(n_layers, int(first_size), shrink, architecture)
     use_gelu = activation == "gelu"
 
     skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=42)
@@ -177,13 +218,20 @@ def objective(
             layer_sizes,
             dropout,
             use_gelu,
+            bool(use_skip),
             lr,
             weight_decay,
             num_idx,
             cat_idx,
         )
         fold_aucs.append(auc)
+        if DEVICE.type == "cuda":
+            torch.cuda.empty_cache()
+        gc.collect()
 
+    if DEVICE.type == "cuda":
+        torch.cuda.empty_cache()
+    gc.collect()
     return float(np.mean(fold_aucs))
 
 
@@ -192,26 +240,27 @@ def main() -> None:
     print("Preparing data...")
 
     train_raw = pl.read_csv(DATA_DIR / "train.csv")
+    test_raw = pl.read_csv(DATA_DIR / "test.csv")
     train_pl = build_features(train_raw)
+    test_pl = build_features(test_raw)
     train_pl = compute_group_features(train_raw, train_pl)
+    test_pl = compute_group_features(train_raw, test_pl)
 
+    _exclude = {"id", TARGET} | DRIVER_COLS
     cat_cols = [
         c
         for c in train_pl.columns
-        if train_pl[c].dtype == pl.String and c not in ("id", TARGET)
+        if train_pl[c].dtype == pl.String and c not in _exclude
     ]
-    feature_cols = [c for c in train_pl.columns if c not in ("id", TARGET)]
+    feature_cols = [c for c in train_pl.columns if c not in _exclude]
 
-    cat_set = set(cat_cols)
-    cat_idx = [i for i, c in enumerate(feature_cols) if c in cat_set]
-    num_idx = [i for i, c in enumerate(feature_cols) if c not in cat_set]
-
-    X, y = prepare_arrays(train_pl, cat_cols, feature_cols)
+    X, y, num_idx, cat_idx = prepare_arrays(train_pl, test_pl, cat_cols, feature_cols)
     print(f"X shape: {X.shape}, num_idx: {len(num_idx)}, cat_idx: {len(cat_idx)}")
 
     print(f"Running {N_TRIALS} Optuna trials ({N_FOLDS}-fold CV each)...")
     optuna.logging.set_verbosity(optuna.logging.WARNING)
-    study = optuna.create_study(direction="maximize")
+    pruner = optuna.pruners.MedianPruner(n_startup_trials=5)
+    study = optuna.create_study(direction="maximize", pruner=pruner)
     study.optimize(
         lambda trial: objective(trial, X, y, num_idx, cat_idx),
         n_trials=N_TRIALS,

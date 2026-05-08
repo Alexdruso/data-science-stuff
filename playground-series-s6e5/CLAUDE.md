@@ -111,18 +111,15 @@ OOF inflation ~+0.027 across all models. **Expected LB ≈ 0.929 (ensemble).**
 
 ## Current Best
 
-**Ensemble OOF: 0.9506** (2026-05-06)
-Weights: LGBM 52.7% + XGBoost 23.9% + MLP 23.4% + CatBoost 0%
+**Ensemble OOF: 0.9506** (2026-05-08)
+Weights: LGBM 65.8% + MLP 25.2% + XGBoost 9.0% + CatBoost 0%
 
 | Model | OOF AUC | Script |
 |---|---|---|
-| LGBM | 0.9500 | `src/baseline.py` (lgbm_v10) |
-| XGBoost | 0.9493 | `src/train_xgboost.py` (xgb_v3) |
-| CatBoost | 0.9476 | `src/train_catboost.py` (catboost_v3) |
-| MLP | 0.9458 | `src/train_mlp.py` (mlp_v5) |
-
-Note: `oof_mlp.npy` / `test_mlp.npy` currently contain mlp_v6 results (OHE, 0.9455).
-**Re-run mlp_v5 or re-tune before next ensemble submission.**
+| LGBM | 0.9500 | `src/baseline.py` (lgbm_v11) |
+| XGBoost | 0.9494 | `src/train_xgboost.py` (xgb_v4) |
+| CatBoost | 0.9473 | `src/train_catboost.py` (catboost_v4) |
+| MLP | 0.9461 | `src/train_mlp.py` (mlp_v7) |
 
 ---
 
@@ -168,11 +165,11 @@ Dropping all driver features (tried) left ensemble flat; dropping only the strin
 ## Modelling Notes
 
 - **CV**: 5-fold stratified, `random_state=42`. Scores logged to `results/cv_scores.csv`
-- **LGBM**: CPU only — GPU bin limit of 256 is incompatible with Driver's 887 unique values; stays CPU even with Driver excluded (consistency)
+- **LGBM**: GPU (`device="gpu"`) — previously CPU-only due to Driver's 887 unique values exceeding the GPU 256-bin limit; switched to GPU after Driver string was dropped
 - **XGBoost / CatBoost**: `device="cuda"` / `task_type="GPU"` — no bin restriction
 - **Categoricals**: `Compound` + `Race` passed as `category` dtype to LGBM/XGBoost, `cat_features` to CatBoost, OHE (`pd.get_dummies`) to MLP
 - **MLP preprocessing**: Yeo-Johnson on numeric cols, StandardScaler on OHE binary cols
-- **MLP GPU fix**: `del` tensors + `torch.cuda.empty_cache()` after each fold — prevents CUDA fragmentation crash over 5 folds
+- **GPU memory rule (all MLP scripts)**: `del` model + optimizer + tensors before returning from each fold function; call `torch.cuda.empty_cache()` after each fold/trial in the outer loop. Applies to both `train_mlp.py` and `tune_mlp.py`. Omitting this in a 150-iteration tuning run (50 trials × 3 folds) crashed the PC
 - **MLP params** (Optuna, 50 trials): 4-layer [1024→683→456→304], dropout=0.35, lr=4.8e-3, wd=1.9e-3 — tuned on 38-feature setup, needs re-tune for 67-feature OHE
 
 ---
@@ -234,3 +231,5 @@ sequential test-time inference. Highest ceiling (+0.003–0.005 on fresh-tyre re
 | 2026-05-06 | ensemble w/ mlp_v5 | LGBM 52.7% + XGB 23.9% + MLP 23.4% + CB 0% | **0.9506** (new best) |
 | 2026-05-06 | mlp_v6 | +OHE for Compound/Race (38→67 features); params not re-tuned | 0.9455 (−0.0003) |
 | 2026-05-06 | ensemble w/ mlp_v6 | same weights | 0.9506 (flat) |
+| 2026-05-08 | all models re-tuned (GPU for LGBM) | lgbm_v11, xgb_v4, catboost_v4, mlp_v7 — re-tuned params post Driver-drop | LGBM 0.9500, XGB 0.9494, CB 0.9473, MLP 0.9461 |
+| 2026-05-08 | ensemble w/ all v4/v7 | LGBM 65.8% + MLP 25.2% + XGB 9.0% + CB 0% | **0.9506** (flat) |

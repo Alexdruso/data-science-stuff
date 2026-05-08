@@ -94,14 +94,14 @@ def main() -> None:
     print(f"\nBest strategy: {strategy}  OOF AUC: {best_auc:.4f}")
 
     model_names = "_".join(MODELS[: len(oofs)])
-    run_name = f"ensemble_{model_names}_v1"
+    run_name = f"ensemble_{model_names}_v2"
     save_cv_result(RESULTS_DIR, run_name, [], best_auc)
 
     np.save(RESULTS_DIR / "oof_ensemble.npy", best_oof)
 
     SUBMISSIONS_DIR.mkdir(exist_ok=True)
     submission = pd.DataFrame({"id": test_ids, TARGET: best_test})
-    out_path = SUBMISSIONS_DIR / "ensemble_v1.csv"
+    out_path = SUBMISSIONS_DIR / "ensemble_v2.csv"
     submission.to_csv(out_path, index=False)
     print(f"Submission saved → {out_path}")
 

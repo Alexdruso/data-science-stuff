@@ -36,6 +36,8 @@ DEFAULT_PARAMS: dict[str, object] = {
     "lr": 1e-3,
     "weight_decay": 1e-4,
     "activation": "relu",
+    "use_skip": False,
+    "architecture": "shrinking",
 }
 
 
@@ -50,7 +52,10 @@ def load_params() -> dict[str, object]:
 def build_layer_sizes(params: dict[str, object]) -> list[int]:
     n = int(params["n_layers"])  # type: ignore[arg-type]
     first = int(params["first_size"])  # type: ignore[arg-type]
-    shrink = float(params["shrink"])  # type: ignore[arg-type]
+    architecture = str(params.get("architecture", "shrinking"))
+    if architecture == "fixed_width":
+        return [first] * n
+    shrink = float(params.get("shrink", 0.5))  # type: ignore[arg-type]
     sizes = [first]
     for _ in range(n - 1):
         sizes.append(max(32, int(sizes[-1] * shrink)))
@@ -64,24 +69,40 @@ class MLP(nn.Module):
         layer_sizes: list[int],
         dropout: float,
         use_gelu: bool,
+        use_skip: bool = False,
     ) -> None:
         super().__init__()
         act_cls: type[nn.Module] = nn.GELU if use_gelu else nn.ReLU
-        layers: list[nn.Module] = []
+        self.use_skip = use_skip
+        self.blocks = nn.ModuleList()
+        self.projections = nn.ModuleList()
         in_size = n_features
         for size in layer_sizes:
-            layers += [
-                nn.Linear(in_size, size),
-                nn.BatchNorm1d(size),
-                act_cls(),
-                nn.Dropout(dropout),
-            ]
+            self.blocks.append(
+                nn.Sequential(
+                    nn.Linear(in_size, size),
+                    nn.BatchNorm1d(size),
+                    act_cls(),
+                    nn.Dropout(dropout),
+                )
+            )
+            if use_skip:
+                proj: nn.Module = (
+                    nn.Identity()
+                    if in_size == size
+                    else nn.Linear(in_size, size, bias=False)
+                )
+                self.projections.append(proj)
             in_size = size
-        layers.append(nn.Linear(in_size, 1))
-        self.net = nn.Sequential(*layers)
+        self.output_layer = nn.Linear(in_size, 1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.net(x).squeeze(1)
+        for i, block in enumerate(self.blocks):
+            if self.use_skip:
+                x = block(x) + self.projections[i](x)
+            else:
+                x = block(x)
+        return self.output_layer(x).squeeze(1)
 
 
 def load_data() -> tuple[pl.DataFrame, pl.DataFrame]:
@@ -152,10 +173,11 @@ def train_fold(
     layer_sizes = build_layer_sizes(params)
     dropout = float(params["dropout"])  # type: ignore[arg-type]
     use_gelu = params["activation"] == "gelu"
+    use_skip = bool(params.get("use_skip", False))
     lr = float(params["lr"])  # type: ignore[arg-type]
     weight_decay = float(params["weight_decay"])  # type: ignore[arg-type]
 
-    model = MLP(X_tr.shape[1], layer_sizes, dropout, use_gelu).to(DEVICE)
+    model = MLP(X_tr.shape[1], layer_sizes, dropout, use_gelu, use_skip).to(DEVICE)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)
     criterion = nn.BCEWithLogitsLoss()
@@ -256,7 +278,7 @@ def main() -> None:
     oof_auc = float(roc_auc_score(y, oof_proba))
     print(f"\nOOF AUC: {oof_auc:.4f}")
 
-    save_cv_result(RESULTS_DIR, "mlp_v6", fold_aucs, oof_auc)
+    save_cv_result(RESULTS_DIR, "mlp_v7", fold_aucs, oof_auc)
 
     np.save(RESULTS_DIR / "oof_mlp.npy", oof_proba)
     np.save(RESULTS_DIR / "test_mlp.npy", test_proba)
@@ -264,7 +286,7 @@ def main() -> None:
 
     SUBMISSIONS_DIR.mkdir(exist_ok=True)
     submission = pd.DataFrame({"id": test_ids, TARGET: test_proba})
-    out_path = SUBMISSIONS_DIR / "mlp_v6.csv"
+    out_path = SUBMISSIONS_DIR / "mlp_v7.csv"
     submission.to_csv(out_path, index=False)
     print(f"Submission saved → {out_path}")
 
