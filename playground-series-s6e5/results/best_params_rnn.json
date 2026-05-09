@@ -1,0 +1,9 @@
+{
+  "hidden_size": 128,
+  "n_layers": 3,
+  "dropout": 0.11680542985438477,
+  "lr": 0.0006974493668253716,
+  "weight_decay": 0.0012446998192932376,
+  "bidirectional": true,
+  "batch_size": 32
+}
