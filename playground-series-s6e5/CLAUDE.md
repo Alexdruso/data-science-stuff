@@ -225,6 +225,8 @@ Useful variants:
 ### Blend exhaustion signal
 When every support submission has `corr > 0.999` and `mean_abs_delta < 0.001` to the anchor, linear micro-blends will not move the leaderboard — the signal set is exhausted. The next gain requires a genuinely *different* high-scoring submission, not tighter mixing of existing ones. Track `corr` and `mean_abs_delta` to anchor when evaluating new blend candidates.
 
+**Tested 2026-05-09**: Support submissions corr range 0.965–0.998 (diverse by definition), yet best blend delta = 5e-6 (noise). The RNN (most diverse at corr=0.965) has too low quality (OOF 0.9368) to contribute positively; the better models (corr 0.997–0.998) lack the ordering diversity needed. Signal is exhausted — the next gain requires a structurally different high-quality model, not blending of the current set.
+
 ### Submission diversity taxonomy
 Before blending, classify submissions by tier using `corr + mean_abs_delta` to the anchor:
 
@@ -272,3 +274,4 @@ Diversity (low corr / high delta) is a prerequisite for blending to help — two
 | 2026-05-09 | ensemble_v4 | Conditional blend with 5 models (lgbm_ar added); 2023→LGBM 43.6%+LGBM-AR 17.9%+XGB 31.9%+MLP 6.6%; non-2023→LGBM 44.4%+LGBM-AR 25.3%+MLP 28.5% | **0.9508** (new best; +0.0001) |
 | 2026-05-09 | pace features (item D) | `degradation_rate_pace` + `lap_time_delta_ewma5` — reverted; OOF flat at 0.9500; LGBM already captures these interactions internally | 0.9500 (no change) |
 | 2026-05-09 | catboost_v5 (item B) | Driver string restored as cat feature — reverted; solo +0.0005 (0.9478) but ensemble −0.0001 (0.9507); Driver displacement of XGBoost weight harms blend | 0.9478 solo / 0.9507 ensemble |
+| 2026-05-09 | blend_submissions (rank+selective) | Post-ensemble rank blend + selective consensus correction; all support submissions diverse (corr 0.96–0.998) but best blend delta = 5e-6 (noise); signal exhausted with current model set | 0.9508 (flat) |
