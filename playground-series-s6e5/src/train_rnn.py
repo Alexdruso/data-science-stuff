@@ -6,8 +6,10 @@ the MLP misses (undercuts, degradation curves, strategic suppression).
 
 CV: GroupKFold so no sequence is ever split across train/val.
 Outputs: oof_rnn.npy, test_rnn.npy — same row-order convention as all other models.
+Loads tuned hyperparameters from results/best_params_rnn.json when available.
 """
 
+import json
 import sys
 from pathlib import Path
 
@@ -33,15 +35,30 @@ RESULTS_DIR = Path(__file__).parent.parent / "results"
 
 TARGET = "PitNextLap"
 N_FOLDS = 5
-BATCH_SIZE = 64      # sequences per batch
 EPOCHS = 50
 PATIENCE = 7
-HIDDEN_SIZE = 256
-N_LAYERS = 2
-DROPOUT = 0.3
-LR = 1e-3
-WEIGHT_DECAY = 1e-4
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Defaults (overridden by best_params_rnn.json when present)
+_DEFAULTS: dict[str, object] = {
+    "hidden_size": 256,
+    "n_layers": 2,
+    "dropout": 0.3,
+    "lr": 1e-3,
+    "weight_decay": 1e-4,
+    "bidirectional": False,
+    "batch_size": 64,
+}
+
+
+def load_params() -> dict[str, object]:
+    params_path = RESULTS_DIR / "best_params_rnn.json"
+    base: dict[str, object] = dict(_DEFAULTS)
+    if params_path.exists():
+        with params_path.open() as f:
+            base.update(json.load(f))
+        print(f"Loaded tuned params from {params_path}", flush=True)
+    return base
 
 
 # ---------------------------------------------------------------------------
@@ -50,7 +67,12 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class GRUModel(nn.Module):
     def __init__(
-        self, n_features: int, hidden_size: int, n_layers: int, dropout: float
+        self,
+        n_features: int,
+        hidden_size: int,
+        n_layers: int,
+        dropout: float,
+        bidirectional: bool = False,
     ) -> None:
         super().__init__()
         self.rnn = nn.GRU(
@@ -59,17 +81,18 @@ class GRUModel(nn.Module):
             n_layers,
             batch_first=True,
             dropout=dropout if n_layers > 1 else 0.0,
+            bidirectional=bidirectional,
         )
-        self.head = nn.Sequential(nn.Dropout(dropout), nn.Linear(hidden_size, 1))
+        head_in = hidden_size * 2 if bidirectional else hidden_size
+        self.head = nn.Sequential(nn.Dropout(dropout), nn.Linear(head_in, 1))
 
     def forward(self, x: torch.Tensor, lengths: torch.Tensor) -> torch.Tensor:
-        # lengths must be on CPU for pack_padded_sequence
         x_packed = pack_padded_sequence(
             x, lengths.cpu(), batch_first=True, enforce_sorted=False
         )
         out_packed, _ = self.rnn(x_packed)
-        out_padded, _ = pad_packed_sequence(out_packed, batch_first=True)  # (B, T_max, H)
-        return self.head(out_padded).squeeze(-1)  # (B, T_max)
+        out_padded, _ = pad_packed_sequence(out_packed, batch_first=True)  # (B, T, H[*2])
+        return self.head(out_padded).squeeze(-1)  # (B, T)
 
 
 # ---------------------------------------------------------------------------
@@ -102,20 +125,16 @@ class RaceSequenceDataset(Dataset):
     def __len__(self) -> int:
         return len(self.seqs)
 
-    def __getitem__(
-        self, i: int
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def __getitem__(self, i: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         return self.seqs[i], self.labels[i], self.row_indices[i]
 
 
 def collate_fn(
-    batch: list[tuple[np.ndarray, np.ndarray, np.ndarray]]
+    batch: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, list[np.ndarray]]:
     seqs, labels, row_indices = zip(*batch)
     lengths = torch.tensor([len(s) for s in seqs], dtype=torch.long)
-    seqs_padded = pad_sequence(
-        [torch.from_numpy(s) for s in seqs], batch_first=True
-    )
+    seqs_padded = pad_sequence([torch.from_numpy(s) for s in seqs], batch_first=True)
     labels_padded = pad_sequence(
         [torch.from_numpy(la) for la in labels],
         batch_first=True,
@@ -150,7 +169,7 @@ def collect_predictions(
 
 
 # ---------------------------------------------------------------------------
-# Data preparation (mirrors train_mlp.py)
+# Data preparation
 # ---------------------------------------------------------------------------
 
 def prepare_arrays(
@@ -211,7 +230,16 @@ def train_fold(
     train_row_idx: np.ndarray,
     val_row_idx: np.ndarray,
     n_features: int,
+    params: dict[str, object],
 ) -> tuple[np.ndarray, np.ndarray]:
+    batch_size = int(params["batch_size"])
+    hidden_size = int(params["hidden_size"])
+    n_layers = int(params["n_layers"])
+    dropout = float(params["dropout"])
+    lr = float(params["lr"])
+    weight_decay = float(params["weight_decay"])
+    bidirectional = bool(params["bidirectional"])
+
     train_mask = np.zeros(len(X_scaled), dtype=bool)
     train_mask[train_row_idx] = True
     val_mask = np.zeros(len(X_scaled), dtype=bool)
@@ -223,18 +251,12 @@ def train_fold(
         X_test_scaled, np.zeros(len(X_test_scaled), dtype=np.float32), test_group_ids
     )
 
-    train_loader = DataLoader(
-        train_ds, batch_size=BATCH_SIZE, shuffle=True, collate_fn=collate_fn
-    )
-    val_loader = DataLoader(
-        val_ds, batch_size=BATCH_SIZE, shuffle=False, collate_fn=collate_fn
-    )
-    test_loader = DataLoader(
-        test_ds, batch_size=BATCH_SIZE, shuffle=False, collate_fn=collate_fn
-    )
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
+    val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
+    test_loader = DataLoader(test_ds, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
 
-    model = GRUModel(n_features, HIDDEN_SIZE, N_LAYERS, DROPOUT).to(DEVICE)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
+    model = GRUModel(n_features, hidden_size, n_layers, dropout, bidirectional).to(DEVICE)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)
 
     best_val_auc = 0.0
@@ -302,8 +324,10 @@ def main() -> None:
 
     train_group_ids = make_group_ids(train_pl)
     test_group_ids = make_group_ids(test_pl)
-    n_train_seqs = len(np.unique(train_group_ids))
-    print(f"Train sequences: {n_train_seqs}", flush=True)
+    print(f"Train sequences: {len(np.unique(train_group_ids))}", flush=True)
+
+    params = load_params()
+    print(f"Params: {params}", flush=True)
 
     gkf = GroupKFold(n_splits=N_FOLDS)
     oof_proba = np.zeros(len(X), dtype=np.float32)
@@ -313,7 +337,6 @@ def main() -> None:
     for fold, (train_row_idx, val_row_idx) in enumerate(
         gkf.split(X, groups=train_group_ids), 1
     ):
-        # Scale: fit on train rows only, apply to all rows + test
         pt = PowerTransformer(method="yeo-johnson", standardize=True)
         sc = StandardScaler()
         pt.fit(X[train_row_idx][:, num_idx])
@@ -330,7 +353,7 @@ def main() -> None:
             X_scaled, y, X_test_scaled,
             train_group_ids, test_group_ids,
             train_row_idx, val_row_idx,
-            n_features,
+            n_features, params,
         )
 
         oof_proba[val_row_idx] = val_pred[val_row_idx]
@@ -346,14 +369,14 @@ def main() -> None:
     oof_auc = float(roc_auc_score(y, oof_proba))
     print(f"\nOOF AUC: {oof_auc:.4f}", flush=True)
 
-    save_cv_result(RESULTS_DIR, "rnn_v1", fold_aucs, oof_auc)
+    save_cv_result(RESULTS_DIR, "rnn_v2", fold_aucs, oof_auc)
     np.save(RESULTS_DIR / "oof_rnn.npy", oof_proba)
     np.save(RESULTS_DIR / "test_rnn.npy", test_proba)
     print(f"OOF/test arrays saved → {RESULTS_DIR}", flush=True)
 
     SUBMISSIONS_DIR.mkdir(exist_ok=True)
     submission = pd.DataFrame({"id": test_ids, TARGET: test_proba})
-    out_path = SUBMISSIONS_DIR / "rnn_v1.csv"
+    out_path = SUBMISSIONS_DIR / "rnn_v2.csv"
     submission.to_csv(out_path, index=False)
     print(f"Submission saved → {out_path}", flush=True)
 
