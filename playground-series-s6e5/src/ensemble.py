@@ -1,4 +1,4 @@
-"""Blend LGBM + CatBoost + XGBoost + MLP OOF predictions and build final submission."""
+"""Blend LGBM + LGBM-AR + CatBoost + XGBoost + MLP OOF predictions and build final submission."""
 
 import sys
 from pathlib import Path
@@ -18,7 +18,7 @@ SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
 RESULTS_DIR = Path(__file__).parent.parent / "results"
 TARGET = "PitNextLap"
 
-MODELS = ["lgbm", "catboost", "xgboost", "mlp"]
+MODELS = ["lgbm", "lgbm_ar", "catboost", "xgboost", "mlp"]
 
 
 def neg_ensemble_auc(
@@ -129,12 +129,12 @@ def main() -> None:
     strategy, best_auc, best_oof, best_test = max(candidates, key=lambda t: t[1])
     print(f"\nBest strategy: {strategy}  OOF AUC: {best_auc:.4f}")
 
-    save_cv_result(RESULTS_DIR, "ensemble_v3", [], best_auc)
+    save_cv_result(RESULTS_DIR, "ensemble_v4", [], best_auc)
     np.save(RESULTS_DIR / "oof_ensemble.npy", best_oof)
 
     SUBMISSIONS_DIR.mkdir(exist_ok=True)
     submission = pd.DataFrame({"id": test_ids, TARGET: best_test})
-    out_path = SUBMISSIONS_DIR / "ensemble_v3.csv"
+    out_path = SUBMISSIONS_DIR / "ensemble_v4.csv"
     submission.to_csv(out_path, index=False)
     print(f"Submission saved → {out_path}")
 

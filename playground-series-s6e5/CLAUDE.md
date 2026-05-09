@@ -111,14 +111,15 @@ OOF inflation ~+0.027 across all models. **Expected LB ≈ 0.929 (ensemble).**
 
 ## Current Best
 
-**Ensemble OOF: 0.9507** (2026-05-09) ← current best
-Conditional blend: 2023 rows → LGBM 57.5% + XGB 35.5% + MLP 7.0% + CB 0%; non-2023 → LGBM 66.4% + MLP 30.0% + XGB 3.7% + CB 0%
+**Ensemble OOF: 0.9508** (2026-05-09) ← current best
+Conditional blend (5 models, lgbm_ar added): 2023→LGBM 43.6%+LGBM-AR 17.9%+XGB 31.9%+MLP 6.6%; non-2023→LGBM 44.4%+LGBM-AR 25.3%+MLP 28.5%+CB 1.7%
 
-Previous best: **0.9506** (2026-05-08) flat weights LGBM 65.8% + MLP 25.2% + XGBoost 9.0% + CatBoost 0%
+Previous best: **0.9507** (2026-05-09) 4-model conditional blend
 
 | Model | OOF AUC | Script |
 |---|---|---|
 | LGBM | 0.9500 | `src/baseline.py` (lgbm_v11) |
+| LGBM-AR | 0.9498 | `src/train_lgbm_ar.py` (lgbm_ar_v1) — autoregressive overdue feature |
 | XGBoost | 0.9494 | `src/train_xgboost.py` (xgb_v4) |
 | CatBoost | 0.9473 | `src/train_catboost.py` (catboost_v4) |
 | MLP | 0.9461 | `src/train_mlp.py` (mlp_v7) |
@@ -178,11 +179,7 @@ Dropping all driver features (tried) left ensemble flat; dropping only the strin
 
 ## Next Steps (remove each item when implemented)
 
-Priority order: A → B → E → D → C → F
-
-**A. Conditional ensemble split on is_2023** — change `ensemble.py` to fit separate weight
-vectors for 2023 vs non-2023 rows. MLP scores 0.9126 on 2023 vs trees at 0.9335–0.9428;
-flat blending penalises the ensemble. Expected +0.001–0.002. No retraining needed.
+Priority order: B → E → D → C
 
 **B. CatBoost with Driver string restored** — retrain `train_catboost.py` with Driver
 added back. CatBoost's ordered target statistics regularise high-cardinality categoricals;
@@ -203,10 +200,51 @@ Test in LGBM first (fast).
 `features.py::build_features()`. Year 2022 ensemble AUC is 0.9139 vs 0.9284+ for
 2024/2025; mirrors `is_2023` logic. One line, test in LGBM first.
 
-**F. Autoregressive "overdue" feature** — for each (Driver, Race, Year) stint, running sum
-of OOF pit probabilities on laps where no pit occurred. Requires two model passes +
-sequential test-time inference. Highest ceiling (+0.003–0.005 on fresh-tyre regime) but
-1–2 days effort. Attempt last.
+---
+
+## Post-Ensemble Submission Blending
+
+Strategies from public competition notebooks — untried by us; use as inspiration for the blending phase once model training plateaus.
+
+### Rank blending
+Instead of linearly mixing probabilities, blend the *ranks* of two submissions, then re-assign the anchor's sorted probability values to the new ordering. Preserves the anchor's calibration (distribution shape unchanged) while potentially improving AUC-relevant ordering.
+
+```python
+def rank_blend(anchor, support, w):
+    anchor_rank = np.argsort(np.argsort(anchor, kind="mergesort"), kind="mergesort") / len(anchor)
+    support_rank = np.argsort(np.argsort(support, kind="mergesort"), kind="mergesort") / len(support)
+    blended_rank = (1 - w) * anchor_rank + w * support_rank
+    order = np.argsort(blended_rank, kind="mergesort")
+    out = np.empty_like(anchor)
+    out[order] = np.sort(anchor)
+    return out
+```
+
+Try `w=0.02` (2%) with the next most diverse strong submission as support.
+
+### Selective consensus correction
+Build a consensus from N support submissions (e.g. `0.40*s_a + 0.35*s_b + 0.25*s_c`), then only modify the rows where `|consensus − anchor|` is largest (top 2%). Apply a mild blend weight (≈10% consensus) only on those rows. Targets correction effort at rows most likely to be wrong without diluting the whole submission.
+
+Useful variants:
+- **Up-only**: correct only rows where `consensus > anchor` — tests for systematic under-estimation
+- **Down-only**: correct only rows where `consensus < anchor` — tests for systematic over-estimation
+- **Extreme-rank**: restrict to top/bottom 10% of anchor predictions (where AUC is most sensitive) before selecting the top-2% disagreement rows
+
+### Blend exhaustion signal
+When every support submission has `corr > 0.999` and `mean_abs_delta < 0.001` to the anchor, linear micro-blends will not move the leaderboard — the signal set is exhausted. The next gain requires a genuinely *different* high-scoring submission, not tighter mixing of existing ones. Track `corr` and `mean_abs_delta` to anchor when evaluating new blend candidates.
+
+### Submission diversity taxonomy
+Before blending, classify submissions by tier using `corr + mean_abs_delta` to the anchor:
+
+| Tier | Description | Expected corr to anchor |
+|---|---|---|
+| super | Current top-LB cluster | > 0.9998 |
+| core | Strong cluster 0.001–0.003 below top | ~0.9996 |
+| diverse | Structurally different (e.g. mean ≈ 0.5) | < 0.998 |
+| support | Older/lower-scoring but complementary | ~0.997–0.999 |
+| top_external | Other teams' public best submissions | varies |
+
+Diversity (low corr / high delta) is a prerequisite for blending to help — two submissions that are 0.9999 correlated will not correct each other's errors.
 
 ---
 
@@ -237,4 +275,6 @@ sequential test-time inference. Highest ceiling (+0.003–0.005 on fresh-tyre re
 | 2026-05-08 | ensemble w/ all v4/v7 | LGBM 65.8% + MLP 25.2% + XGB 9.0% + CB 0% | **0.9506** (flat) |
 | 2026-05-09 | stacking_v2_lr_with_features | LR meta-learner (L2, C=0.1/1/10) + full feature matrix alongside OOF logits | 0.9506 (flat — LR learns nothing extra from raw features on top of calibrated OOFs) |
 | 2026-05-09 | rnn_v1 | GRU hidden=256 layers=2 dropout=0.3, GroupKFold(5), 50 epochs — src/train_rnn.py | 0.9368 (below MLP 0.9461; no tuning; folds balanced so gap is real — needs Optuna before ensemble use) |
-| 2026-05-09 | ensemble_v3 | Conditional blend split on is_2023 — separate Nelder-Mead per regime | **0.9507** (new best; +0.0001 over flat; 2023→LGBM 57.5%+XGB 35.5%+MLP 7%; non-2023→LGBM 66.4%+MLP 30%) |
+| 2026-05-09 | ensemble_v3 | Conditional blend split on is_2023 — separate Nelder-Mead per regime | **0.9507** (+0.0001; 2023→LGBM 57.5%+XGB 35.5%+MLP 7%; non-2023→LGBM 66.4%+MLP 30%) |
+| 2026-05-09 | lgbm_ar_v1 | Autoregressive overdue feature (cumsum OOF within stint, lag 1); sequential test inference — src/train_lgbm_ar.py | 0.9498 (−0.0002 vs lgbm; adds diversity via different structure) |
+| 2026-05-09 | ensemble_v4 | Conditional blend with 5 models (lgbm_ar added); 2023→LGBM 43.6%+LGBM-AR 17.9%+XGB 31.9%+MLP 6.6%; non-2023→LGBM 44.4%+LGBM-AR 25.3%+MLP 28.5% | **0.9508** (new best; +0.0001) |
