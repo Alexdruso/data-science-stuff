@@ -111,8 +111,10 @@ OOF inflation ~+0.027 across all models. **Expected LB ≈ 0.929 (ensemble).**
 
 ## Current Best
 
-**Ensemble OOF: 0.9506** (2026-05-08)
-Weights: LGBM 65.8% + MLP 25.2% + XGBoost 9.0% + CatBoost 0%
+**Ensemble OOF: 0.9507** (2026-05-09) ← current best
+Conditional blend: 2023 rows → LGBM 57.5% + XGB 35.5% + MLP 7.0% + CB 0%; non-2023 → LGBM 66.4% + MLP 30.0% + XGB 3.7% + CB 0%
+
+Previous best: **0.9506** (2026-05-08) flat weights LGBM 65.8% + MLP 25.2% + XGBoost 9.0% + CatBoost 0%
 
 | Model | OOF AUC | Script |
 |---|---|---|
@@ -234,3 +236,5 @@ sequential test-time inference. Highest ceiling (+0.003–0.005 on fresh-tyre re
 | 2026-05-08 | all models re-tuned (GPU for LGBM) | lgbm_v11, xgb_v4, catboost_v4, mlp_v7 — re-tuned params post Driver-drop | LGBM 0.9500, XGB 0.9494, CB 0.9473, MLP 0.9461 |
 | 2026-05-08 | ensemble w/ all v4/v7 | LGBM 65.8% + MLP 25.2% + XGB 9.0% + CB 0% | **0.9506** (flat) |
 | 2026-05-09 | stacking_v2_lr_with_features | LR meta-learner (L2, C=0.1/1/10) + full feature matrix alongside OOF logits | 0.9506 (flat — LR learns nothing extra from raw features on top of calibrated OOFs) |
+| 2026-05-09 | rnn_v1 | GRU hidden=256 layers=2 dropout=0.3, GroupKFold(5), 50 epochs — src/train_rnn.py | 0.9368 (below MLP 0.9461; no tuning; folds balanced so gap is real — needs Optuna before ensemble use) |
+| 2026-05-09 | ensemble_v3 | Conditional blend split on is_2023 — separate Nelder-Mead per regime | **0.9507** (new best; +0.0001 over flat; 2023→LGBM 57.5%+XGB 35.5%+MLP 7%; non-2023→LGBM 66.4%+MLP 30%) |

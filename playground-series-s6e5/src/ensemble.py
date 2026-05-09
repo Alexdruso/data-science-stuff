@@ -32,6 +32,21 @@ def neg_ensemble_auc(
     return -float(roc_auc_score(y, blend))
 
 
+def optimize_weights(
+    oofs: list[np.ndarray], y: np.ndarray, mask: np.ndarray
+) -> np.ndarray:
+    x0 = np.ones(len(oofs)) / len(oofs)
+    result = minimize(
+        neg_ensemble_auc,
+        x0,
+        args=([o[mask] for o in oofs], y[mask]),
+        method="Nelder-Mead",
+        options={"maxiter": 5000, "xatol": 1e-6, "fatol": 1e-6},
+    )
+    w = np.clip(result.x, 0, None)
+    return w / w.sum()
+
+
 def main() -> None:
     train_raw = pl.read_csv(DATA_DIR / "train.csv")
     train = build_features(train_raw)
@@ -39,7 +54,10 @@ def main() -> None:
     y = train[TARGET].to_numpy()
     # Must go through build_features so IDs are in the same sorted order
     # as the test_{model}.npy prediction arrays.
-    test_ids = build_features(pl.read_csv(DATA_DIR / "test.csv"))["id"].to_numpy()
+    test_df = build_features(pl.read_csv(DATA_DIR / "test.csv"))
+    test_ids = test_df["id"].to_numpy()
+    is_2023_train = (train["Year"] == 2023).to_numpy().astype(bool)
+    is_2023_test = (test_df["Year"] == 2023).to_numpy().astype(bool)
 
     oofs, tests = [], []
     for model in MODELS:
@@ -57,51 +75,66 @@ def main() -> None:
         print("Need at least 2 models to ensemble.")
         return
 
-    # Simple average
+    # --- Strategy 1: simple average ---
     simple_blend_oof = np.mean(oofs, axis=0)
     simple_auc = float(roc_auc_score(y, simple_blend_oof))
     print(f"\n  Simple average OOF AUC: {simple_auc:.4f}")
 
-    # Optimized weights (Nelder-Mead, non-negative)
-    x0 = np.ones(len(oofs)) / len(oofs)
-    result = minimize(
-        neg_ensemble_auc,
-        x0=x0,
-        args=(oofs, y),
-        method="Nelder-Mead",
-        options={"maxiter": 5000, "xatol": 1e-6, "fatol": 1e-6},
-    )
-    opt_w = np.clip(result.x, 0, None)
-    opt_w = opt_w / opt_w.sum()
+    # --- Strategy 2: flat optimized weights ---
+    opt_w = optimize_weights(oofs, y, mask=np.ones(len(y), dtype=bool))
     opt_blend_oof = sum(w * oof for w, oof in zip(opt_w, oofs))
     opt_auc = float(roc_auc_score(y, opt_blend_oof))
-    print(f"  Optimized weights OOF AUC: {opt_auc:.4f}")
+    print(f"  Flat optimized OOF AUC: {opt_auc:.4f}")
     for name, w in zip(MODELS[: len(oofs)], opt_w):
         print(f"    {name}: {w:.3f}")
 
-    # Pick best blend
-    if opt_auc >= simple_auc:
-        best_oof = opt_blend_oof
-        best_test = sum(w * t for w, t in zip(opt_w, tests))
-        best_auc = opt_auc
-        strategy = "optimized"
-    else:
-        best_oof = simple_blend_oof
-        best_test = np.mean(tests, axis=0)
-        best_auc = simple_auc
-        strategy = "simple_avg"
+    # --- Strategy 3: conditional weights split on is_2023 ---
+    print(f"\n  Optimizing 2023 weights  (n={is_2023_train.sum()}) ...")
+    w_2023 = optimize_weights(oofs, y, mask=is_2023_train)
+    print(f"  Optimizing non-2023 weights (n={(~is_2023_train).sum()}) ...")
+    w_non2023 = optimize_weights(oofs, y, mask=~is_2023_train)
 
+    oof_cond = np.empty(len(y))
+    oof_cond[is_2023_train] = sum(
+        w * o[is_2023_train] for w, o in zip(w_2023, oofs)
+    )
+    oof_cond[~is_2023_train] = sum(
+        w * o[~is_2023_train] for w, o in zip(w_non2023, oofs)
+    )
+    cond_auc = float(roc_auc_score(y, oof_cond))
+    print(f"  Conditional OOF AUC: {cond_auc:.4f}")
+    print("  2023 weights:")
+    for name, w in zip(MODELS[: len(oofs)], w_2023):
+        print(f"    {name}: {w:.3f}")
+    print("  non-2023 weights:")
+    for name, w in zip(MODELS[: len(oofs)], w_non2023):
+        print(f"    {name}: {w:.3f}")
+
+    # --- Pick best strategy ---
+    candidates = [
+        ("simple_avg",   simple_auc, simple_blend_oof, np.mean(tests, axis=0)),
+        ("flat_opt",     opt_auc,    opt_blend_oof,    sum(w * t for w, t in zip(opt_w, tests))),
+        ("conditional",  cond_auc,   oof_cond,         None),
+    ]
+    test_cond = np.empty(len(test_ids))
+    test_cond[is_2023_test] = sum(
+        w * t[is_2023_test] for w, t in zip(w_2023, tests)
+    )
+    test_cond[~is_2023_test] = sum(
+        w * t[~is_2023_test] for w, t in zip(w_non2023, tests)
+    )
+    # patch the None placeholder
+    candidates[2] = ("conditional", cond_auc, oof_cond, test_cond)
+
+    strategy, best_auc, best_oof, best_test = max(candidates, key=lambda t: t[1])
     print(f"\nBest strategy: {strategy}  OOF AUC: {best_auc:.4f}")
 
-    model_names = "_".join(MODELS[: len(oofs)])
-    run_name = f"ensemble_{model_names}_v2"
-    save_cv_result(RESULTS_DIR, run_name, [], best_auc)
-
+    save_cv_result(RESULTS_DIR, "ensemble_v3", [], best_auc)
     np.save(RESULTS_DIR / "oof_ensemble.npy", best_oof)
 
     SUBMISSIONS_DIR.mkdir(exist_ok=True)
     submission = pd.DataFrame({"id": test_ids, TARGET: best_test})
-    out_path = SUBMISSIONS_DIR / "ensemble_v2.csv"
+    out_path = SUBMISSIONS_DIR / "ensemble_v3.csv"
     submission.to_csv(out_path, index=False)
     print(f"Submission saved → {out_path}")
 
