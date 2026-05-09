@@ -233,3 +233,4 @@ sequential test-time inference. Highest ceiling (+0.003–0.005 on fresh-tyre re
 | 2026-05-06 | ensemble w/ mlp_v6 | same weights | 0.9506 (flat) |
 | 2026-05-08 | all models re-tuned (GPU for LGBM) | lgbm_v11, xgb_v4, catboost_v4, mlp_v7 — re-tuned params post Driver-drop | LGBM 0.9500, XGB 0.9494, CB 0.9473, MLP 0.9461 |
 | 2026-05-08 | ensemble w/ all v4/v7 | LGBM 65.8% + MLP 25.2% + XGB 9.0% + CB 0% | **0.9506** (flat) |
+| 2026-05-09 | stacking_v2_lr_with_features | LR meta-learner (L2, C=0.1/1/10) + full feature matrix alongside OOF logits | 0.9506 (flat — LR learns nothing extra from raw features on top of calibrated OOFs) |
