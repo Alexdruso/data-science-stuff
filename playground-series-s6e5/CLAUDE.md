@@ -155,6 +155,8 @@ Numeric driver stats (`driver_pit_rate`, `driver_compound_pit_rate`, `driver_med
 **Key insight**: the raw Driver categorical (887 values, 86 train-only drivers) hurts LGBM
 via memorisation. The numeric aggregates are computable on test and are universally helpful.
 Dropping all driver features (tried) left ensemble flat; dropping only the string gave +0.0006.
+CatBoost with Driver restored: solo +0.0005 (0.9478) but ensemble −0.0001 — Driver gains in CB
+displace XGB weight in the blend, netting a loss. Driver stays excluded for all models.
 
 | Model | With Driver | Drop Driver string only | Drop all driver |
 |---|---|---|---|
@@ -180,12 +182,7 @@ Dropping all driver features (tried) left ensemble flat; dropping only the strin
 
 ## Next Steps (remove each item when implemented)
 
-Priority order: B → E → C
-
-**B. CatBoost with Driver string restored** — retrain `train_catboost.py` with Driver
-added back. CatBoost's ordered target statistics regularise high-cardinality categoricals;
-unlike LGBM it extracts signal rather than memorising. CB currently 0%-weighted; expected
-to recover 10–15% weight with Driver.
+Priority order: E → C
 
 **C. HPO re-run** — all models were tuned with Driver in feature set; params are now stale.
 MLP is most critical (38→67 features via OHE). Run `tune_mlp.py` first, then
@@ -274,3 +271,4 @@ Diversity (low corr / high delta) is a prerequisite for blending to help — two
 | 2026-05-09 | lgbm_ar_v1 | Autoregressive overdue feature (cumsum OOF within stint, lag 1); sequential test inference — src/train_lgbm_ar.py | 0.9498 (−0.0002 vs lgbm; adds diversity via different structure) |
 | 2026-05-09 | ensemble_v4 | Conditional blend with 5 models (lgbm_ar added); 2023→LGBM 43.6%+LGBM-AR 17.9%+XGB 31.9%+MLP 6.6%; non-2023→LGBM 44.4%+LGBM-AR 25.3%+MLP 28.5% | **0.9508** (new best; +0.0001) |
 | 2026-05-09 | pace features (item D) | `degradation_rate_pace` + `lap_time_delta_ewma5` — reverted; OOF flat at 0.9500; LGBM already captures these interactions internally | 0.9500 (no change) |
+| 2026-05-09 | catboost_v5 (item B) | Driver string restored as cat feature — reverted; solo +0.0005 (0.9478) but ensemble −0.0001 (0.9507); Driver displacement of XGBoost weight harms blend | 0.9478 solo / 0.9507 ensemble |
