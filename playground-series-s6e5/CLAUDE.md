@@ -143,6 +143,7 @@ All features implemented in `src/features.py`. Currently active:
 | Sequential features lag/roll (v6) | −0.0003 | Deep trees already capture this |
 | `TyreLife_frac` | −0.0002 | Redundant with existing tyre features |
 | Drop 2023 entirely (v4) | −0.029 | Removes 136k clean negatives |
+| `degradation_rate_pace` + `lap_time_delta_ewma5` | 0.0000 | LGBM captures LapTime_Delta×TyreLife interactions and recency weighting internally |
 
 ---
 
@@ -179,7 +180,7 @@ Dropping all driver features (tried) left ensemble flat; dropping only the strin
 
 ## Next Steps (remove each item when implemented)
 
-Priority order: B → E → D → C
+Priority order: B → E → C
 
 **B. CatBoost with Driver string restored** — retrain `train_catboost.py` with Driver
 added back. CatBoost's ordered target statistics regularise high-cardinality categoricals;
@@ -189,12 +190,6 @@ to recover 10–15% weight with Driver.
 **C. HPO re-run** — all models were tuned with Driver in feature set; params are now stale.
 MLP is most critical (38→67 features via OHE). Run `tune_mlp.py` first, then
 `tune.py` / `tune_xgboost.py` / `tune_catboost.py` as time permits.
-
-**D. Pace-based degradation rate** — add `degradation_rate_pace = LapTime_Delta / (TyreLife + 1)`
-to `features.py`. Captures lap-time loss per lap of tyre age — distinct from `TyreLife_frac`
-(age-based) and the unexplained `Cumulative_Degradation`. Also consider EWMA of
-`LapTime_Delta` (span=5) — `LapTime_Delta` is SHAP #3 so improvements here have leverage.
-Test in LGBM first (fast).
 
 **E. is_2022 flag** — add `(pl.col("Year") == 2022).cast(pl.Int8).alias("is_2022")` to
 `features.py::build_features()`. Year 2022 ensemble AUC is 0.9139 vs 0.9284+ for
@@ -278,3 +273,4 @@ Diversity (low corr / high delta) is a prerequisite for blending to help — two
 | 2026-05-09 | ensemble_v3 | Conditional blend split on is_2023 — separate Nelder-Mead per regime | **0.9507** (+0.0001; 2023→LGBM 57.5%+XGB 35.5%+MLP 7%; non-2023→LGBM 66.4%+MLP 30%) |
 | 2026-05-09 | lgbm_ar_v1 | Autoregressive overdue feature (cumsum OOF within stint, lag 1); sequential test inference — src/train_lgbm_ar.py | 0.9498 (−0.0002 vs lgbm; adds diversity via different structure) |
 | 2026-05-09 | ensemble_v4 | Conditional blend with 5 models (lgbm_ar added); 2023→LGBM 43.6%+LGBM-AR 17.9%+XGB 31.9%+MLP 6.6%; non-2023→LGBM 44.4%+LGBM-AR 25.3%+MLP 28.5% | **0.9508** (new best; +0.0001) |
+| 2026-05-09 | pace features (item D) | `degradation_rate_pace` + `lap_time_delta_ewma5` — reverted; OOF flat at 0.9500; LGBM already captures these interactions internally | 0.9500 (no change) |
