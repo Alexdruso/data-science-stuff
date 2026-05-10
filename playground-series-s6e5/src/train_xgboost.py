@@ -13,7 +13,7 @@ from xgboost import XGBClassifier
 
 sys.path.insert(0, str(Path(__file__).parent))
 from cv_results import save_cv_result
-from features import DRIVER_COLS, build_features, compute_group_features
+from features import DRIVER_COLS, build_features, compute_group_features, compute_race_lap_features
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
@@ -67,6 +67,8 @@ def main() -> None:
     test_pl = build_features(test_pl)
     train_pl = compute_group_features(train_raw, train_pl)
     test_pl = compute_group_features(train_raw, test_pl)
+    train_pl = compute_race_lap_features(train_pl)
+    test_pl = compute_race_lap_features(test_pl)
     print(f"Train: {train_pl.shape}, Test: {test_pl.shape}")
 
     _exclude = {"id", TARGET} | DRIVER_COLS

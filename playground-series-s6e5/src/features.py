@@ -104,6 +104,82 @@ def _smoothed_rate(
     )
 
 
+def compute_race_lap_features(df: pl.DataFrame) -> pl.DataFrame:
+    """Add cross-driver race-lap context features.
+
+    Groups PitStop across all drivers in (Race, Year, LapNumber) to capture
+    strategic context: pit waves, safety-car windows, undercut pressure.
+    Uses PitStop (current lap) only — no leakage from the target PitNextLap.
+    """
+    race_lap = (
+        df.group_by(["Race", "Year", "LapNumber"])
+        .agg(
+            [
+                pl.col("PitStop").sum().alias("n_pitted_this_lap"),
+                pl.len().alias("n_drivers_this_lap"),
+            ]
+        )
+        .with_columns(
+            (pl.col("n_pitted_this_lap") / pl.col("n_drivers_this_lap")).alias(
+                "frac_pitted_this_lap"
+            )
+        )
+        .sort(["Race", "Year", "LapNumber"])
+    )
+
+    race_lap = (
+        race_lap.with_columns(
+            pl.col("n_pitted_this_lap")
+            .shift(1)
+            .over(["Race", "Year"])
+            .fill_null(0)
+            .alias("_n_pitted_prev")
+        )
+        .with_columns(
+            [
+                pl.col("_n_pitted_prev")
+                .rolling_sum(window_size=3, min_periods=1)
+                .over(["Race", "Year"])
+                .alias("n_pitted_last3"),
+                pl.col("_n_pitted_prev")
+                .rolling_sum(window_size=5, min_periods=1)
+                .over(["Race", "Year"])
+                .alias("n_pitted_last5"),
+                pl.when(pl.col("n_pitted_this_lap") > 0)
+                .then(pl.col("LapNumber"))
+                .otherwise(None)
+                .forward_fill()
+                .over(["Race", "Year"])
+                .alias("_last_pit_lap"),
+            ]
+        )
+        .with_columns(
+            (pl.col("LapNumber") - pl.col("_last_pit_lap").fill_null(0)).alias(
+                "laps_since_last_pit_in_race"
+            )
+        )
+        .drop(["_n_pitted_prev", "_last_pit_lap"])
+    )
+
+    return df.join(
+        race_lap.select(
+            [
+                "Race",
+                "Year",
+                "LapNumber",
+                "n_pitted_this_lap",
+                "n_drivers_this_lap",
+                "frac_pitted_this_lap",
+                "n_pitted_last3",
+                "n_pitted_last5",
+                "laps_since_last_pit_in_race",
+            ]
+        ),
+        on=["Race", "Year", "LapNumber"],
+        how="left",
+    )
+
+
 def compute_group_features(
     train_df: pl.DataFrame,
     df: pl.DataFrame,
