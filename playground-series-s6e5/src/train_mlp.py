@@ -11,11 +11,11 @@ import torch
 import torch.nn as nn
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedKFold
-from sklearn.preprocessing import PowerTransformer, StandardScaler
+from sklearn.preprocessing import PowerTransformer, StandardScaler, TargetEncoder
 
 sys.path.insert(0, str(Path(__file__).parent))
 from cv_results import save_cv_result
-from features import DRIVER_COLS, build_features, compute_group_features, compute_race_lap_features
+from features import DRIVER_COLS, build_features, compute_group_features, compute_race_lap_features, compute_race_stint_features
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
@@ -238,6 +238,8 @@ def main() -> None:
     test_pl = compute_group_features(train_raw, test_pl)
     train_pl = compute_race_lap_features(train_pl)
     test_pl = compute_race_lap_features(test_pl)
+    train_pl = compute_race_stint_features(train_raw, train_pl)
+    test_pl = compute_race_stint_features(train_raw, test_pl)
     print(f"Train: {train_pl.shape}, Test: {test_pl.shape}")
 
     _exclude = {"id", TARGET} | DRIVER_COLS
@@ -252,12 +254,31 @@ def main() -> None:
         train_pl, test_pl, cat_cols, feature_cols
     )
 
+    # Driver target encoding: numeric column added after prepare_arrays (goes into num_idx)
+    driver_train = train_pl["Driver"].to_numpy()
+    driver_test = test_pl["Driver"].to_numpy()
+    te_full = TargetEncoder(smooth="auto", random_state=42)
+    te_full.fit(driver_train.reshape(-1, 1), y)
+    driver_enc_test = te_full.transform(driver_test.reshape(-1, 1)).ravel().astype(np.float32)
+    driver_col_idx = X.shape[1]
+    X = np.hstack([X, np.zeros((len(X), 1), dtype=np.float32)])
+    X_test = np.hstack([X_test, driver_enc_test.reshape(-1, 1)])
+    num_idx = num_idx + [driver_col_idx]
+
     skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=42)
     oof_proba = np.zeros(len(X))
     test_proba = np.zeros(len(X_test))
     fold_aucs: list[float] = []
 
     for fold, (train_idx, val_idx) in enumerate(skf.split(X, y), 1):
+        te = TargetEncoder(smooth="auto", cv=5, random_state=42)
+        X[train_idx, driver_col_idx] = te.fit_transform(
+            driver_train[train_idx].reshape(-1, 1), y[train_idx]
+        ).ravel().astype(np.float32)
+        X[val_idx, driver_col_idx] = te.transform(
+            driver_train[val_idx].reshape(-1, 1)
+        ).ravel().astype(np.float32)
+
         val_pred, test_pred = train_fold(
             X[train_idx],
             y[train_idx],
@@ -280,7 +301,7 @@ def main() -> None:
     oof_auc = float(roc_auc_score(y, oof_proba))
     print(f"\nOOF AUC: {oof_auc:.4f}")
 
-    save_cv_result(RESULTS_DIR, "mlp_v7", fold_aucs, oof_auc)
+    save_cv_result(RESULTS_DIR, "mlp_v8", fold_aucs, oof_auc)
 
     np.save(RESULTS_DIR / "oof_mlp.npy", oof_proba)
     np.save(RESULTS_DIR / "test_mlp.npy", test_proba)
@@ -288,7 +309,7 @@ def main() -> None:
 
     SUBMISSIONS_DIR.mkdir(exist_ok=True)
     submission = pd.DataFrame({"id": test_ids, TARGET: test_proba})
-    out_path = SUBMISSIONS_DIR / "mlp_v7.csv"
+    out_path = SUBMISSIONS_DIR / "mlp_v8.csv"
     submission.to_csv(out_path, index=False)
     print(f"Submission saved → {out_path}")
 

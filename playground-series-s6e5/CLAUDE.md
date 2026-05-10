@@ -111,19 +111,19 @@ OOF inflation ~+0.027 across all models. **Expected LB ≈ 0.929 (ensemble).**
 
 ## Current Best
 
-**Ensemble OOF: 0.9508** (2026-05-09) ← current best (4-model, pre-race-lap-features; use `submissions/ensemble_v4.csv`)
+**Ensemble OOF: 0.9508** (2026-05-09) ← all-time best (pre-race-lap-features; `submissions/ensemble_v4.csv`)
 Conditional blend (5 models, lgbm_ar included): 2023→LGBM 43.6%+LGBM-AR 17.9%+XGB 31.9%+MLP 6.6%; non-2023→LGBM 44.4%+LGBM-AR 25.3%+MLP 28.5%+CB 1.7%
 
-**Ensemble OOF: 0.9504** (2026-05-10, ensemble_v5) — 4-model conditional blend after race-lap context features; LGBM-AR dropped from ensemble (insufficient marginal gain)
-2023→LGBM 45.8%+CB 16.7%+XGB 34.8%+MLP 2.6%; non-2023→LGBM 69.4%+XGB 1.5%+MLP 29.1%+CB 0%
+**Ensemble OOF: 0.9506** (2026-05-10, ensemble_v6) ← current model state (`submissions/ensemble_v6.csv`)
+Conditional blend: 2023→XGB 51.2%+LGBM 35.5%+CB 10.0%+MLP 3.3%; non-2023→LGBM 68.9%+MLP 26.6%+XGB 4.6%+CB 0%
 
-| Model | OOF AUC (pre-race-lap) | OOF AUC (post-race-lap) | Script |
-|---|---|---|---|
-| LGBM | 0.9500 | 0.9498 | `src/baseline.py` |
-| LGBM-AR | 0.9498 | — (dropped from ensemble) | `src/train_lgbm_ar.py` |
-| XGBoost | 0.9494 | 0.9492 | `src/train_xgboost.py` |
-| CatBoost | 0.9473 | 0.9472 | `src/train_catboost.py` |
-| MLP | 0.9461 | 0.9454 | `src/train_mlp.py` |
+| Model | Pre-race-lap | Post-race-lap | Post feat-eng (v12/v5/v5/v8) | Script |
+|---|---|---|---|---|
+| LGBM | 0.9500 | 0.9498 | **0.9501** | `src/baseline.py` |
+| XGBoost | 0.9494 | 0.9492 | **0.9495** | `src/train_xgboost.py` |
+| CatBoost | 0.9473 | 0.9472 | **0.9475** | `src/train_catboost.py` |
+| MLP | 0.9461 | 0.9454 | **0.9452** | `src/train_mlp.py` |
+| LGBM-AR | 0.9498 | — (dropped from ensemble) | — | `src/train_lgbm_ar.py` |
 
 ---
 
@@ -185,7 +185,7 @@ displace XGB weight in the blend, netting a loss. Driver stays excluded for all 
 
 ## Next Steps (remove each item when implemented)
 
-Priority order: I → E → J → G → C → F → H
+Priority order: ~~I~~ → ~~E~~ → J → ~~G~~ → C → F → H
 
 **I. Race stint economics** — add total-laps-in-race and derived features to `compute_group_features()`:
 - `total_race_laps`: `max(LapNumber)` per `(Race, Year)` computed on train, joined to test.
@@ -310,3 +310,5 @@ Diversity (low corr / high delta) is a prerequisite for blending to help — two
 | 2026-05-10 | tune_rnn + rnn_v2 | Optuna 30-trial tuning (3-fold GroupKFold); best: bidirectional=True, hidden=128, n_layers=3, dropout=0.117, lr=7e-4, batch=32; full 5-fold retrain | 0.9382 (+0.0014 vs rnn_v1); still gets 0% ensemble weight — gap to trees too large |
 | 2026-05-10 | race-lap context features | Activated `compute_race_lap_features()` in all train scripts (n_pitted_this_lap, n_drivers_this_lap, frac_pitted_this_lap, n_pitted_last3, n_pitted_last5, laps_since_last_pit_in_race); retrained all 4 base models | LGBM 0.9498 (−0.0002), XGB 0.9492 (−0.0002), CB 0.9472 (−0.0001), MLP 0.9454 (−0.0007) — all models regressed |
 | 2026-05-10 | ensemble_v5 | 4-model conditional blend (LGBM-AR dropped: insufficient marginal gain); race-lap features active | **0.9504** (−0.0004 vs ensemble_v4); 2023→LGBM 45.8%+CB 16.7%+XGB 34.8%+MLP 2.6%; non-2023→LGBM 69.4%+MLP 29.1%+XGB 1.5% |
+| 2026-05-10 | feat-eng sprint (I+E+G) | Added `is_2022`, `compute_race_stint_features` (total_race_laps, laps_remaining, prev_stint_length, max_tyre_life_at_pit_race), Driver TargetEncoder (fold-aware, cv=5) to all 4 base models; retrained | LGBM 0.9501 (+0.0003), XGB 0.9495 (+0.0003), CB 0.9475 (+0.0003), MLP 0.9452 (−0.0002) |
+| 2026-05-10 | ensemble_v6 | 4-model conditional blend post feat-eng sprint | **0.9506** (+0.0002 vs v5); 2023→XGB 51.2%+LGBM 35.5%+CB 10.0%+MLP 3.3%; non-2023→LGBM 68.9%+MLP 26.6%+XGB 4.6% |
