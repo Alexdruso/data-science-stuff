@@ -1,9 +1,10 @@
 {
-  "num_leaves": 385,
-  "min_child_samples": 196,
-  "learning_rate": 0.015404321338120126,
-  "subsample": 0.8382602109481754,
-  "colsample_bytree": 0.44664079004326346,
-  "reg_alpha": 0.47727646580435407,
-  "reg_lambda": 0.038954703270179
+  "fourier_L": 2,
+  "num_leaves": 334,
+  "min_child_samples": 228,
+  "learning_rate": 0.017821350586623284,
+  "subsample": 0.5381720107589512,
+  "colsample_bytree": 0.6613311407185909,
+  "reg_alpha": 0.8312226012056128,
+  "reg_lambda": 1.074251761206747
 }

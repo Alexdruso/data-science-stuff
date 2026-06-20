@@ -14,7 +14,8 @@ from xgboost import XGBClassifier
 sys.path.insert(0, str(Path(__file__).parent))
 from cv_results import save_cv_result
 from features import DRIVER_COLS, build_features, compute_group_features, compute_race_lap_features, compute_race_stint_features
-from sklearn.preprocessing import TargetEncoder
+from positional_encoding import PE_FEATURE_NAMES, apply_fourier_df
+from sklearn.preprocessing import MinMaxScaler, TargetEncoder
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
@@ -43,6 +44,7 @@ DEFAULT_PARAMS: dict[str, object] = {
     "reg_lambda": 5.0,
     "min_child_weight": 10,
     "gamma": 0.0,
+    "fourier_L": 3,
 }
 
 
@@ -100,6 +102,9 @@ def main() -> None:
     X_test["driver_target_enc"] = te_full.transform(driver_test.reshape(-1, 1)).ravel()
 
     params = load_params()
+    fourier_L = int(params.pop("fourier_L", 3))
+    pe_cols = [c for c in PE_FEATURE_NAMES if c in X.columns]
+
     skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=42)
     oof_proba = np.zeros(len(X))
     test_proba = np.zeros(len(X_test))
@@ -118,12 +123,17 @@ def main() -> None:
             driver_train[val_idx].reshape(-1, 1)
         ).ravel()
 
+        pe_scaler = MinMaxScaler().fit(X_tr[pe_cols])
+        X_tr = apply_fourier_df(X_tr, pe_cols, fourier_L, pe_scaler)
+        X_val = apply_fourier_df(X_val, pe_cols, fourier_L, pe_scaler)
+        X_test_fold = apply_fourier_df(X_test.copy(), pe_cols, fourier_L, pe_scaler)
+
         model = XGBClassifier(**params)
         model.fit(X_tr, y_tr, eval_set=[(X_val, y_val)], verbose=False)
 
         val_pred = model.predict_proba(X_val)[:, 1]
         oof_proba[val_idx] = val_pred
-        test_proba += model.predict_proba(X_test)[:, 1] / N_FOLDS
+        test_proba += model.predict_proba(X_test_fold)[:, 1] / N_FOLDS
 
         fold_auc = float(roc_auc_score(y_val, val_pred))
         fold_aucs.append(fold_auc)
@@ -132,7 +142,7 @@ def main() -> None:
     oof_auc = float(roc_auc_score(y, oof_proba))
     print(f"\nOOF AUC: {oof_auc:.4f}")
 
-    save_cv_result(RESULTS_DIR, "xgboost_v5", fold_aucs, oof_auc)
+    save_cv_result(RESULTS_DIR, "xgboost_v7", fold_aucs, oof_auc)
 
     np.save(RESULTS_DIR / "oof_xgboost.npy", oof_proba)
     np.save(RESULTS_DIR / "test_xgboost.npy", test_proba)
@@ -140,7 +150,7 @@ def main() -> None:
 
     SUBMISSIONS_DIR.mkdir(exist_ok=True)
     submission = pd.DataFrame({"id": test_ids, TARGET: test_proba})
-    out_path = SUBMISSIONS_DIR / "xgboost_v5.csv"
+    out_path = SUBMISSIONS_DIR / "xgboost_v7.csv"
     submission.to_csv(out_path, index=False)
     print(f"Submission saved → {out_path}")
 

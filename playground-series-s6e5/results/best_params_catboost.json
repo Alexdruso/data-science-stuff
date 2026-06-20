@@ -1,8 +1,9 @@
 {
-  "depth": 7,
-  "learning_rate": 0.10081379955566934,
-  "l2_leaf_reg": 2.5542465375266046,
-  "bagging_temperature": 0.0068038400952401545,
-  "random_strength": 5.12699019630377,
-  "min_data_in_leaf": 90
+  "fourier_L": 6,
+  "depth": 8,
+  "learning_rate": 0.07257749117218273,
+  "l2_leaf_reg": 25.12155975366238,
+  "bagging_temperature": 0.20368572136167812,
+  "random_strength": 8.958494516457762,
+  "min_data_in_leaf": 51
 }

@@ -16,7 +16,9 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import PowerTransformer, StandardScaler
 
 sys.path.insert(0, str(Path(__file__).parent))
-from features import DRIVER_COLS, build_features, compute_group_features
+from features import DRIVER_COLS, build_features, compute_group_features, compute_race_lap_features, compute_race_stint_features
+from positional_encoding import PE_FEATURE_NAMES, apply_fourier_np
+from sklearn.preprocessing import TargetEncoder
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 RESULTS_DIR = Path(__file__).parent.parent / "results"
@@ -89,9 +91,11 @@ def prepare_arrays(
     test_pl: pl.DataFrame,
     cat_cols: list[str],
     feature_cols: list[str],
-) -> tuple[np.ndarray, np.ndarray, list[int], list[int]]:
+) -> tuple[np.ndarray, np.ndarray, list[str], list[int], list[int], np.ndarray]:
     train_pd = train_pl.to_pandas()
     test_pd = test_pl.to_pandas()
+
+    driver_arr = train_pd["Driver"].to_numpy()
 
     num_cols = [c for c in feature_cols if c not in set(cat_cols)]
 
@@ -110,7 +114,7 @@ def prepare_arrays(
     n_ohe = train_ohe.shape[1]
     num_idx = list(range(n_num))
     cat_idx = list(range(n_num, n_num + n_ohe))
-    return X, y, num_idx, cat_idx
+    return X, y, num_cols, num_idx, cat_idx, driver_arr
 
 
 def _train_fold_tune(
@@ -126,6 +130,8 @@ def _train_fold_tune(
     weight_decay: float,
     num_idx: list[int],
     cat_idx: list[int],
+    fourier_L: int = 0,
+    pe_indices: list[int] | None = None,
 ) -> float:
     pt = PowerTransformer(method="yeo-johnson", standardize=True)
     sc = StandardScaler()
@@ -138,6 +144,10 @@ def _train_fold_tune(
 
     X_tr_s[:, cat_idx] = sc.fit_transform(X_tr[:, cat_idx])
     X_val_s[:, cat_idx] = sc.transform(X_val[:, cat_idx])
+
+    if fourier_L > 0 and pe_indices:
+        X_tr_s = apply_fourier_np(X_tr_s, pe_indices, fourier_L)
+        X_val_s = apply_fourier_np(X_val_s, pe_indices, fourier_L)
 
     model = MLP(X_tr_s.shape[1], layer_sizes, dropout, use_gelu, use_skip).to(DEVICE)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
@@ -188,8 +198,10 @@ def objective(
     trial: optuna.Trial,
     X: np.ndarray,
     y: np.ndarray,
+    num_cols: list[str],
     num_idx: list[int],
     cat_idx: list[int],
+    driver_arr: np.ndarray,
 ) -> float:
     n_layers = trial.suggest_int("n_layers", 2, 4)
     first_size = trial.suggest_categorical("first_size", [128, 256, 512, 1024])
@@ -202,18 +214,33 @@ def objective(
     lr = trial.suggest_float("lr", 1e-4, 5e-3, log=True)
     weight_decay = trial.suggest_float("weight_decay", 1e-5, 1e-2, log=True)
     activation = trial.suggest_categorical("activation", ["relu", "gelu"])
+    fourier_L = trial.suggest_int("fourier_L", 1, 6)
 
     layer_sizes = build_layer_sizes(n_layers, int(first_size), shrink, architecture)
     use_gelu = activation == "gelu"
+    pe_indices = [num_cols.index(n) for n in PE_FEATURE_NAMES if n in num_cols]
 
     skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=42)
     fold_aucs: list[float] = []
 
     for train_idx, val_idx in skf.split(X, y):
+        te = TargetEncoder(smooth="auto", cv=5, random_state=42)
+        driver_enc_tr = te.fit_transform(
+            driver_arr[train_idx].reshape(-1, 1), y[train_idx]
+        ).astype(np.float32)
+        driver_enc_val = te.transform(
+            driver_arr[val_idx].reshape(-1, 1)
+        ).astype(np.float32)
+        X_tr = np.hstack([X[train_idx], driver_enc_tr])
+        X_val = np.hstack([X[val_idx], driver_enc_val])
+        driver_col_idx = [X_tr.shape[1] - 1]
+        num_idx_ext = num_idx + driver_col_idx
+        cat_idx_ext = cat_idx
+
         auc = _train_fold_tune(
-            X[train_idx],
+            X_tr,
             y[train_idx],
-            X[val_idx],
+            X_val,
             y[val_idx],
             layer_sizes,
             dropout,
@@ -221,8 +248,10 @@ def objective(
             bool(use_skip),
             lr,
             weight_decay,
-            num_idx,
-            cat_idx,
+            num_idx_ext,
+            cat_idx_ext,
+            fourier_L=fourier_L,
+            pe_indices=pe_indices,
         )
         fold_aucs.append(auc)
         if DEVICE.type == "cuda":
@@ -245,6 +274,10 @@ def main() -> None:
     test_pl = build_features(test_raw)
     train_pl = compute_group_features(train_raw, train_pl)
     test_pl = compute_group_features(train_raw, test_pl)
+    train_pl = compute_race_lap_features(train_pl)
+    test_pl = compute_race_lap_features(test_pl)
+    train_pl = compute_race_stint_features(train_raw, train_pl)
+    test_pl = compute_race_stint_features(train_raw, test_pl)
 
     _exclude = {"id", TARGET} | DRIVER_COLS
     cat_cols = [
@@ -254,7 +287,7 @@ def main() -> None:
     ]
     feature_cols = [c for c in train_pl.columns if c not in _exclude]
 
-    X, y, num_idx, cat_idx = prepare_arrays(train_pl, test_pl, cat_cols, feature_cols)
+    X, y, num_cols, num_idx, cat_idx, driver_arr = prepare_arrays(train_pl, test_pl, cat_cols, feature_cols)
     print(f"X shape: {X.shape}, num_idx: {len(num_idx)}, cat_idx: {len(cat_idx)}")
 
     print(f"Running {N_TRIALS} Optuna trials ({N_FOLDS}-fold CV each)...")
@@ -262,7 +295,7 @@ def main() -> None:
     pruner = optuna.pruners.MedianPruner(n_startup_trials=5)
     study = optuna.create_study(direction="maximize", pruner=pruner)
     study.optimize(
-        lambda trial: objective(trial, X, y, num_idx, cat_idx),
+        lambda trial: objective(trial, X, y, num_cols, num_idx, cat_idx, driver_arr),
         n_trials=N_TRIALS,
         show_progress_bar=True,
     )

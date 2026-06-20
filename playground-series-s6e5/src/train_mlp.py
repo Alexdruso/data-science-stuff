@@ -16,6 +16,7 @@ from sklearn.preprocessing import PowerTransformer, StandardScaler, TargetEncode
 sys.path.insert(0, str(Path(__file__).parent))
 from cv_results import save_cv_result
 from features import DRIVER_COLS, build_features, compute_group_features, compute_race_lap_features, compute_race_stint_features
+from positional_encoding import PE_FEATURE_NAMES, apply_fourier_np
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
@@ -38,6 +39,7 @@ DEFAULT_PARAMS: dict[str, object] = {
     "activation": "relu",
     "use_skip": False,
     "architecture": "shrinking",
+    "fourier_L": 3,
 }
 
 
@@ -114,7 +116,7 @@ def prepare_arrays(
     test_pl: pl.DataFrame,
     cat_cols: list[str],
     feature_cols: list[str],
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, list[int], list[int]]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, list[str], list[int], list[int]]:
     train_pd = train_pl.to_pandas()
     test_pd = test_pl.to_pandas()
 
@@ -140,7 +142,7 @@ def prepare_arrays(
     n_ohe = train_ohe.shape[1]
     num_idx = list(range(n_num))
     cat_idx = list(range(n_num, n_num + n_ohe))
-    return X, y, X_test, test_ids, num_idx, cat_idx
+    return X, y, X_test, test_ids, num_cols, num_idx, cat_idx
 
 
 def train_fold(
@@ -152,6 +154,8 @@ def train_fold(
     num_idx: list[int],
     cat_idx: list[int],
     params: dict[str, object],
+    fourier_L: int = 0,
+    pe_indices: list[int] | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     pt = PowerTransformer(method="yeo-johnson", standardize=True)
     sc = StandardScaler()
@@ -167,6 +171,11 @@ def train_fold(
     X_tr_s[:, cat_idx] = sc.fit_transform(X_tr[:, cat_idx])
     X_val_s[:, cat_idx] = sc.transform(X_val[:, cat_idx])
     X_test_scaled[:, cat_idx] = sc.transform(X_test[:, cat_idx])
+
+    if fourier_L > 0 and pe_indices:
+        X_tr_s = apply_fourier_np(X_tr_s, pe_indices, fourier_L)
+        X_val_s = apply_fourier_np(X_val_s, pe_indices, fourier_L)
+        X_test_scaled = apply_fourier_np(X_test_scaled, pe_indices, fourier_L)
 
     X_tr, X_val = X_tr_s, X_val_s
 
@@ -250,7 +259,7 @@ def main() -> None:
     ]
     feature_cols = [c for c in train_pl.columns if c not in _exclude]
 
-    X, y, X_test, test_ids, num_idx, cat_idx = prepare_arrays(
+    X, y, X_test, test_ids, num_cols, num_idx, cat_idx = prepare_arrays(
         train_pl, test_pl, cat_cols, feature_cols
     )
 
@@ -263,7 +272,12 @@ def main() -> None:
     driver_col_idx = X.shape[1]
     X = np.hstack([X, np.zeros((len(X), 1), dtype=np.float32)])
     X_test = np.hstack([X_test, driver_enc_test.reshape(-1, 1)])
+    num_cols = num_cols + ["driver_target_enc"]
     num_idx = num_idx + [driver_col_idx]
+
+    fourier_L = int(params.get("fourier_L", 3))
+    pe_indices = [num_cols.index(n) for n in PE_FEATURE_NAMES if n in num_cols]
+    print(f"Fourier L={fourier_L}, encoding {len(pe_indices)} features: {[num_cols[i] for i in pe_indices]}")
 
     skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=42)
     oof_proba = np.zeros(len(X))
@@ -288,6 +302,8 @@ def main() -> None:
             num_idx,
             cat_idx,
             params,
+            fourier_L=fourier_L,
+            pe_indices=pe_indices,
         )
         oof_proba[val_idx] = val_pred
         test_proba += test_pred / N_FOLDS
@@ -301,7 +317,7 @@ def main() -> None:
     oof_auc = float(roc_auc_score(y, oof_proba))
     print(f"\nOOF AUC: {oof_auc:.4f}")
 
-    save_cv_result(RESULTS_DIR, "mlp_v8", fold_aucs, oof_auc)
+    save_cv_result(RESULTS_DIR, "mlp_v10", fold_aucs, oof_auc)
 
     np.save(RESULTS_DIR / "oof_mlp.npy", oof_proba)
     np.save(RESULTS_DIR / "test_mlp.npy", test_proba)
@@ -309,7 +325,7 @@ def main() -> None:
 
     SUBMISSIONS_DIR.mkdir(exist_ok=True)
     submission = pd.DataFrame({"id": test_ids, TARGET: test_proba})
-    out_path = SUBMISSIONS_DIR / "mlp_v8.csv"
+    out_path = SUBMISSIONS_DIR / "mlp_v10.csv"
     submission.to_csv(out_path, index=False)
     print(f"Submission saved → {out_path}")
 
