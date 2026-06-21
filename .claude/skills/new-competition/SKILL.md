@@ -41,8 +41,11 @@ features → train/tune → ensemble → submit pipeline works immediately.
    Confirm `data/` is gitignored so the CSVs are never committed.
 
 3. **Seed `src/`** by adapting the reference files (do not invent new conventions):
-   - `src/cv_results.py` — copy verbatim from
-     `playground-series-s6e5/src/cv_results.py` (the `save_cv_result` helper is generic).
+   - `src/cv_results.py` — a thin re-export of the **shared** helper, copied verbatim from
+     `playground-series-s6e5/src/cv_results.py`:
+     `from data_science_stuff.kaggle_utils import save_cv_result`. The real implementation lives
+     in `data_science_stuff/kaggle_utils.py` (which also provides `weighted_predict`,
+     `tune_decision_weights`, and `classification_report_dict` for multiclass tasks).
    - `src/features.py` — adapt `playground-series-s6e5/src/features.py`. Keep the
      **`build_features(df)` contract**: it must `df.sort([...invariant keys...])` FIRST, then add
      derived columns, and return a Polars DataFrame. Define `TARGET` and `DRIVER_COLS` (or the

@@ -20,7 +20,9 @@ non-negotiable. Mirror the existing reference scripts rather than inventing stru
 3. **Outputs** written to `results/`:
    - `results/oof_<model>.npy` — out-of-fold predictions, length = n_train, in sort order.
    - `results/test_<model>.npy` — mean of per-fold test predictions, length = n_test.
-   - Append a row via `cv_results.save_cv_result(RESULTS_DIR, "<model>_vN", fold_aucs, oof_auc)`.
+   - Append a row via `save_cv_result(RESULTS_DIR, "<model>_vN", fold_scores, oof_score)` — the
+     shared helper from `data_science_stuff.kaggle_utils` (re-exported by each competition's
+     `src/cv_results.py`). Pass `metric_name="..."` for non-AUC metrics (e.g. `"balanced_acc"`).
    - Optionally a `submissions/<model>_vN.csv`.
 4. **Exclude** the same columns as the baseline: `{"id", TARGET} | DRIVER_COLS` (or the
    competition's equivalent). Pass string categoricals as `category` dtype to LGBM/XGBoost,
