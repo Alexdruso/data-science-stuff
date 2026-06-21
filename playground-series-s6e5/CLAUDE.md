@@ -111,18 +111,19 @@ OOF inflation ~+0.027 across all models. **Expected LB ≈ 0.929 (ensemble).**
 
 ## Current Best
 
-**Ensemble OOF: 0.9508** (2026-05-09) ← current best
-Conditional blend (5 models, lgbm_ar added): 2023→LGBM 43.6%+LGBM-AR 17.9%+XGB 31.9%+MLP 6.6%; non-2023→LGBM 44.4%+LGBM-AR 25.3%+MLP 28.5%+CB 1.7%
+**Ensemble OOF: 0.9508** (2026-05-09) ← all-time best (pre-race-lap-features; `submissions/ensemble_v4.csv`)
+Conditional blend (5 models, lgbm_ar included): 2023→LGBM 43.6%+LGBM-AR 17.9%+XGB 31.9%+MLP 6.6%; non-2023→LGBM 44.4%+LGBM-AR 25.3%+MLP 28.5%+CB 1.7%
 
-Previous best: **0.9507** (2026-05-09) 4-model conditional blend
+**Ensemble OOF: 0.9506** (2026-05-10, ensemble_v6) ← current model state (`submissions/ensemble_v6.csv`)
+Conditional blend: 2023→XGB 51.2%+LGBM 35.5%+CB 10.0%+MLP 3.3%; non-2023→LGBM 68.9%+MLP 26.6%+XGB 4.6%+CB 0%
 
-| Model | OOF AUC | Script |
-|---|---|---|
-| LGBM | 0.9500 | `src/baseline.py` (lgbm_v11) |
-| LGBM-AR | 0.9498 | `src/train_lgbm_ar.py` (lgbm_ar_v1) — autoregressive overdue feature |
-| XGBoost | 0.9494 | `src/train_xgboost.py` (xgb_v4) |
-| CatBoost | 0.9473 | `src/train_catboost.py` (catboost_v4) |
-| MLP | 0.9461 | `src/train_mlp.py` (mlp_v7) |
+| Model | Pre-race-lap | Post-race-lap | Post feat-eng (v12/v5/v5/v8) | Script |
+|---|---|---|---|---|
+| LGBM | 0.9500 | 0.9498 | **0.9501** | `src/baseline.py` |
+| XGBoost | 0.9494 | 0.9492 | **0.9495** | `src/train_xgboost.py` |
+| CatBoost | 0.9473 | 0.9472 | **0.9475** | `src/train_catboost.py` |
+| MLP | 0.9461 | 0.9454 | **0.9452** | `src/train_mlp.py` |
+| LGBM-AR | 0.9498 | — (dropped from ensemble) | — | `src/train_lgbm_ar.py` |
 
 ---
 
@@ -134,6 +135,7 @@ All features implemented in `src/features.py`. Currently active:
 - **v2**: `TyreLife_log`, `compound_ord`, `tyre_life_x_compound`, `race_progress_x_stint`, `degradation_rate`, `est_laps_remaining`
 - **rolling**: `lap_time_delta_roll3/7`, `lap_time_s_roll5`, `lap_time_delta_lag1/2/3`, `lap_time_vs_roll5`, `pace_anomaly_pct`
 - **group stats** (train-only, joined to test): `driver_pit_rate`, `driver_compound_pit_rate`, `race_compound_pit_rate`, `driver/race_compound_median_tyre_life_at_pit`, `TyreLife_frac`, `window_gap`, `laps_past_window`
+- **race-lap context** (`compute_race_lap_features`, cross-driver, computable from test): `n_pitted_this_lap`, `n_drivers_this_lap`, `frac_pitted_this_lap`, `n_pitted_last3`, `n_pitted_last5`, `laps_since_last_pit_in_race` — captures pit waves, safety-car windows, undercut pressure
 
 ### What didn't help (LGBM baseline)
 | Idea | Delta | Why |
@@ -144,6 +146,7 @@ All features implemented in `src/features.py`. Currently active:
 | `TyreLife_frac` | −0.0002 | Redundant with existing tyre features |
 | Drop 2023 entirely (v4) | −0.029 | Removes 136k clean negatives |
 | `degradation_rate_pace` + `lap_time_delta_ewma5` | 0.0000 | LGBM captures LapTime_Delta×TyreLife interactions and recency weighting internally |
+| Race-lap context (`compute_race_lap_features`) | −0.002 to −0.007 per model | Cross-driver pit activity within a lap adds noise; models already learn strategy pressure via TyreLife + Stint. All 4 models regressed; ensemble dropped 0.9508→0.9504. **Activated on 2026-05-10 — consider reverting.** |
 
 ---
 
@@ -182,15 +185,44 @@ displace XGB weight in the blend, netting a loss. Driver stays excluded for all 
 
 ## Next Steps (remove each item when implemented)
 
-Priority order: E → C
+Priority order: ~~I~~ → ~~E~~ → J → ~~G~~ → C → F → H
 
-**C. HPO re-run** — all models were tuned with Driver in feature set; params are now stale.
-MLP is most critical (38→67 features via OHE). Run `tune_mlp.py` first, then
-`tune.py` / `tune_xgboost.py` / `tune_catboost.py` as time permits.
+**I. Race stint economics** — add total-laps-in-race and derived features to `compute_group_features()`:
+- `total_race_laps`: `max(LapNumber)` per `(Race, Year)` computed on train, joined to test.
+- `laps_remaining`: `total_race_laps - LapNumber` — how much race is left.
+- `prev_stint_length`: how long the driver's *previous* stint was. Infer by looking back at
+  the last `PitStop==1` row within the same `(Driver, Race, Year)` and taking that row's `TyreLife`.
+- `max_tyre_life_seen_in_race`: max `TyreLife` seen for this compound in this race so far
+  (train reference joined to test) — a soft "pit window open" signal.
+Expected delta: +0.001–0.003. Test in LGBM first.
 
 **E. is_2022 flag** — add `(pl.col("Year") == 2022).cast(pl.Int8).alias("is_2022")` to
 `features.py::build_features()`. Year 2022 ensemble AUC is 0.9139 vs 0.9284+ for
 2024/2025; mirrors `is_2023` logic. One line, test in LGBM first.
+
+**J. Tune scripts update** — `tune.py`, `tune_xgboost.py`, `tune_catboost.py`, `tune_mlp.py`
+still don't call `compute_race_lap_features()`. Once H1 confirms a positive delta, add the import
+and two-line call to all four tune scripts before the next HPO run. Otherwise tuned params are
+optimized against an older feature set.
+
+**G. Driver target encoding** — replace the excluded Driver string with a fold-aware smoothed
+target encoding: mean `PitNextLap` per Driver, computed only on train folds (never on the
+held-out fold). Use sklearn `TargetEncoder` with `cv=5`, `smooth="auto"`. Driver strategy is
+a real predictor; the numeric aggregates we have are global, not fold-aware. Expected delta:
++0.001–0.002.
+
+**C. HPO re-run** — all models were tuned with Driver in feature set; params are now stale.
+MLP is most critical (38→67 features via OHE). Run `tune_mlp.py` first, then
+`tune.py` / `tune_xgboost.py` / `tune_catboost.py` as time permits. Do after J.
+
+**F. Multi-seed LGBM** — train LGBM with 3 random seeds (42, 0, 7), average OOF and test
+predictions. Near-zero cost (GPU training is fast). Adds prediction diversity within the same
+model family. Expected delta: +0.0001–0.0003.
+
+**H. Pseudo-labeling** — filter test rows where `ensemble_v4` probability > 0.90 or < 0.05
+(high-confidence labels). Append to training set with soft labels (use the probability directly,
+not hard 0/1). Retrain LGBM and XGBoost on the expanded set. Risk: test distribution drift
+adds noise — mitigate by using only the most extreme quantiles.
 
 ---
 
@@ -276,3 +308,7 @@ Diversity (low corr / high delta) is a prerequisite for blending to help — two
 | 2026-05-09 | catboost_v5 (item B) | Driver string restored as cat feature — reverted; solo +0.0005 (0.9478) but ensemble −0.0001 (0.9507); Driver displacement of XGBoost weight harms blend | 0.9478 solo / 0.9507 ensemble |
 | 2026-05-09 | blend_submissions (rank+selective) | Post-ensemble rank blend + selective consensus correction; all support submissions diverse (corr 0.96–0.998) but best blend delta = 5e-6 (noise); signal exhausted with current model set | 0.9508 (flat) |
 | 2026-05-10 | tune_rnn + rnn_v2 | Optuna 30-trial tuning (3-fold GroupKFold); best: bidirectional=True, hidden=128, n_layers=3, dropout=0.117, lr=7e-4, batch=32; full 5-fold retrain | 0.9382 (+0.0014 vs rnn_v1); still gets 0% ensemble weight — gap to trees too large |
+| 2026-05-10 | race-lap context features | Activated `compute_race_lap_features()` in all train scripts (n_pitted_this_lap, n_drivers_this_lap, frac_pitted_this_lap, n_pitted_last3, n_pitted_last5, laps_since_last_pit_in_race); retrained all 4 base models | LGBM 0.9498 (−0.0002), XGB 0.9492 (−0.0002), CB 0.9472 (−0.0001), MLP 0.9454 (−0.0007) — all models regressed |
+| 2026-05-10 | ensemble_v5 | 4-model conditional blend (LGBM-AR dropped: insufficient marginal gain); race-lap features active | **0.9504** (−0.0004 vs ensemble_v4); 2023→LGBM 45.8%+CB 16.7%+XGB 34.8%+MLP 2.6%; non-2023→LGBM 69.4%+MLP 29.1%+XGB 1.5% |
+| 2026-05-10 | feat-eng sprint (I+E+G) | Added `is_2022`, `compute_race_stint_features` (total_race_laps, laps_remaining, prev_stint_length, max_tyre_life_at_pit_race), Driver TargetEncoder (fold-aware, cv=5) to all 4 base models; retrained | LGBM 0.9501 (+0.0003), XGB 0.9495 (+0.0003), CB 0.9475 (+0.0003), MLP 0.9452 (−0.0002) |
+| 2026-05-10 | ensemble_v6 | 4-model conditional blend post feat-eng sprint | **0.9506** (+0.0002 vs v5); 2023→XGB 51.2%+LGBM 35.5%+CB 10.0%+MLP 3.3%; non-2023→LGBM 68.9%+MLP 26.6%+XGB 4.6% |

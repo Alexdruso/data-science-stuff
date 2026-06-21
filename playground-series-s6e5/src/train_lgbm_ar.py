@@ -24,7 +24,7 @@ from sklearn.model_selection import StratifiedKFold
 
 sys.path.insert(0, str(Path(__file__).parent))
 from cv_results import save_cv_result
-from features import DRIVER_COLS, build_features, compute_group_features
+from features import DRIVER_COLS, build_features, compute_group_features, compute_race_lap_features
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
@@ -90,6 +90,8 @@ def main() -> None:
     test_pl = build_features(test_pl_raw)
     train_pl = compute_group_features(train_pl_raw, train_pl)
     test_pl = compute_group_features(train_pl_raw, test_pl)
+    train_pl = compute_race_lap_features(train_pl)
+    test_pl = compute_race_lap_features(test_pl)
 
     # Pass 1 OOF already exists — compute overdue from it
     oof_pass1 = np.load(RESULTS_DIR / "oof_lgbm.npy")
@@ -158,17 +160,17 @@ def main() -> None:
     ]
 
     test_proba = np.zeros(len(X_test))
+    overdue_col_pos = X_test.columns.get_loc("overdue")
 
-    # test is sorted by (Driver, Race, Year, LapNumber) via build_features;
-    # groupby with sort=True processes groups in alphabetical order, and within
-    # each group rows remain in their original (LapNumber) order.
+    # Use num_threads=1 to avoid thread-spawn overhead on single-row calls
+    # (default multi-thread predict adds ~20ms/call overhead = ~5h for 188k rows)
     for _, group in test.groupby(["Driver", "Race", "Year", "Stint"], sort=True):
         group_idx = group.index.to_numpy()
         overdue = 0.0
         for row_idx in group_idx:
-            X_test.loc[row_idx, "overdue"] = overdue
-            row = X_test.loc[[row_idx]]
-            pred = float(np.mean([m.predict(row)[0] for m in fold_models]))
+            X_test.iat[row_idx, overdue_col_pos] = overdue
+            row = X_test.iloc[[row_idx]]
+            pred = float(np.mean([m.predict(row, num_threads=1)[0] for m in fold_models]))
             test_proba[row_idx] = pred
             overdue += pred
 

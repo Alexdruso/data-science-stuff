@@ -24,6 +24,7 @@ from torch.utils.data import DataLoader
 
 sys.path.insert(0, str(Path(__file__).parent))
 from features import DRIVER_COLS, build_features, compute_group_features
+from positional_encoding import PE_FEATURE_NAMES, apply_fourier_np
 from train_rnn import (
     GRUModel,
     RaceSequenceDataset,
@@ -123,10 +124,11 @@ def objective(
     X: np.ndarray,
     y: np.ndarray,
     train_group_ids: np.ndarray,
+    num_cols: list[str],
     num_idx: list[int],
     cat_idx: list[int],
-    n_features: int,
 ) -> float:
+    fourier_L = trial.suggest_int("fourier_L", 1, 6)
     params: dict[str, object] = {
         "hidden_size": trial.suggest_categorical("hidden_size", [128, 256, 512]),
         "n_layers": trial.suggest_int("n_layers", 1, 3),
@@ -136,6 +138,7 @@ def objective(
         "bidirectional": trial.suggest_categorical("bidirectional", [True, False]),
         "batch_size": trial.suggest_categorical("batch_size", [32, 64, 128]),
     }
+    pe_indices = [num_cols.index(n) for n in PE_FEATURE_NAMES if n in num_cols]
 
     gkf = GroupKFold(n_splits=N_FOLDS)
     fold_aucs: list[float] = []
@@ -152,9 +155,14 @@ def objective(
         X_scaled[:, num_idx] = pt.transform(X[:, num_idx])
         X_scaled[:, cat_idx] = sc.transform(X[:, cat_idx])
 
+        if fourier_L > 0 and pe_indices:
+            X_scaled = apply_fourier_np(X_scaled, pe_indices, fourier_L)
+
+        n_features_fold = X_scaled.shape[1]
+
         auc = _train_fold_tune(
             X_scaled, y, train_row_idx, val_row_idx,
-            train_group_ids, n_features, params,
+            train_group_ids, n_features_fold, params,
         )
         fold_aucs.append(auc)
 
@@ -191,17 +199,16 @@ def main() -> None:
     ]
     feature_cols = [c for c in train_pl.columns if c not in _exclude]
 
-    X, y, X_test, _, num_idx, cat_idx = prepare_arrays(
+    X, y, X_test, _, num_cols, num_idx, cat_idx = prepare_arrays(
         train_pl, test_pl, cat_cols, feature_cols
     )
-    n_features = X.shape[1]
     train_group_ids = make_group_ids(train_pl)
-    print(f"Features: {n_features}, Train sequences: {len(np.unique(train_group_ids))}", flush=True)
+    print(f"Features: {X.shape[1]}, Train sequences: {len(np.unique(train_group_ids))}", flush=True)
 
     pruner = optuna.pruners.MedianPruner(n_startup_trials=5)
     study = optuna.create_study(direction="maximize", pruner=pruner)
     study.optimize(
-        lambda trial: objective(trial, X, y, train_group_ids, num_idx, cat_idx, n_features),
+        lambda trial: objective(trial, X, y, train_group_ids, num_cols, num_idx, cat_idx),
         n_trials=N_TRIALS,
         show_progress_bar=False,
     )

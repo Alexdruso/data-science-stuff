@@ -13,7 +13,9 @@ from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedKFold
 
 sys.path.insert(0, str(Path(__file__).parent))
-from features import DRIVER_COLS, build_features, compute_group_features
+from features import DRIVER_COLS, build_features, compute_group_features, compute_race_stint_features
+from positional_encoding import PE_FEATURE_NAMES, apply_fourier_df
+from sklearn.preprocessing import MinMaxScaler, TargetEncoder
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 RESULTS_DIR = Path(__file__).parent.parent / "results"
@@ -32,10 +34,11 @@ FIXED_PARAMS: dict[str, object] = {
 }
 
 
-def prepare_data() -> tuple[pd.DataFrame, np.ndarray, list[str]]:
+def prepare_data() -> tuple[pd.DataFrame, np.ndarray, list[str], list[str], np.ndarray]:
     train_raw = pl.read_csv(DATA_DIR / "train.csv")
     train = build_features(train_raw)
     train = compute_group_features(train_raw, train)
+    train = compute_race_stint_features(train_raw, train)
 
     _exclude = {"id", TARGET} | DRIVER_COLS
     cat_cols = [
@@ -47,9 +50,11 @@ def prepare_data() -> tuple[pd.DataFrame, np.ndarray, list[str]]:
 
     # CatBoost takes string columns as-is — no category dtype conversion
     pdf = train.to_pandas()
+    driver_arr = pdf["Driver"].to_numpy()
     X = pdf[feature_cols]
     y = pdf[TARGET].to_numpy()
-    return X, y, cat_cols
+    pe_cols = [c for c in PE_FEATURE_NAMES if c in X.columns]
+    return X, y, cat_cols, pe_cols, driver_arr
 
 
 def objective(
@@ -57,7 +62,10 @@ def objective(
     X: pd.DataFrame,
     y: np.ndarray,
     cat_cols: list[str],
+    pe_cols: list[str],
+    driver_arr: np.ndarray,
 ) -> float:
+    fourier_L = trial.suggest_int("fourier_L", 1, 6)
     params = {
         **FIXED_PARAMS,
         "cat_features": cat_cols,
@@ -73,8 +81,21 @@ def objective(
     oof = np.zeros(len(X))
 
     for train_idx, val_idx in skf.split(X, y):
-        X_tr, X_val = X.iloc[train_idx], X.iloc[val_idx]
+        X_tr = X.iloc[train_idx].copy()
+        X_val = X.iloc[val_idx].copy()
         y_tr, y_val = y[train_idx], y[val_idx]
+
+        te = TargetEncoder(smooth="auto", cv=5, random_state=42)
+        X_tr["driver_target_enc"] = te.fit_transform(
+            driver_arr[train_idx].reshape(-1, 1), y_tr
+        ).ravel()
+        X_val["driver_target_enc"] = te.transform(
+            driver_arr[val_idx].reshape(-1, 1)
+        ).ravel()
+
+        pe_scaler = MinMaxScaler().fit(X_tr[pe_cols])
+        X_tr = apply_fourier_df(X_tr, pe_cols, fourier_L, pe_scaler)
+        X_val = apply_fourier_df(X_val, pe_cols, fourier_L, pe_scaler)
 
         model = CatBoostClassifier(**params)
         model.fit(X_tr, y_tr, eval_set=(X_val, y_val))
@@ -85,13 +106,13 @@ def objective(
 
 def main() -> None:
     print("Preparing data...")
-    X, y, cat_cols = prepare_data()
+    X, y, cat_cols, pe_cols, driver_arr = prepare_data()
 
     print(f"Running {N_TRIALS} Optuna trials ({N_FOLDS}-fold CV each)...")
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     study = optuna.create_study(direction="maximize")
     study.optimize(
-        lambda trial: objective(trial, X, y, cat_cols),
+        lambda trial: objective(trial, X, y, cat_cols, pe_cols, driver_arr),
         n_trials=N_TRIALS,
         show_progress_bar=True,
     )

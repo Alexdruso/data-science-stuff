@@ -28,6 +28,7 @@ from torch.utils.data import DataLoader, Dataset
 sys.path.insert(0, str(Path(__file__).parent))
 from cv_results import save_cv_result
 from features import DRIVER_COLS, build_features, compute_group_features
+from positional_encoding import PE_FEATURE_NAMES, apply_fourier_np
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
@@ -48,6 +49,7 @@ _DEFAULTS: dict[str, object] = {
     "weight_decay": 1e-4,
     "bidirectional": False,
     "batch_size": 64,
+    "fourier_L": 3,
 }
 
 
@@ -177,7 +179,7 @@ def prepare_arrays(
     test_pl: pl.DataFrame,
     cat_cols: list[str],
     feature_cols: list[str],
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, list[int], list[int]]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, list[str], list[int], list[int]]:
     train_pd = train_pl.to_pandas()
     test_pd = test_pl.to_pandas()
 
@@ -203,7 +205,7 @@ def prepare_arrays(
     n_ohe = train_ohe.shape[1]
     num_idx = list(range(n_num))
     cat_idx = list(range(n_num, n_num + n_ohe))
-    return X, y, X_test, test_ids, num_idx, cat_idx
+    return X, y, X_test, test_ids, num_cols, num_idx, cat_idx
 
 
 def make_group_ids(df: pl.DataFrame) -> np.ndarray:
@@ -316,18 +318,20 @@ def main() -> None:
     ]
     feature_cols = [c for c in train_pl.columns if c not in _exclude]
 
-    X, y, X_test, test_ids, num_idx, cat_idx = prepare_arrays(
+    X, y, X_test, test_ids, num_cols, num_idx, cat_idx = prepare_arrays(
         train_pl, test_pl, cat_cols, feature_cols
     )
-    n_features = X.shape[1]
-    print(f"Features: {n_features}  ({len(num_idx)} numeric, {len(cat_idx)} OHE)", flush=True)
+    print(f"Features: {X.shape[1]}  ({len(num_idx)} numeric, {len(cat_idx)} OHE)", flush=True)
 
     train_group_ids = make_group_ids(train_pl)
     test_group_ids = make_group_ids(test_pl)
     print(f"Train sequences: {len(np.unique(train_group_ids))}", flush=True)
 
     params = load_params()
+    fourier_L = int(params.get("fourier_L", 3))
+    pe_indices = [num_cols.index(n) for n in PE_FEATURE_NAMES if n in num_cols]
     print(f"Params: {params}", flush=True)
+    print(f"Fourier L={fourier_L}, encoding {len(pe_indices)} features", flush=True)
 
     gkf = GroupKFold(n_splits=N_FOLDS)
     oof_proba = np.zeros(len(X), dtype=np.float32)
@@ -349,6 +353,12 @@ def main() -> None:
         X_test_scaled[:, num_idx] = pt.transform(X_test[:, num_idx])
         X_test_scaled[:, cat_idx] = sc.transform(X_test[:, cat_idx])
 
+        if fourier_L > 0 and pe_indices:
+            X_scaled = apply_fourier_np(X_scaled, pe_indices, fourier_L)
+            X_test_scaled = apply_fourier_np(X_test_scaled, pe_indices, fourier_L)
+
+        n_features = X_scaled.shape[1]
+
         val_pred, test_pred = train_fold(
             X_scaled, y, X_test_scaled,
             train_group_ids, test_group_ids,
@@ -369,14 +379,14 @@ def main() -> None:
     oof_auc = float(roc_auc_score(y, oof_proba))
     print(f"\nOOF AUC: {oof_auc:.4f}", flush=True)
 
-    save_cv_result(RESULTS_DIR, "rnn_v2", fold_aucs, oof_auc)
+    save_cv_result(RESULTS_DIR, "rnn_v3", fold_aucs, oof_auc)
     np.save(RESULTS_DIR / "oof_rnn.npy", oof_proba)
     np.save(RESULTS_DIR / "test_rnn.npy", test_proba)
     print(f"OOF/test arrays saved → {RESULTS_DIR}", flush=True)
 
     SUBMISSIONS_DIR.mkdir(exist_ok=True)
     submission = pd.DataFrame({"id": test_ids, TARGET: test_proba})
-    out_path = SUBMISSIONS_DIR / "rnn_v2.csv"
+    out_path = SUBMISSIONS_DIR / "rnn_v3.csv"
     submission.to_csv(out_path, index=False)
     print(f"Submission saved → {out_path}", flush=True)
 

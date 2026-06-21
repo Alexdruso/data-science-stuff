@@ -164,4 +164,21 @@ cython_debug/
 data_science_stuff/_version.py
 .python-version
 
+# Large data / output files (use Git LFS or keep local)
 *.csv
+*.npy
+*.png
+*.jpg
+*.jpeg
+
+# Training run logs and library scratch dirs
+*.log
+catboost_info/
+
+# Model checkpoints, archives, and binary data templates
+*.pth
+*.pt
+*.ckpt
+*.zip
+*.fits
+*_ckpt/

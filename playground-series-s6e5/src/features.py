@@ -25,6 +25,7 @@ def build_features(df: pl.DataFrame) -> pl.DataFrame:
         [
             # --- v1 features (kept) ---
             (pl.col("Year") == 2023).cast(pl.Int8).alias("is_2023"),
+            (pl.col("Year") == 2022).cast(pl.Int8).alias("is_2022"),
             (pl.col("TyreLife") ** 2).alias("TyreLife_sq"),
             # --- v2 features ---
             (pl.col("TyreLife") + 1).log(base=2.718281828).alias("TyreLife_log"),
@@ -101,6 +102,143 @@ def _smoothed_rate(
             ).alias(out_col)
         )
         .select(group_keys + [out_col])
+    )
+
+
+def compute_race_lap_features(df: pl.DataFrame) -> pl.DataFrame:
+    """Add cross-driver race-lap context features.
+
+    Groups PitStop across all drivers in (Race, Year, LapNumber) to capture
+    strategic context: pit waves, safety-car windows, undercut pressure.
+    Uses PitStop (current lap) only — no leakage from the target PitNextLap.
+    """
+    race_lap = (
+        df.group_by(["Race", "Year", "LapNumber"])
+        .agg(
+            [
+                pl.col("PitStop").sum().alias("n_pitted_this_lap"),
+                pl.len().alias("n_drivers_this_lap"),
+            ]
+        )
+        .with_columns(
+            (pl.col("n_pitted_this_lap") / pl.col("n_drivers_this_lap")).alias(
+                "frac_pitted_this_lap"
+            )
+        )
+        .sort(["Race", "Year", "LapNumber"])
+    )
+
+    race_lap = (
+        race_lap.with_columns(
+            pl.col("n_pitted_this_lap")
+            .shift(1)
+            .over(["Race", "Year"])
+            .fill_null(0)
+            .alias("_n_pitted_prev")
+        )
+        .with_columns(
+            [
+                pl.col("_n_pitted_prev")
+                .rolling_sum(window_size=3, min_periods=1)
+                .over(["Race", "Year"])
+                .alias("n_pitted_last3"),
+                pl.col("_n_pitted_prev")
+                .rolling_sum(window_size=5, min_periods=1)
+                .over(["Race", "Year"])
+                .alias("n_pitted_last5"),
+                pl.when(pl.col("n_pitted_this_lap") > 0)
+                .then(pl.col("LapNumber"))
+                .otherwise(None)
+                .forward_fill()
+                .over(["Race", "Year"])
+                .alias("_last_pit_lap"),
+            ]
+        )
+        .with_columns(
+            (pl.col("LapNumber") - pl.col("_last_pit_lap").fill_null(0)).alias(
+                "laps_since_last_pit_in_race"
+            )
+        )
+        .drop(["_n_pitted_prev", "_last_pit_lap"])
+    )
+
+    return df.join(
+        race_lap.select(
+            [
+                "Race",
+                "Year",
+                "LapNumber",
+                "n_pitted_this_lap",
+                "n_drivers_this_lap",
+                "frac_pitted_this_lap",
+                "n_pitted_last3",
+                "n_pitted_last5",
+                "laps_since_last_pit_in_race",
+            ]
+        ),
+        on=["Race", "Year", "LapNumber"],
+        how="left",
+    )
+
+
+def compute_race_stint_features(
+    train_df: pl.DataFrame,
+    df: pl.DataFrame,
+) -> pl.DataFrame:
+    """Race stint economics: total race laps, laps remaining, prev stint length, pit window upper bound.
+
+    Uses train_df as the reference for train-joined aggregates; df may be train or test.
+    df must already be sorted by [Driver, Race, Year, LapNumber] (guaranteed by build_features).
+    """
+    # total_race_laps: use all years (2023 laps are valid, anomaly is pit rate only)
+    race_total = (
+        train_df.group_by(["Race", "Year"])
+        .agg(pl.col("LapNumber").max().alias("total_race_laps"))
+    )
+    global_total = float(
+        train_df.group_by(["Race", "Year"])
+        .agg(pl.col("LapNumber").max().alias("total_race_laps"))
+        ["total_race_laps"].mean()
+    )
+    df = (
+        df.join(race_total, on=["Race", "Year"], how="left")
+        .with_columns(
+            [
+                pl.col("total_race_laps").fill_null(global_total),
+                (
+                    pl.col("total_race_laps").fill_null(global_total)
+                    - pl.col("LapNumber")
+                ).alias("laps_remaining"),
+            ]
+        )
+    )
+
+    # prev_stint_length: TyreLife at the most recent PitStop==1 lap before this row
+    df = df.with_columns(
+        pl.when(pl.col("PitStop") == 1)
+        .then(pl.col("TyreLife"))
+        .otherwise(None)
+        .shift(1)
+        .forward_fill()
+        .over(["Driver", "Race", "Year"])
+        .fill_null(0.0)
+        .alias("prev_stint_length")
+    )
+
+    # max_tyre_life_at_pit_race: upper bound of pit window per (Race, Year, Compound)
+    # Excludes 2023 (anomalous pit rate distorts the maximum)
+    ref = train_df.filter(pl.col("Year") != 2023)
+    global_max = float(ref.filter(pl.col(TARGET) == 1)["TyreLife"].max())
+    race_compound_max = (
+        ref.filter(pl.col(TARGET) == 1)
+        .group_by(["Race", "Year", "Compound"])
+        .agg(pl.col("TyreLife").max().alias("max_tyre_life_at_pit_race"))
+    )
+    return (
+        df.join(race_compound_max, on=["Race", "Year", "Compound"], how="left")
+        .with_columns(
+            pl.col("max_tyre_life_at_pit_race").fill_null(global_max)
+        )
     )
 
 
