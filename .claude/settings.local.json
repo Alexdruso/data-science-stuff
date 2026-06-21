@@ -2,25 +2,26 @@
   "permissions": {
     "allow": [
       "Bash(wait)",
-      "Bash(unzip -t /home/alexdruso/Desktop/data-science-stuff/playground-series-s6e4/data/playground-series-s6e4.zip)",
-      "Bash(unzip -o /home/alexdruso/Desktop/data-science-stuff/playground-series-s6e4/data/playground-series-s6e4.zip -d /home/alexdruso/Desktop/data-science-stuff/playground-series-s6e4/data/)",
       "Bash(uv pip *)",
+      "Bash(uv venv *)",
       "Bash(python *)",
+      "Bash(python3 *)",
       "Bash(git lfs *)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
       "Bash(.venv/bin/uv pip *)",
-      "Bash(/home/alexdruso/Desktop/data-science-stuff/.venv/bin/python *)",
+      "Bash(.venv/bin/python *)",
+      "Bash(make *)",
+      "Bash(pytest *)",
+      "Bash(unzip *)",
+      "Bash(rm *.zip)",
       "Bash(pip --version)",
       "Bash(pip3 --version)",
       "Bash(uv --version)",
-      "Bash(python3 *)",
       "Bash(apt list *)",
       "Bash(dpkg -l python3-pip)",
-      "Bash(pip show *)",
-      "Bash(unzip -q playground-series-s6e5.zip)",
-      "Bash(rm playground-series-s6e5.zip)"
+      "Bash(pip show *)"
     ]
   }
 }
