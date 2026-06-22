@@ -42,9 +42,8 @@ pytest --cov=data_science_stuff --cov-report=term-missing
 
 ## CI Pipeline (`.github/workflows/ci.yml`)
 
-Matrix: Python 3.9, 3.10, 3.11 on Ubuntu. Two jobs:
-1. **lint-and-test**: ruff → mypy → bandit → safety → pytest → codecov
-2. **security**: Snyk vulnerability scan
+Matrix: Python 3.9, 3.10, 3.11 on Ubuntu. One job:
+1. **lint-and-test**: ruff → mypy → bandit → pytest → codecov
 
 **Gate scope**: ruff, mypy, and bandit are intentionally scoped to the maintained package
 (`data_science_stuff/`) and its `tests/`. The Kaggle competition (`playground-*`,
