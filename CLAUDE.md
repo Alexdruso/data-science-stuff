@@ -46,6 +46,13 @@ Matrix: Python 3.9, 3.10, 3.11 on Ubuntu. Two jobs:
 1. **lint-and-test**: ruff → mypy → bandit → safety → pytest → codecov
 2. **security**: Snyk vulnerability scan
 
+**Gate scope**: ruff, mypy, and bandit are intentionally scoped to the maintained package
+(`data_science_stuff/`) and its `tests/`. The Kaggle competition (`playground-*`,
+`playground_*`) and `data_mining/` coursework directories are experiment code and are excluded
+from the gate (ruff/mypy via `pyproject.toml`, bandit via its explicit target in `ci.yml`). The
+exclusion globs cover competitions scaffolded in the future, so new competition dirs don't
+re-break CI.
+
 ## Claude Code Skills
 
 Project skills live in `.claude/skills/`. Invoke the matching one instead of re-deriving these

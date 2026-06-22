@@ -49,7 +49,9 @@ def test_tune_decision_weights_recovers_rare_class() -> None:
     weights = tune_decision_weights(y, proba, n_restarts=4)
     assert weights.shape == (3,)
     assert np.isclose(weights.max(), 1.0)  # normalized so max weight is 1
-    assert weights[2] > weights[0] and weights[2] > weights[1]  # rare class up-weighted
+    # rare class up-weighted relative to both others
+    assert weights[2] > weights[0]
+    assert weights[2] > weights[1]
 
     tuned_acc = classification_report_dict(y, proba, weights=weights)[
         "weighted_balanced_acc"
