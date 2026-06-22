@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from numpy.typing import NDArray
 
 from data_science_stuff.kaggle_utils import (
     classification_report_dict,
@@ -14,7 +15,7 @@ from data_science_stuff.kaggle_utils import (
 )
 
 
-def _imbalanced_proba() -> tuple[np.ndarray, np.ndarray]:
+def _imbalanced_proba() -> tuple[NDArray[np.int64], NDArray[np.float64]]:
     """3-class problem where argmax suppresses the rare class (recall 0).
 
     Class-2 rows put equal mass on class 0 and class 2, so argmax's first-max
