@@ -79,6 +79,18 @@ Changelog = "https://github.com/alexdruso/data-science-stuff/blob/main/CHANGELOG
 target-version = "py39"
 line-length = 88
 
+# The quality gate (ruff/mypy/bandit) is scoped to the maintained package and
+# its tests. The Kaggle competition (`playground-*`, `playground_*`) and
+# `data_mining` coursework directories are experiment code: they may be linted
+# opportunistically but are intentionally kept out of the CI gate. The globs
+# below also cover competition directories scaffolded in the future.
+extend-exclude = [
+    "data_mining",
+    "playground-*",
+    "playground_*",
+]
+
+[tool.ruff.lint]
 # Linting rules
 select = [
     "E",   # pycodestyle errors
@@ -113,7 +125,15 @@ select = [
 ignore = [
     "E501",    # Line length handled by formatter
     "PLR0913", # Too many arguments to function call
+    "COM812",  # Trailing comma handled by the formatter (avoids conflicts)
 ]
+
+# Allow assert and "magic" constants in the test suite.
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "PLR2004"]
+# kaggle_utils exposes interactive reporting helpers whose job is to write to
+# stdout (e.g. print_classification_report, save_cv_result status line).
+"data_science_stuff/kaggle_utils.py" = ["T201"]
 
 # Formatting configuration
 [tool.ruff.format]
@@ -124,6 +144,11 @@ line-ending = "auto"
 
 [tool.mypy]
 python_version = "3.9"
+# Gate scoped to maintained code; `mypy .` walks the tree but skips the
+# experiment directories (see the ruff note above). `files` makes a bare
+# `mypy` (no args, as in `make py-static`) check the same scope.
+files = ["data_science_stuff", "tests"]
+exclude = "^(data_mining|playground[-_])"
 strict = true
 warn_unreachable = true
 warn_unused_ignores = true
@@ -141,6 +166,11 @@ disable_error_code = ["attr-defined"]
 [[tool.mypy.overrides]]
 module = ["tests.*"]
 disallow_untyped_defs = false
+
+# Third-party scientific libraries that ship no type stubs / py.typed marker.
+[[tool.mypy.overrides]]
+module = ["scipy.*", "sklearn.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "7.0"

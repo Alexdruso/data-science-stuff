@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from numpy.typing import NDArray
 
 from data_science_stuff.kaggle_utils import (
     classification_report_dict,
@@ -14,7 +15,7 @@ from data_science_stuff.kaggle_utils import (
 )
 
 
-def _imbalanced_proba() -> tuple[np.ndarray, np.ndarray]:
+def _imbalanced_proba() -> tuple[NDArray[np.int64], NDArray[np.float64]]:
     """3-class problem where argmax suppresses the rare class (recall 0).
 
     Class-2 rows put equal mass on class 0 and class 2, so argmax's first-max
@@ -49,7 +50,9 @@ def test_tune_decision_weights_recovers_rare_class() -> None:
     weights = tune_decision_weights(y, proba, n_restarts=4)
     assert weights.shape == (3,)
     assert np.isclose(weights.max(), 1.0)  # normalized so max weight is 1
-    assert weights[2] > weights[0] and weights[2] > weights[1]  # rare class up-weighted
+    # rare class up-weighted relative to both others
+    assert weights[2] > weights[0]
+    assert weights[2] > weights[1]
 
     tuned_acc = classification_report_dict(y, proba, weights=weights)[
         "weighted_balanced_acc"

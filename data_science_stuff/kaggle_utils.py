@@ -1,9 +1,11 @@
 """Shared utilities for Kaggle Playground Series competitions."""
 
+from __future__ import annotations
+
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import cast
+from typing import Union, cast
 
 import numpy as np
 import pandas as pd
@@ -11,10 +13,14 @@ from numpy.typing import NDArray
 from scipy.optimize import minimize
 from sklearn.metrics import balanced_accuracy_score, confusion_matrix, recall_score
 
+# Per-class weights accepted either as a plain sequence or as the float array
+# returned by :func:`tune_decision_weights`.
+Weights = Union[Sequence[float], NDArray[np.float64]]
+
 
 def weighted_predict(
     proba: NDArray[np.float64],
-    weights: Sequence[float],
+    weights: Weights,
 ) -> NDArray[np.int64]:
     """Argmax of class probabilities scaled by per-class weights.
 
@@ -94,7 +100,7 @@ def classification_report_dict(
     y_true: NDArray[np.int64],
     proba: NDArray[np.float64],
     *,
-    weights: Sequence[float] | None = None,
+    weights: Weights | None = None,
     labels: Sequence[str] | None = None,
 ) -> dict[str, object]:
     """Per-class recall + balanced accuracy + confusion for argmax (and weights).
@@ -171,7 +177,7 @@ def save_cv_result(
 
     row: dict[str, object] = {
         "model": model,
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "timestamp": datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
         f"oof_{metric_name}": round(oof_score, 6),
     }
     for i, score in enumerate(fold_scores, 1):
@@ -179,7 +185,9 @@ def save_cv_result(
 
     new_row = pd.DataFrame([row])
     if path.exists():
-        pd.concat([pd.read_csv(path), new_row], ignore_index=True).to_csv(path, index=False)
+        pd.concat([pd.read_csv(path), new_row], ignore_index=True).to_csv(
+            path, index=False
+        )
     else:
         new_row.to_csv(path, index=False)
 
