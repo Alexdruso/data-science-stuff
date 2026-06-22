@@ -69,4 +69,7 @@ jobs:
           files: ./coverage.xml
           flags: unittests
           name: codecov-umbrella
-          fail_ci_if_error: true
+          # Coverage threshold is enforced by pytest (--cov-fail-under=80).
+          # This step only reports to codecov.io, so a missing token must not
+          # fail the build; it will upload once CODECOV_TOKEN is configured.
+          fail_ci_if_error: false
