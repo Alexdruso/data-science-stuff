@@ -1,5 +1,7 @@
 """Shared utilities for Kaggle Playground Series competitions."""
 
+from __future__ import annotations
+
 from collections.abc import Sequence
 from datetime import datetime, timezone
 from pathlib import Path
