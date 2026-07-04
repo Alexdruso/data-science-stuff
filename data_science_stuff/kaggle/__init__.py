@@ -23,6 +23,16 @@ from data_science_stuff.kaggle.decision import (
     split_half_gate,
 )
 from data_science_stuff.kaggle.device import get_lgbm_device
+from data_science_stuff.kaggle.encoding import (
+    add_fold_safe_target_encoding,
+    add_frequency_features,
+    add_quantile_bin_features,
+    cat_key,
+    qcut_codes,
+    select_low_cardinality_cols,
+    sorted_factorize,
+    te_source_columns,
+)
 from data_science_stuff.kaggle.io import (
     CompetitionDirs,
     competition_dirs,
@@ -30,16 +40,29 @@ from data_science_stuff.kaggle.io import (
     save_threshold_weights,
     write_submission,
 )
+from data_science_stuff.kaggle.stacking import (
+    CaruanaResult,
+    caruana_select,
+    clipped_logit,
+    stack_oof,
+)
 
 __all__ = [
     "CVResult",
+    "CaruanaResult",
     "CompetitionDirs",
     "FitFoldFn",
     "Matrix",
     "Normalize",
     "ScoreFn",
+    "add_fold_safe_target_encoding",
+    "add_frequency_features",
+    "add_quantile_bin_features",
     "blend",
+    "caruana_select",
     "cascade_combine",
+    "cat_key",
+    "clipped_logit",
     "competition_dirs",
     "cost_decide",
     "diversity_report",
@@ -50,8 +73,13 @@ __all__ = [
     "normalize_weights",
     "optimize_blend_weights",
     "optimize_thresholds",
+    "qcut_codes",
     "run_cv",
     "save_threshold_weights",
+    "select_low_cardinality_cols",
+    "sorted_factorize",
     "split_half_gate",
+    "stack_oof",
+    "te_source_columns",
     "write_submission",
 ]
