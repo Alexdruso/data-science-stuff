@@ -33,9 +33,9 @@ from postprocess import optimize_thresholds, save_threshold_weights
 from train_realmlp_deotte import CLASS_MAP, ID, INV_CLASS_MAP, TARGET, feature_engineering
 
 warnings.filterwarnings("ignore")
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 CKPT = RESULTS_DIR / "_ftt_ckpt"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 SEED, FOLDS, N_CLASSES = 42, 5, 3
@@ -192,8 +192,7 @@ def main() -> None:
     np.save(RESULTS_DIR / f"oof_{RUN}.npy", oof)
     np.save(RESULTS_DIR / f"test_{RUN}.npy", test_proba)
     labels = [INV_CLASS_MAP[i] for i in np.argmax(test_proba * tw, axis=1)]
-    SUBMISSIONS_DIR.mkdir(exist_ok=True)
-    pd.DataFrame({ID: test_ids, TARGET: labels}).to_csv(SUBMISSIONS_DIR / f"{RUN}.csv", index=False)
+    write_submission(SUBMISSIONS_DIR, f"{RUN}.csv", test_ids, TARGET, labels, id_col=ID)
     print(f"Saved → {RUN}")
 
 

@@ -173,6 +173,13 @@ displace XGB weight in the blend, netting a loss. Driver stays excluded for all 
 
 ## Modelling Notes
 
+- **Refactored onto `data_science_stuff.kaggle` (2026-07-04)**: paths via `competition_dirs`,
+  tuned params via `load_params`, submissions via `write_submission`, blend weights via
+  `kaggle.blending.optimize_blend_weights` (clip/AUC, same Nelder-Mead settings). All
+  historical scores in this file were produced by the pre-refactor scripts; `results/`
+  artifacts are untouched. Trainers keep their bespoke fold loops (in-loop fold-aware
+  TargetEncoder/Fourier transforms index external arrays, which `run_cv`'s `fit_fold`
+  contract intentionally does not model).
 - **CV**: 5-fold stratified, `random_state=42`. Scores logged to `results/cv_scores.csv`
 - **LGBM**: GPU (`device="gpu"`) — previously CPU-only due to Driver's 887 unique values exceeding the GPU 256-bin limit; switched to GPU after Driver string was dropped
 - **XGBoost / CatBoost**: `device="cuda"` / `task_type="GPU"` — no bin restriction

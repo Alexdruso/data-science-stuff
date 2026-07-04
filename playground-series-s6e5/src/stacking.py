@@ -14,9 +14,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 from cv_results import save_cv_result
 from features import build_features
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 
 TARGET = "PitNextLap"
 MODELS = ["lgbm", "catboost", "xgboost", "mlp"]
@@ -83,11 +83,8 @@ def main() -> None:
     save_cv_result(RESULTS_DIR, "stacking_v1", [], oof_auc)
     np.save(RESULTS_DIR / "oof_stacking.npy", oof_stack)
 
-    SUBMISSIONS_DIR.mkdir(exist_ok=True)
-    submission = pd.DataFrame({"id": test_ids, TARGET: test_stack})
-    out_path = SUBMISSIONS_DIR / "stacking_v1.csv"
-    submission.to_csv(out_path, index=False)
-    print(f"\nSubmission saved → {out_path}  ({len(submission)} rows)")
+    out_path = write_submission(SUBMISSIONS_DIR, "stacking_v1.csv", test_ids, TARGET, test_stack)
+    print(f"\nSubmission saved → {out_path}  ({len(test_ids)} rows)")
 
 
 if __name__ == "__main__":

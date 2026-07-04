@@ -9,7 +9,6 @@ import pandas as pd
 import polars as pl
 from lightgbm import LGBMClassifier, early_stopping, log_evaluation
 from sklearn.metrics import balanced_accuracy_score
-from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import LabelEncoder
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -18,9 +17,10 @@ from features import EXCLUDE_COLS, TARGET, build_features, compute_group_feature
 from lgbm_device import get_lgbm_device
 from postprocess import optimize_thresholds, save_threshold_weights
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.cv import run_cv
+from data_science_stuff.kaggle.io import competition_dirs, load_params, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 
 N_FOLDS = 5
 _DEVICE_TYPE, _N_JOBS = get_lgbm_device()
@@ -39,18 +39,6 @@ LGBM_PARAMS: dict[str, object] = {
     "n_jobs": _N_JOBS,
     "device_type": _DEVICE_TYPE,
 }
-
-
-def load_params() -> dict[str, object]:
-    params_path = RESULTS_DIR / "best_params.json"
-    base: dict[str, object] = dict(LGBM_PARAMS)
-    if params_path.exists():
-        with params_path.open() as f:
-            tuned = json.load(f)
-        base.update(tuned)
-        print(f"Loaded tuned params from {params_path}")
-    return base
-
 
 def load_data() -> tuple[pl.DataFrame, pl.DataFrame]:
     train = pl.read_csv(DATA_DIR / "train.csv")
@@ -93,34 +81,28 @@ def main() -> None:
     y = le.fit_transform(train_pd[TARGET].to_numpy())
     print(f"Classes: {list(le.classes_)}")  # e.g. ['GALAXY', 'QSO', 'STAR']
 
-    params = load_params()
+    params = load_params(RESULTS_DIR, LGBM_PARAMS, "best_params.json")
     params["num_class"] = len(le.classes_)
     tuned = (RESULTS_DIR / "best_params.json").exists()
 
-    skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=42)
-    oof_proba = np.zeros((len(X), len(le.classes_)))
-    test_proba = np.zeros((len(X_test), len(le.classes_)))
-    fold_scores: list[float] = []
-
-    for fold, (train_idx, val_idx) in enumerate(skf.split(X, y), 1):
-        X_tr, X_val = X.iloc[train_idx], X.iloc[val_idx]
-        y_tr, y_val = y[train_idx], y[val_idx]
-
+    def fit_fold(x_tr, y_tr, x_va, y_va, x_te, _fold):
         model = LGBMClassifier(**params)
         model.fit(
-            X_tr,
+            x_tr,
             y_tr,
-            eval_set=[(X_val, y_val)],
+            eval_set=[(x_va, y_va)],
             callbacks=[early_stopping(50, verbose=False), log_evaluation(0)],
         )
+        return model.predict_proba(x_va), model.predict_proba(x_te)
 
-        val_proba = model.predict_proba(X_val)
-        oof_proba[val_idx] = val_proba
-        test_proba += model.predict_proba(X_test) / N_FOLDS
+    def fold_score(y_va, val_proba):
+        return float(balanced_accuracy_score(y_va, np.argmax(val_proba, axis=1)))
 
-        val_pred = np.argmax(val_proba, axis=1)
-        score = float(balanced_accuracy_score(y_val, val_pred))
-        fold_scores.append(score)
+    oof_proba, test_proba, fold_scores = run_cv(
+        X, y, X_test, fit_fold,
+        n_splits=N_FOLDS, n_outputs=len(le.classes_), score_fn=fold_score,
+    )
+    for fold, score in enumerate(fold_scores, 1):
         print(f"  Fold {fold} balanced_acc: {score:.4f}")
 
     oof_score = float(balanced_accuracy_score(y, np.argmax(oof_proba, axis=1)))
@@ -149,9 +131,7 @@ def main() -> None:
     # ── submission ─────────────────────────────────────────────────────────
     test_pred = np.argmax(test_proba * threshold_weights, axis=1)
     test_pred_labels = le.inverse_transform(test_pred)
-    SUBMISSIONS_DIR.mkdir(exist_ok=True)
-    out_path = SUBMISSIONS_DIR / f"{run_name}.csv"
-    pd.DataFrame({"id": test_ids, TARGET: test_pred_labels}).to_csv(out_path, index=False)
+    out_path = write_submission(SUBMISSIONS_DIR, f"{run_name}.csv", test_ids, TARGET, test_pred_labels)
     print(f"Submission saved → {out_path}")
 
 

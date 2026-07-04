@@ -24,8 +24,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 from cv_results import save_cv_result
 from features import TARGET, build_features, compute_group_features
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, load_params
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 
 N_FOLDS = 5
 FIXED_PARAMS: dict[str, object] = {
@@ -42,17 +43,6 @@ DRIVER_COLS: set[str] = {
     "driver_compound_pit_rate",
     "driver_median_tyre_life_at_pit",
 }
-
-
-def load_params() -> dict[str, object]:
-    params: dict[str, object] = dict(FIXED_PARAMS)
-    path = RESULTS_DIR / "best_params.json"
-    if path.exists():
-        with path.open() as f:
-            params.update(json.load(f))
-        print(f"Loaded tuned params from {path}")
-    return params
-
 
 def main() -> None:
     train_raw = pl.read_csv(DATA_DIR / "train.csv")
@@ -76,7 +66,7 @@ def main() -> None:
     X = train_pd[feature_cols]
     y = train_pd[TARGET].to_numpy()
 
-    params = load_params()
+    params = load_params(RESULTS_DIR, FIXED_PARAMS, "best_params.json")
     skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=42)
     oof = np.zeros(len(X))
     fold_aucs: list[float] = []

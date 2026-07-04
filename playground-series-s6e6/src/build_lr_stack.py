@@ -20,7 +20,6 @@ import pandas as pd
 import polars as pl
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import balanced_accuracy_score, recall_score
-from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import LabelEncoder
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -28,9 +27,10 @@ from cv_results import save_cv_result
 from features import TARGET, build_features
 from postprocess import optimize_thresholds, save_threshold_weights
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, write_submission
+from data_science_stuff.kaggle.stacking import stack_oof
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 # Diverse base set (skip near-duplicate lgbm variants that add only collinearity).
 # Pruned to STRONG bases — ablation showed the 6 weak ~0.95 bases (mlp/mlp_la/realmlp/
 # realmlp_emb/extratrees/rf) add only +0.0001 = dead weight / overfit surface.
@@ -38,11 +38,10 @@ MODELS = ["lgbm", "xgboost", "catboost", "lgbm_fe",
           "xgb_deotte", "realmlp_deotte", "catboost_deotte", "catboost_v3", "xgb_v3fe",
           "chain_cascade", "chain_cascade_xgb"]
 SEEDS = [2024, 7, 13, 42, 99]
-EPS = 1e-6
 
 
-def logit(p: np.ndarray) -> np.ndarray:
-    return np.log(np.clip(p, EPS, 1 - EPS))
+def lr_meta() -> LogisticRegression:
+    return LogisticRegression(C=1.0, class_weight="balanced", max_iter=2000, n_jobs=-1)
 
 
 def main() -> None:
@@ -52,25 +51,21 @@ def main() -> None:
     y = le.fit_transform(tr[TARGET].to_numpy())
     test_ids = te["id"].to_numpy()
 
-    Ztr, Zte, used = [], [], []
+    base_oofs, base_tests, used = [], [], []
     for m in MODELS:
         fo, ft = RESULTS_DIR / f"oof_{m}.npy", RESULTS_DIR / f"test_{m}.npy"
         if fo.exists() and ft.exists():
-            Ztr.append(logit(np.load(fo)))
-            Zte.append(logit(np.load(ft)))
+            base_oofs.append(np.load(fo))
+            base_tests.append(np.load(ft))
             used.append(m)
     print(f"Stacking {len(used)} models: {used}")
-    Ztr, Zte = np.hstack(Ztr), np.hstack(Zte)
 
-    oof = np.zeros((len(y), 3))
-    test = np.zeros((len(test_ids), 3))
-    for seed in SEEDS:
-        skf = StratifiedKFold(5, shuffle=True, random_state=seed)
-        for tri, vai in skf.split(Ztr, y):
-            lr = LogisticRegression(C=1.0, class_weight="balanced", max_iter=2000, n_jobs=-1)
-            lr.fit(Ztr[tri], y[tri])
-            oof[vai] += lr.predict_proba(Ztr[vai]) / len(SEEDS)
-            test += lr.predict_proba(Zte) / (len(SEEDS) * 5)
+    # Honest multi-seed OOF stacking on the base logits — the shared core in
+    # data_science_stuff.kaggle.stacking (fit on 4 folds of the OOF rows,
+    # predict the 5th; test averaged over every seed x fold fit).
+    oof, test = stack_oof(
+        base_oofs, base_tests, y, lr_meta, seeds=SEEDS, n_splits=5, use_logits=True
+    )
 
     argmax = float(balanced_accuracy_score(y, np.argmax(oof, axis=1)))
     rec = recall_score(y, np.argmax(oof, axis=1), average=None, labels=[0, 1, 2])
@@ -84,8 +79,7 @@ def main() -> None:
     np.save(RESULTS_DIR / "oof_lrstack.npy", oof)
     np.save(RESULTS_DIR / "test_lrstack.npy", test)
     labels = le.inverse_transform(np.argmax(test * tw, axis=1))
-    SUBMISSIONS_DIR.mkdir(exist_ok=True)
-    pd.DataFrame({"id": test_ids, TARGET: labels}).to_csv(SUBMISSIONS_DIR / "lrstack.csv", index=False)
+    write_submission(SUBMISSIONS_DIR, "lrstack.csv", test_ids, TARGET, labels)
     print("Saved → lrstack (oof/test/submission)")
 
 

@@ -15,9 +15,9 @@ import polars as pl
 sys.path.insert(0, str(Path(__file__).parent))
 from features import DRIVER_COLS, build_features, compute_group_features, compute_race_lap_features
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 TARGET = "PitNextLap"
 N_FOLDS = 5
 
@@ -67,10 +67,7 @@ def main() -> None:
     np.save(RESULTS_DIR / "test_lgbm_ar.npy", test_proba)
     print(f"test_lgbm_ar.npy saved → {RESULTS_DIR}")
 
-    SUBMISSIONS_DIR.mkdir(exist_ok=True)
-    submission = pd.DataFrame({"id": test_ids, TARGET: test_proba})
-    out_path = SUBMISSIONS_DIR / "lgbm_ar_v1.csv"
-    submission.to_csv(out_path, index=False)
+    out_path = write_submission(SUBMISSIONS_DIR, "lgbm_ar_v1.csv", test_ids, TARGET, test_proba)
     print(f"Submission saved → {out_path}")
 
 

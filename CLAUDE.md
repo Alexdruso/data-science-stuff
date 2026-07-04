@@ -7,7 +7,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A Python monorepo containing:
 - **`data_mining/`** — KTH ID2222 coursework (Shingling/LSH, A-priori, Triest, Spectral Clustering, JaBeJa)
 - **`playground-series-*/` / `playground_series_s5e1/`** — Kaggle Playground Series competition solutions
-- **`data_science_stuff/`** — Shared installable package (versioned via git tags through setuptools_scm)
+- **`data_science_stuff/`** — Shared installable package (versioned via git tags through
+  setuptools_scm). `kaggle_utils.py` holds the original helpers (`save_cv_result`,
+  `tune_decision_weights`, ...); the `kaggle/` subpackage holds the competition machinery
+  extracted from s6e5/s6e6: `io` (paths/params/submissions), `device` (LightGBM CUDA probe),
+  `cv` (`run_cv` fold loop), `blending` (Nelder-Mead blend weights, diversity report),
+  `decision` (threshold weights, Bayes cost matrix, cascade recombination), `encoding`
+  (fold-safe target encoding, quantile bins, frequency features), `stacking` (`stack_oof`,
+  Caruana selection), and `models` (MLP scaffold, RealMLP-TD, imbalance losses).
 
 ## Setup
 
@@ -63,7 +70,10 @@ workflows by hand:
 - **`add-model`** — add a `train_<model>.py` (+ optional `tune_<model>.py`) that follows the
   CV/OOF conventions and the PyTorch GPU memory rule.
 - **`ensemble-submit`** — rebuild the ensemble from `oof_*.npy`/`test_*.npy` (Nelder-Mead weights)
-  and write a submission, enforcing the row-order invariant.
+  and write a submission, enforcing the row-order invariant; covers stacking (LR-on-logits) when
+  the scalar blend plateaus.
+- **`select-finals`** — choose the final Kaggle submissions at competition end by CV rather than
+  public LB rank, flagging public-split-overfit candidates.
 - **`quality-gate`** — run `make py-fmt` → `make py-static` → `pytest` before committing.
 
 A SessionStart hook (`.claude/hooks/session-start.sh`) installs dependencies automatically in
@@ -71,20 +81,28 @@ Claude Code on the web so the venv, linters, and tests are ready at session star
 
 ## Competition Workflow
 
-Each Kaggle competition follows the same pipeline (mature reference: `playground-series-s6e5/`):
+Each Kaggle competition follows the same pipeline (mature references: `playground-series-s6e5/`
+for regression/AUC, `playground-series-s6e6/` for imbalanced multiclass + stacking):
 
 ```
 features.py  →  baseline.py / train_<model>.py  →  tune_<model>.py  →  ensemble.py  →  submission
             (5-fold stratified CV, results/oof_<m>.npy + test_<m>.npy)  (Nelder-Mead)   (kaggle CLI)
 ```
 
-Two invariants are critical and have each caused real failures:
+The pipeline is built on `data_science_stuff.kaggle`: `competition_dirs`/`load_params` →
+`run_cv` → `save_cv_result` + `optimize_thresholds` → `optimize_blend_weights`/`stack_oof` →
+`write_submission`. Competition scripts import these; they never copy them.
+
+Three invariants are critical and have each caused (or nearly caused) real failures:
 
 1. **Row-order invariant** — `features.py::build_features()` sorts every dataframe by the
    competition's key columns, and all `oof_*.npy`/`test_*.npy` arrays are stored in that order.
    Any code that loads `y` or `test_ids` to combine with those arrays **must** go through
    `build_features()`, or predictions silently misalign (a 0.5-AUC submission once resulted).
 2. **GPU memory rule** — see below; omitting it OOM-crashes multi-fold/multi-trial runs.
+3. **Fold-aware target encoding** — any target-derived feature is fit on the fold's training
+   split only; fitting globally leaks val targets and inflates OOF scores that don't transfer
+   to the leaderboard.
 
 Per-competition `CLAUDE.md` files capture the dataset, EDA findings, current best, and an
 experiments log; read them before working in a competition directory.

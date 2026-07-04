@@ -17,9 +17,9 @@ from features import DRIVER_COLS, build_features, compute_group_features, comput
 from positional_encoding import PE_FEATURE_NAMES, apply_fourier_df
 from sklearn.preprocessing import MinMaxScaler, TargetEncoder
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, load_params, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 
 TARGET = "PitNextLap"
 N_FOLDS = 5
@@ -37,18 +37,6 @@ LGBM_PARAMS: dict[str, object] = {
     "device": "gpu",
     "fourier_L": 3,
 }
-
-
-def load_params() -> dict[str, object]:
-    params_path = RESULTS_DIR / "best_params.json"
-    base: dict[str, object] = dict(LGBM_PARAMS)
-    if params_path.exists():
-        with params_path.open() as f:
-            tuned = json.load(f)
-        base.update(tuned)
-        print(f"Loaded tuned params from {params_path}")
-    return base
-
 
 def load_data() -> tuple[pl.DataFrame, pl.DataFrame]:
     train = pl.read_csv(DATA_DIR / "train.csv")
@@ -98,7 +86,7 @@ def main() -> None:
     te_full.fit(driver_train.reshape(-1, 1), y)
     X_test["driver_target_enc"] = te_full.transform(driver_test.reshape(-1, 1)).ravel()
 
-    params = load_params()
+    params = load_params(RESULTS_DIR, LGBM_PARAMS, "best_params.json")
     fourier_L = int(params.pop("fourier_L", 3))
     pe_cols = [c for c in PE_FEATURE_NAMES if c in X.columns]
 
@@ -150,10 +138,7 @@ def main() -> None:
     np.save(RESULTS_DIR / "test_lgbm.npy", test_proba)
     print(f"OOF/test arrays saved → {RESULTS_DIR}")
 
-    SUBMISSIONS_DIR.mkdir(exist_ok=True)
-    submission = pd.DataFrame({"id": test_ids, TARGET: test_proba})
-    out_path = SUBMISSIONS_DIR / "baseline_lgbm_v14.csv"
-    submission.to_csv(out_path, index=False)
+    out_path = write_submission(SUBMISSIONS_DIR, "baseline_lgbm_v14.csv", test_ids, TARGET, test_proba)
     print(f"Submission saved → {out_path}")
 
 

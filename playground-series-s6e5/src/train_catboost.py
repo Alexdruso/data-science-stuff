@@ -17,9 +17,9 @@ from features import DRIVER_COLS, build_features, compute_group_features, comput
 from positional_encoding import PE_FEATURE_NAMES, apply_fourier_df
 from sklearn.preprocessing import MinMaxScaler, TargetEncoder
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, load_params, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 
 TARGET = "PitNextLap"
 N_FOLDS = 5
@@ -42,19 +42,6 @@ DEFAULT_PARAMS: dict[str, object] = {
     "min_data_in_leaf": 50,
     "fourier_L": 3,
 }
-
-
-def load_params() -> dict[str, object]:
-    params_path = RESULTS_DIR / "best_params_catboost.json"
-    base: dict[str, object] = {**FIXED_PARAMS, **DEFAULT_PARAMS}
-    if params_path.exists():
-        with params_path.open() as f:
-            base.update(json.load(f))
-        print(f"Loaded tuned params from {params_path}")
-    else:
-        print("No tuned params found — using sensible defaults")
-    return base
-
 
 def load_data() -> tuple[pl.DataFrame, pl.DataFrame]:
     return pl.read_csv(DATA_DIR / "train.csv"), pl.read_csv(DATA_DIR / "test.csv")
@@ -95,7 +82,7 @@ def main() -> None:
     te_full.fit(driver_train.reshape(-1, 1), y)
     X_test["driver_target_enc"] = te_full.transform(driver_test.reshape(-1, 1)).ravel()
 
-    params = load_params()
+    params = load_params(RESULTS_DIR, {**FIXED_PARAMS, **DEFAULT_PARAMS}, "best_params_catboost.json")
     fourier_L = int(params.pop("fourier_L", 3))
     params["cat_features"] = cat_cols
     pe_cols = [c for c in PE_FEATURE_NAMES if c in X.columns]
@@ -143,10 +130,7 @@ def main() -> None:
     np.save(RESULTS_DIR / "test_catboost.npy", test_proba)
     print(f"OOF/test arrays saved → {RESULTS_DIR}")
 
-    SUBMISSIONS_DIR.mkdir(exist_ok=True)
-    submission = pd.DataFrame({"id": test_ids, TARGET: test_proba})
-    out_path = SUBMISSIONS_DIR / "catboost_v7.csv"
-    submission.to_csv(out_path, index=False)
+    out_path = write_submission(SUBMISSIONS_DIR, "catboost_v7.csv", test_ids, TARGET, test_proba)
     print(f"Submission saved → {out_path}")
 
 

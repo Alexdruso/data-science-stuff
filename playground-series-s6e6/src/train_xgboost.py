@@ -13,7 +13,6 @@ import numpy as np
 import pandas as pd
 import polars as pl
 from sklearn.metrics import balanced_accuracy_score
-from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import LabelEncoder
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -26,9 +25,10 @@ try:
 except ImportError as e:
     raise SystemExit("xgboost not installed — run: uv pip install xgboost") from e
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.cv import run_cv
+from data_science_stuff.kaggle.io import competition_dirs, load_params, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 
 N_FOLDS = 5
 XGB_PARAMS: dict[str, object] = {
@@ -49,18 +49,6 @@ XGB_PARAMS: dict[str, object] = {
     "verbosity": 0,
     "n_jobs": -1,
 }
-
-
-def load_params() -> dict[str, object]:
-    params_path = RESULTS_DIR / "best_params_xgboost.json"
-    base: dict[str, object] = dict(XGB_PARAMS)
-    if params_path.exists():
-        with params_path.open() as f:
-            tuned = json.load(f)
-        base.update(tuned)
-        print(f"Loaded tuned params from {params_path}")
-    return base
-
 
 def make_sample_weights(y: np.ndarray) -> np.ndarray:
     """Inverse-frequency weights so minority classes get equal gradient mass."""
@@ -103,37 +91,31 @@ def main() -> None:
     y = le.fit_transform(train_pd[TARGET].to_numpy())
     print(f"Classes: {list(le.classes_)}")
 
-    sample_weights = make_sample_weights(y)
-
-    params = load_params()
+    params = load_params(RESULTS_DIR, XGB_PARAMS, "best_params_xgboost.json")
     params["num_class"] = len(le.classes_)
 
-    skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=42)
-    oof_proba = np.zeros((len(X), len(le.classes_)))
-    test_proba = np.zeros((len(X_test), len(le.classes_)))
-    fold_scores: list[float] = []
-
-    for fold, (train_idx, val_idx) in enumerate(skf.split(X, y), 1):
-        X_tr, X_val = X.iloc[train_idx], X.iloc[val_idx]
-        y_tr, y_val = y[train_idx], y[val_idx]
-        w_tr = sample_weights[train_idx]
-
+    def fit_fold(x_tr, y_tr, x_va, y_va, x_te, _fold):
+        # Inverse-frequency weights from the fold's training labels (fold
+        # statistics; stratification keeps them ~identical to global counts).
+        w_tr = make_sample_weights(y_tr)
         model = XGBClassifier(**params)
         model.fit(
-            X_tr,
+            x_tr,
             y_tr,
             sample_weight=w_tr,
-            eval_set=[(X_val, y_val)],
+            eval_set=[(x_va, y_va)],
             verbose=False,
         )
+        return model.predict_proba(x_va), model.predict_proba(x_te)
 
-        val_proba = model.predict_proba(X_val)
-        oof_proba[val_idx] = val_proba
-        test_proba += model.predict_proba(X_test) / N_FOLDS
+    def fold_score(y_va, val_proba):
+        return float(balanced_accuracy_score(y_va, np.argmax(val_proba, axis=1)))
 
-        val_pred = np.argmax(val_proba, axis=1)
-        score = float(balanced_accuracy_score(y_val, val_pred))
-        fold_scores.append(score)
+    oof_proba, test_proba, fold_scores = run_cv(
+        X, y, X_test, fit_fold,
+        n_splits=N_FOLDS, n_outputs=len(le.classes_), score_fn=fold_score,
+    )
+    for fold, score in enumerate(fold_scores, 1):
         print(f"  Fold {fold} balanced_acc: {score:.4f}")
 
     oof_score = float(balanced_accuracy_score(y, np.argmax(oof_proba, axis=1)))
@@ -153,9 +135,7 @@ def main() -> None:
     print(f"OOF/test arrays saved → {RESULTS_DIR}")
 
     test_pred_labels = le.inverse_transform(np.argmax(test_proba * threshold_weights, axis=1))
-    SUBMISSIONS_DIR.mkdir(exist_ok=True)
-    out_path = SUBMISSIONS_DIR / f"{run_name}.csv"
-    pd.DataFrame({"id": test_ids, TARGET: test_pred_labels}).to_csv(out_path, index=False)
+    out_path = write_submission(SUBMISSIONS_DIR, f"{run_name}.csv", test_ids, TARGET, test_pred_labels)
     print(f"Submission saved → {out_path}")
 
 

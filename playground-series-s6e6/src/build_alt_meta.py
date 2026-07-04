@@ -37,9 +37,9 @@ from features import TARGET, build_features
 from lgbm_device import get_lgbm_device
 from postprocess import optimize_thresholds, save_threshold_weights
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 MODELS = ["lgbm", "xgboost", "catboost", "lgbm_fe",
           "xgb_deotte", "realmlp_deotte", "catboost_deotte", "catboost_v3", "xgb_v3fe",
           "chain_cascade", "chain_cascade_xgb"]
@@ -153,8 +153,7 @@ def main() -> None:
     if argmax > GATE:
         save_threshold_weights(tw, le.classes_.tolist(), RESULTS_DIR / f"threshold_weights_{run}.json")
         labels = le.inverse_transform(np.argmax(test * tw, axis=1))
-        SUBMISSIONS_DIR.mkdir(exist_ok=True)
-        pd.DataFrame({"id": test_ids, TARGET: labels}).to_csv(SUBMISSIONS_DIR / f"{run}.csv", index=False)
+        write_submission(SUBMISSIONS_DIR, f"{run}.csv", test_ids, TARGET, labels)
         print(f"Saved → {run} (beat gate)")
     else:
         print("Did not beat gate — oof/test saved for the record, no submission.")

@@ -27,8 +27,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 from features import EXCLUDE_COLS, build_features, compute_group_features
 from lgbm_device import get_lgbm_device
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 N_FOLDS = 5
 
 

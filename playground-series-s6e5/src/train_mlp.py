@@ -18,9 +18,9 @@ from cv_results import save_cv_result
 from features import DRIVER_COLS, build_features, compute_group_features, compute_race_lap_features, compute_race_stint_features
 from positional_encoding import PE_FEATURE_NAMES, apply_fourier_np
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, load_params, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 
 TARGET = "PitNextLap"
 N_FOLDS = 5
@@ -41,15 +41,6 @@ DEFAULT_PARAMS: dict[str, object] = {
     "architecture": "shrinking",
     "fourier_L": 3,
 }
-
-
-def load_params() -> dict[str, object]:
-    p = RESULTS_DIR / "best_params_mlp.json"
-    if p.exists():
-        with p.open() as f:
-            return json.load(f)  # type: ignore[no-any-return]
-    return DEFAULT_PARAMS
-
 
 def build_layer_sizes(params: dict[str, object]) -> list[int]:
     n = int(params["n_layers"])  # type: ignore[arg-type]
@@ -237,7 +228,7 @@ def train_fold(
 
 def main() -> None:
     print(f"Device: {DEVICE}")
-    params = load_params()
+    params = load_params(RESULTS_DIR, DEFAULT_PARAMS, "best_params_mlp.json")
     print(f"MLP params: {params}")
 
     train_raw, test_raw = load_data()
@@ -323,10 +314,7 @@ def main() -> None:
     np.save(RESULTS_DIR / "test_mlp.npy", test_proba)
     print(f"OOF/test arrays saved → {RESULTS_DIR}")
 
-    SUBMISSIONS_DIR.mkdir(exist_ok=True)
-    submission = pd.DataFrame({"id": test_ids, TARGET: test_proba})
-    out_path = SUBMISSIONS_DIR / "mlp_v10.csv"
-    submission.to_csv(out_path, index=False)
+    out_path = write_submission(SUBMISSIONS_DIR, "mlp_v10.csv", test_ids, TARGET, test_proba)
     print(f"Submission saved → {out_path}")
 
 

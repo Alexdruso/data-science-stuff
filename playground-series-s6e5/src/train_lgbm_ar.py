@@ -26,36 +26,25 @@ sys.path.insert(0, str(Path(__file__).parent))
 from cv_results import save_cv_result
 from features import DRIVER_COLS, build_features, compute_group_features, compute_race_lap_features
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, load_params, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 
 TARGET = "PitNextLap"
 N_FOLDS = 5
-
-
-def load_params() -> dict[str, object]:
-    params_path = RESULTS_DIR / "best_params.json"
-    base: dict[str, object] = {
-        "objective": "binary",
-        "metric": "auc",
-        "n_estimators": 1000,
-        "learning_rate": 0.05,
-        "num_leaves": 127,
-        "subsample": 0.8,
-        "colsample_bytree": 0.8,
-        "random_state": 42,
-        "verbose": -1,
-        "n_jobs": -1,
-        "device": "gpu",
-    }
-    if params_path.exists():
-        import json
-        with params_path.open() as f:
-            base.update(json.load(f))
-        print(f"Loaded tuned params from {params_path}")
-    return base
-
+LGBM_AR_PARAMS: dict[str, object] = {
+    "objective": "binary",
+    "metric": "auc",
+    "n_estimators": 1000,
+    "learning_rate": 0.05,
+    "num_leaves": 127,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "random_state": 42,
+    "verbose": -1,
+    "n_jobs": -1,
+    "device": "gpu",
+}
 
 def to_pandas(df: pl.DataFrame, cat_cols: list[str]) -> pd.DataFrame:
     pdf = df.to_pandas()
@@ -121,7 +110,7 @@ def main() -> None:
     X_test = test[feature_cols].copy()
     test_ids = test["id"].to_numpy()
 
-    params = load_params()
+    params = load_params(RESULTS_DIR, LGBM_AR_PARAMS, "best_params.json")
     skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=42)
     oof_proba = np.zeros(len(X))
     fold_aucs: list[float] = []
@@ -181,10 +170,7 @@ def main() -> None:
     np.save(RESULTS_DIR / "test_lgbm_ar.npy", test_proba)
     print(f"OOF/test arrays saved → {RESULTS_DIR}", flush=True)
 
-    SUBMISSIONS_DIR.mkdir(exist_ok=True)
-    submission = pd.DataFrame({"id": test_ids, TARGET: test_proba})
-    out_path = SUBMISSIONS_DIR / "lgbm_ar_v1.csv"
-    submission.to_csv(out_path, index=False)
+    out_path = write_submission(SUBMISSIONS_DIR, "lgbm_ar_v1.csv", test_ids, TARGET, test_proba)
     print(f"Submission saved → {out_path}", flush=True)
 
 

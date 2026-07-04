@@ -20,8 +20,9 @@ from features import DRIVER_COLS, build_features, compute_group_features, comput
 from positional_encoding import PE_FEATURE_NAMES, apply_fourier_np
 from sklearn.preprocessing import TargetEncoder
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 
 TARGET = "PitNextLap"
 N_FOLDS = 3

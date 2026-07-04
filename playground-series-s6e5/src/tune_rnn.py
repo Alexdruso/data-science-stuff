@@ -35,8 +35,9 @@ from train_rnn import (
     prepare_arrays,
 )
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 
 TARGET = "PitNextLap"
 N_FOLDS = 3       # 3-fold for speed; full 5-fold happens in train_rnn.py

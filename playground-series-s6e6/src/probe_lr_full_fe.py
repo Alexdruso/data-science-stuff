@@ -48,7 +48,10 @@ from deotte_features import (
 def te_sources(top: list[str], cat_cols: list[str]) -> list[str]:
     return [c for c in cat_cols if any(f.startswith(f"TE_{c}_") for f in top)]
 
-DATA_DIR = Path(__file__).parent.parent / "data"
+from data_science_stuff.kaggle.encoding import add_fold_safe_target_encoding
+from data_science_stuff.kaggle.io import competition_dirs
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 SEED = 42
 N_SPLITS = 3      # use 5 for more reliable estimates (slower)
 SUBSAMPLE = 100_000
@@ -293,28 +296,13 @@ def add_v2_transforms(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
 
 
 # ── Fold-safe target encoding (train/val only — no test needed here) ───────
-
 def add_fold_safe_te(
-    X_tr: pd.DataFrame, y_tr: np.ndarray,
-    X_va: pd.DataFrame, te_cols: list[str],
+    X_tr: pd.DataFrame, y_tr: np.ndarray, X_va: pd.DataFrame, te_cols: list[str],
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    X_tr, X_va = X_tr.copy(), X_va.copy()
-    for c in te_cols:
-        if c not in X_tr.columns:
-            continue
-        ktr = cat_key(X_tr[c]).to_frame(c)
-        kva = cat_key(X_va[c]).to_frame(c)
-        for cls_idx, cls_name in INT_TO_CLASS.items():
-            yb = (y_tr == cls_idx).astype(np.int32)
-            enc = TargetEncoder(
-                target_type="binary", smooth=TE_SMOOTH, cv=TE_INNER_SPLITS,
-                shuffle=True, random_state=SEED + 177,
-            )
-            name = f"TE_{c}_{cls_name}"
-            X_tr[name] = enc.fit_transform(ktr, yb).ravel().astype(np.float32)
-            X_va[name] = enc.transform(kva).ravel().astype(np.float32)
-    return X_tr, X_va
-
+    return add_fold_safe_target_encoding(
+        X_tr, y_tr, [X_va], te_cols, INT_TO_CLASS,
+        smooth=TE_SMOOTH, inner_cv=TE_INNER_SPLITS, seed=SEED + 177,
+    )
 
 # ── Design matrix helpers ──────────────────────────────────────────────────
 

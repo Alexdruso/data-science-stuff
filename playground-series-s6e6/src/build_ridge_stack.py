@@ -24,7 +24,6 @@ import pandas as pd
 import polars as pl
 from sklearn.linear_model import Ridge
 from sklearn.metrics import balanced_accuracy_score, recall_score
-from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -32,9 +31,10 @@ from cv_results import save_cv_result
 from features import TARGET, build_features
 from postprocess import optimize_thresholds, save_threshold_weights
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, write_submission
+from data_science_stuff.kaggle.stacking import stack_oof
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 MODELS = ["lgbm", "xgboost", "catboost", "lgbm_fe",
           "xgb_deotte", "realmlp_deotte", "catboost_deotte"]
 SEEDS = [2024, 7, 13, 42, 99]
@@ -58,21 +58,36 @@ def inv_freq_weights(y: np.ndarray) -> np.ndarray:
     return w[y]
 
 
+class RidgeMeta:
+    """Scaler + per-class Ridge on one-hot targets + softmax — a fit/predict_proba meta.
+
+    Wrapping the recipe this way lets the honest multi-seed OOF loop come from
+    data_science_stuff.kaggle.stacking.stack_oof instead of a hand-rolled copy.
+    """
+
+    def __init__(self, alpha: float) -> None:
+        self.alpha = alpha
+
+    def fit(self, X: np.ndarray, y: np.ndarray) -> "RidgeMeta":
+        self.scaler_ = StandardScaler().fit(X)
+        self.ridge_ = Ridge(alpha=self.alpha)
+        onehot = np.eye(3)[y]
+        self.ridge_.fit(self.scaler_.transform(X), onehot,
+                        sample_weight=inv_freq_weights(y))
+        return self
+
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        return softmax(self.ridge_.predict(self.scaler_.transform(X)))
+
+
 def run_ridge(Ztr, Zte, y, alpha, seeds):
-    """Honest OOF ridge meta at one alpha. Returns (oof_probs, test_probs)."""
-    oof = np.zeros((len(y), 3))
-    test = np.zeros((Zte.shape[0], 3))
-    Y = np.eye(3)[y]
-    for seed in seeds:
-        skf = StratifiedKFold(5, shuffle=True, random_state=seed)
-        for tri, vai in skf.split(Ztr, y):
-            sc = StandardScaler().fit(Ztr[tri])
-            Xtr, Xva, Xte = sc.transform(Ztr[tri]), sc.transform(Ztr[vai]), sc.transform(Zte)
-            r = Ridge(alpha=alpha)
-            r.fit(Xtr, Y[tri], sample_weight=inv_freq_weights(y[tri]))
-            oof[vai] += softmax(r.predict(Xva)) / len(seeds)
-            test += softmax(r.predict(Xte)) / (len(seeds) * 5)
-    return oof, test
+    """Honest OOF ridge meta at one alpha. Returns (oof_probs, test_probs).
+
+    Ztr/Zte are the already-prepped meta matrices (logits or probs, optionally
+    + raw features), so they enter stack_oof as a single pre-transformed base.
+    """
+    return stack_oof([Ztr], [Zte], y, lambda: RidgeMeta(alpha),
+                     seeds=seeds, n_splits=5, use_logits=False)
 
 
 def main() -> None:
@@ -124,8 +139,7 @@ def main() -> None:
         np.save(RESULTS_DIR / "oof_ridgestack.npy", oof)
         np.save(RESULTS_DIR / "test_ridgestack.npy", test)
         labels = le.inverse_transform(np.argmax(test * tw, axis=1))
-        SUBMISSIONS_DIR.mkdir(exist_ok=True)
-        pd.DataFrame({"id": test_ids, TARGET: labels}).to_csv(SUBMISSIONS_DIR / "ridgestack.csv", index=False)
+        write_submission(SUBMISSIONS_DIR, "ridgestack.csv", test_ids, TARGET, labels)
         print("Saved → ridgestack (beat LR stack)")
     else:
         print("Did not beat LR stack — not saved as submission.")
