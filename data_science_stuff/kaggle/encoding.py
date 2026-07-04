@@ -23,12 +23,12 @@ from numpy.typing import NDArray
 from sklearn.preprocessing import TargetEncoder
 
 
-def cat_key(s: pd.Series) -> pd.Series:
+def cat_key(s: pd.Series[Any]) -> pd.Series[Any]:
     """String key for a categorical column, with missing values as ``__NA__``."""
     return s.fillna("__NA__").astype(str)
 
 
-def sorted_factorize(*series: pd.Series) -> tuple[NDArray[np.int32], ...]:
+def sorted_factorize(*series: pd.Series[Any]) -> tuple[NDArray[np.int32], ...]:
     """Deterministic integer codes shared across any number of splits.
 
     The category-to-code mapping is built from the *union* of all inputs
