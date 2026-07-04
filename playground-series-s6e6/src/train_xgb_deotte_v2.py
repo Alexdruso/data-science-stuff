@@ -34,6 +34,7 @@ from deotte_features import (
     CLASS_TO_INT, CLASSES, ID_COL, INT_TO_CLASS, TARGET, TE_INNER_SPLITS, TE_SMOOTH,
     TOP_FEATURES, add_experimental_features, build_feature_matrix, cat_key,
 )
+from train_xgb_deotte import add_fold_safe_te, sorted_factorize
 from postprocess import optimize_thresholds, save_threshold_weights
 
 from data_science_stuff.kaggle.io import competition_dirs, write_submission
@@ -76,36 +77,8 @@ def class_weights(y: np.ndarray) -> np.ndarray:
     wpc = np.float32(len(y)) / (np.float32(len(CLASSES)) * np.maximum(counts, 1.0))
     return wpc[y].astype(np.float32)
 
-
-def sorted_factorize(tr: pd.Series, va: pd.Series, te: pd.Series):
-    vals = pd.concat([cat_key(tr), cat_key(va), cat_key(te)], ignore_index=True)
-    cats = pd.Index(sorted(vals.unique()))
-    codes = vals.map({c: i for i, c in enumerate(cats)}).fillna(-1).astype("int32").to_numpy()
-    n1, n2 = len(tr), len(va)
-    return codes[:n1], codes[n1:n1 + n2], codes[n1 + n2:]
-
-
 def te_sources(top: list[str], cat_cols: list[str]) -> list[str]:
     return [c for c in cat_cols if any(f.startswith(f"TE_{c}_") for f in top)]
-
-
-def add_fold_safe_te(X_tr, y_tr, X_va, X_te, te_cols):
-    X_tr, X_va, X_te = X_tr.copy(), X_va.copy(), X_te.copy()
-    for c in te_cols:
-        if c not in X_tr.columns:
-            continue
-        ktr, kva, kte = (cat_key(X_tr[c]).to_frame(c), cat_key(X_va[c]).to_frame(c),
-                         cat_key(X_te[c]).to_frame(c))
-        for cls_idx, cls_name in INT_TO_CLASS.items():
-            yb = (y_tr == cls_idx).astype(np.int32)
-            enc = TargetEncoder(target_type="binary", smooth=TE_SMOOTH, cv=TE_INNER_SPLITS,
-                                shuffle=True, random_state=SEED + 177)
-            name = f"TE_{c}_{cls_name}"
-            X_tr[name] = enc.fit_transform(ktr, yb).ravel().astype(np.float32)
-            X_va[name] = enc.transform(kva).ravel().astype(np.float32)
-            X_te[name] = enc.transform(kte).ravel().astype(np.float32)
-    return X_tr, X_va, X_te
-
 
 def main() -> None:
     train = pd.read_csv(DATA_DIR / "train.csv").sort_values(ID_COL).reset_index(drop=True)

@@ -32,6 +32,8 @@ from sklearn.preprocessing import TargetEncoder
 from xgboost import XGBClassifier
 
 sys.path.insert(0, str(Path(__file__).parent))
+from train_xgb_deotte import add_fold_safe_te, sorted_factorize
+
 from deotte_features import (
     CLASS_TO_INT, CLASSES, ID_COL, INT_TO_CLASS, TARGET, TE_INNER_SPLITS, TE_SMOOTH,
     TOP_FEATURES, build_feature_matrix, cat_key,
@@ -89,42 +91,6 @@ def class_weights(y: np.ndarray) -> np.ndarray:
 
 def te_sources(cat_cols: list[str]) -> list[str]:
     return [c for c in cat_cols if any(f.startswith(f"TE_{c}_") for f in TOP_FEATURES)]
-
-
-def add_fold_safe_te(
-    X_tr: pd.DataFrame, y_tr: np.ndarray,
-    X_va: pd.DataFrame, X_te: pd.DataFrame,
-    te_cols: list[str],
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    X_tr, X_va, X_te = X_tr.copy(), X_va.copy(), X_te.copy()
-    for c in te_cols:
-        if c not in X_tr.columns:
-            continue
-        ktr = cat_key(X_tr[c]).to_frame(c)
-        kva = cat_key(X_va[c]).to_frame(c)
-        kte = cat_key(X_te[c]).to_frame(c)
-        for cls_idx, cls_name in INT_TO_CLASS.items():
-            yb = (y_tr == cls_idx).astype(np.int32)
-            enc = TargetEncoder(
-                target_type="binary", smooth=TE_SMOOTH, cv=TE_INNER_SPLITS,
-                shuffle=True, random_state=SEED + 177,
-            )
-            name = f"TE_{c}_{cls_name}"
-            X_tr[name] = enc.fit_transform(ktr, yb).ravel().astype(np.float32)
-            X_va[name] = enc.transform(kva).ravel().astype(np.float32)
-            X_te[name] = enc.transform(kte).ravel().astype(np.float32)
-    return X_tr, X_va, X_te
-
-
-def sorted_factorize(
-    tr: pd.Series, va: pd.Series, te: pd.Series
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    vals = pd.concat([cat_key(tr), cat_key(va), cat_key(te)], ignore_index=True)
-    cats = pd.Index(sorted(vals.unique()))
-    codes = vals.map({c: i for i, c in enumerate(cats)}).fillna(-1).astype("int32").to_numpy()
-    n1, n2 = len(tr), len(va)
-    return codes[:n1], codes[n1:n1 + n2], codes[n1 + n2:]
-
 
 def run_cv(
     X: pd.DataFrame, y: np.ndarray, X_test: pd.DataFrame,

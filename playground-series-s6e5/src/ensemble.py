@@ -6,13 +6,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import polars as pl
-from scipy.optimize import minimize
 from sklearn.metrics import roc_auc_score
 
 sys.path.insert(0, str(Path(__file__).parent))
 from cv_results import save_cv_result
 from features import build_features, compute_group_features
 
+from data_science_stuff.kaggle.blending import optimize_blend_weights
 from data_science_stuff.kaggle.io import competition_dirs, write_submission
 
 DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
@@ -21,30 +21,22 @@ TARGET = "PitNextLap"
 MODELS = ["lgbm", "catboost", "xgboost", "mlp"]
 
 
-def neg_ensemble_auc(
-    weights: np.ndarray,
-    oofs: list[np.ndarray],
-    y: np.ndarray,
-) -> float:
-    w = np.clip(weights, 0, None)
-    w = w / w.sum()
-    blend = sum(wi * oof for wi, oof in zip(w, oofs))
-    return -float(roc_auc_score(y, blend))
+def auc_score(y: np.ndarray, blended: np.ndarray) -> float:
+    """Blend metric: AUC on the 1-D blended probabilities (higher is better)."""
+    return float(roc_auc_score(y, blended))
 
 
 def optimize_weights(
     oofs: list[np.ndarray], y: np.ndarray, mask: np.ndarray
 ) -> np.ndarray:
-    x0 = np.ones(len(oofs)) / len(oofs)
-    result = minimize(
-        neg_ensemble_auc,
-        x0,
-        args=([o[mask] for o in oofs], y[mask]),
-        method="Nelder-Mead",
-        options={"maxiter": 5000, "xatol": 1e-6, "fatol": 1e-6},
+    """Nelder-Mead blend weights on the masked rows (shared optimizer)."""
+    return optimize_blend_weights(
+        [o[mask] for o in oofs],
+        y[mask],
+        auc_score,
+        normalize="clip",
+        x0=np.ones(len(oofs)) / len(oofs),
     )
-    w = np.clip(result.x, 0, None)
-    return w / w.sum()
 
 
 def main() -> None:

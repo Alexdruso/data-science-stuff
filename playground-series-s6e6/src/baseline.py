@@ -9,7 +9,6 @@ import pandas as pd
 import polars as pl
 from lightgbm import LGBMClassifier, early_stopping, log_evaluation
 from sklearn.metrics import balanced_accuracy_score
-from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import LabelEncoder
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -18,6 +17,7 @@ from features import EXCLUDE_COLS, TARGET, build_features, compute_group_feature
 from lgbm_device import get_lgbm_device
 from postprocess import optimize_thresholds, save_threshold_weights
 
+from data_science_stuff.kaggle.cv import run_cv
 from data_science_stuff.kaggle.io import competition_dirs, load_params, write_submission
 
 DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
@@ -85,30 +85,24 @@ def main() -> None:
     params["num_class"] = len(le.classes_)
     tuned = (RESULTS_DIR / "best_params.json").exists()
 
-    skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=42)
-    oof_proba = np.zeros((len(X), len(le.classes_)))
-    test_proba = np.zeros((len(X_test), len(le.classes_)))
-    fold_scores: list[float] = []
-
-    for fold, (train_idx, val_idx) in enumerate(skf.split(X, y), 1):
-        X_tr, X_val = X.iloc[train_idx], X.iloc[val_idx]
-        y_tr, y_val = y[train_idx], y[val_idx]
-
+    def fit_fold(x_tr, y_tr, x_va, y_va, x_te, _fold):
         model = LGBMClassifier(**params)
         model.fit(
-            X_tr,
+            x_tr,
             y_tr,
-            eval_set=[(X_val, y_val)],
+            eval_set=[(x_va, y_va)],
             callbacks=[early_stopping(50, verbose=False), log_evaluation(0)],
         )
+        return model.predict_proba(x_va), model.predict_proba(x_te)
 
-        val_proba = model.predict_proba(X_val)
-        oof_proba[val_idx] = val_proba
-        test_proba += model.predict_proba(X_test) / N_FOLDS
+    def fold_score(y_va, val_proba):
+        return float(balanced_accuracy_score(y_va, np.argmax(val_proba, axis=1)))
 
-        val_pred = np.argmax(val_proba, axis=1)
-        score = float(balanced_accuracy_score(y_val, val_pred))
-        fold_scores.append(score)
+    oof_proba, test_proba, fold_scores = run_cv(
+        X, y, X_test, fit_fold,
+        n_splits=N_FOLDS, n_outputs=len(le.classes_), score_fn=fold_score,
+    )
+    for fold, score in enumerate(fold_scores, 1):
         print(f"  Fold {fold} balanced_acc: {score:.4f}")
 
     oof_score = float(balanced_accuracy_score(y, np.argmax(oof_proba, axis=1)))

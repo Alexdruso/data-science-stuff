@@ -22,17 +22,21 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import balanced_accuracy_score, recall_score
 from sklearn.model_selection import StratifiedKFold
-from sklearn.preprocessing import TargetEncoder
 from xgboost import XGBClassifier
 
 sys.path.insert(0, str(Path(__file__).parent))
 from cv_results import save_cv_result
 from deotte_features import (
     CLASS_TO_INT, CLASSES, ID_COL, INT_TO_CLASS, TARGET, TE_INNER_SPLITS, TE_SMOOTH,
-    TOP_FEATURES, build_feature_matrix, cat_key,
+    TOP_FEATURES, build_feature_matrix,
 )
 from postprocess import optimize_thresholds, save_threshold_weights
 
+from data_science_stuff.kaggle.encoding import (
+    add_fold_safe_target_encoding,
+    sorted_factorize,
+    te_source_columns,
+)
 from data_science_stuff.kaggle.io import competition_dirs, write_submission
 
 DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
@@ -76,33 +80,18 @@ def class_weights(y: np.ndarray) -> np.ndarray:
     return wpc[y].astype(np.float32)
 
 
-def sorted_factorize(tr: pd.Series, va: pd.Series, te: pd.Series):
-    vals = pd.concat([cat_key(tr), cat_key(va), cat_key(te)], ignore_index=True)
-    cats = pd.Index(sorted(vals.unique()))
-    codes = vals.map({c: i for i, c in enumerate(cats)}).fillna(-1).astype("int32").to_numpy()
-    n1, n2 = len(tr), len(va)
-    return codes[:n1], codes[n1:n1 + n2], codes[n1 + n2:]
-
-
+# Generic implementations live in data_science_stuff.kaggle.encoding
+# (sorted_factorize is imported directly above); these thin wrappers keep the
+# signatures that the sibling deotte-recipe scripts import from this module.
 def te_sources(top: list[str], cat_cols: list[str]) -> list[str]:
-    return [c for c in cat_cols if any(f.startswith(f"TE_{c}_") for f in top)]
+    return te_source_columns(top, cat_cols)
 
 
 def add_fold_safe_te(X_tr, y_tr, X_va, X_te, te_cols):
-    X_tr, X_va, X_te = X_tr.copy(), X_va.copy(), X_te.copy()
-    for c in te_cols:
-        if c not in X_tr.columns:
-            continue
-        ktr, kva, kte = cat_key(X_tr[c]).to_frame(c), cat_key(X_va[c]).to_frame(c), cat_key(X_te[c]).to_frame(c)
-        for cls_idx, cls_name in INT_TO_CLASS.items():
-            yb = (y_tr == cls_idx).astype(np.int32)
-            enc = TargetEncoder(target_type="binary", smooth=TE_SMOOTH, cv=TE_INNER_SPLITS,
-                                shuffle=True, random_state=SEED + 177)
-            name = f"TE_{c}_{cls_name}"
-            X_tr[name] = enc.fit_transform(ktr, yb).ravel().astype(np.float32)
-            X_va[name] = enc.transform(kva).ravel().astype(np.float32)
-            X_te[name] = enc.transform(kte).ravel().astype(np.float32)
-    return X_tr, X_va, X_te
+    return add_fold_safe_target_encoding(
+        X_tr, y_tr, [X_va, X_te], te_cols, INT_TO_CLASS,
+        smooth=TE_SMOOTH, inner_cv=TE_INNER_SPLITS, seed=SEED + 177,
+    )
 
 
 def main() -> None:

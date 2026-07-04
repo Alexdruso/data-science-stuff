@@ -13,7 +13,6 @@ import numpy as np
 import pandas as pd
 import polars as pl
 from sklearn.metrics import balanced_accuracy_score
-from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import LabelEncoder
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -26,6 +25,7 @@ try:
 except ImportError as e:
     raise SystemExit("catboost not installed — run: uv pip install catboost") from e
 
+from data_science_stuff.kaggle.cv import run_cv
 from data_science_stuff.kaggle.io import competition_dirs, load_params, write_submission
 
 DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
@@ -74,18 +74,10 @@ def main() -> None:
 
     params = load_params(RESULTS_DIR, CB_PARAMS, "best_params_catboost.json")
 
-    skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=42)
-    oof_proba = np.zeros((len(X), len(le.classes_)))
-    test_proba = np.zeros((len(X_test), len(le.classes_)))
-    fold_scores: list[float] = []
-
-    for fold, (train_idx, val_idx) in enumerate(skf.split(X, y), 1):
-        X_tr, X_val = X.iloc[train_idx], X.iloc[val_idx]
-        y_tr, y_val = y[train_idx], y[val_idx]
-
-        train_pool = Pool(X_tr, y_tr, cat_features=cat_indices)
-        val_pool = Pool(X_val, y_val, cat_features=cat_indices)
-        test_pool = Pool(X_test, cat_features=cat_indices)
+    def fit_fold(x_tr, y_tr, x_va, y_va, x_te, _fold):
+        train_pool = Pool(x_tr, y_tr, cat_features=cat_indices)
+        val_pool = Pool(x_va, y_va, cat_features=cat_indices)
+        test_pool = Pool(x_te, cat_features=cat_indices)
 
         model = CatBoostClassifier(**params)
         model.fit(
@@ -93,14 +85,16 @@ def main() -> None:
             eval_set=val_pool,
             early_stopping_rounds=50,
         )
+        return model.predict_proba(val_pool), model.predict_proba(test_pool)
 
-        val_proba = model.predict_proba(val_pool)
-        oof_proba[val_idx] = val_proba
-        test_proba += model.predict_proba(test_pool) / N_FOLDS
+    def fold_score(y_va, val_proba):
+        return float(balanced_accuracy_score(y_va, np.argmax(val_proba, axis=1)))
 
-        val_pred = np.argmax(val_proba, axis=1)
-        score = float(balanced_accuracy_score(y_val, val_pred))
-        fold_scores.append(score)
+    oof_proba, test_proba, fold_scores = run_cv(
+        X, y, X_test, fit_fold,
+        n_splits=N_FOLDS, n_outputs=len(le.classes_), score_fn=fold_score,
+    )
+    for fold, score in enumerate(fold_scores, 1):
         print(f"  Fold {fold} balanced_acc: {score:.4f}")
 
     oof_score = float(balanced_accuracy_score(y, np.argmax(oof_proba, axis=1)))

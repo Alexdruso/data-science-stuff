@@ -23,7 +23,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import polars as pl
-from scipy.optimize import minimize
 from sklearn.metrics import balanced_accuracy_score, recall_score
 from sklearn.preprocessing import LabelEncoder
 
@@ -32,6 +31,11 @@ from cv_results import save_cv_result
 from features import TARGET, build_features
 from postprocess import optimize_thresholds, save_threshold_weights
 
+from data_science_stuff.kaggle.blending import (
+    blend,
+    diversity_report,
+    optimize_blend_weights,
+)
 from data_science_stuff.kaggle.io import competition_dirs, write_submission
 
 DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
@@ -56,47 +60,9 @@ def load_arrays() -> tuple[dict[str, np.ndarray], dict[str, np.ndarray]]:
     return oof, test
 
 
-def blend(weights: np.ndarray, arrays: list[np.ndarray]) -> np.ndarray:
-    """Weighted average of probability arrays; weights are softmax-normalised."""
-    w = np.exp(weights) / np.exp(weights).sum()
-    return sum(w[i] * a for i, a in enumerate(arrays))  # type: ignore[return-value]
-
-
-def objective(weights: np.ndarray, oof_list: list[np.ndarray], y: np.ndarray) -> float:
-    blended = blend(weights, oof_list)
-    pred = np.argmax(blended, axis=1)
-    return -float(balanced_accuracy_score(y, pred))
-
-
-def diversity_report(
-    oof_arrays: dict[str, np.ndarray],
-    y: np.ndarray,
-    class_names: list[str],
-) -> None:
-    """Per-class recall + error-overlap vs the anchor model.
-
-    Global proba correlation does NOT predict balanced-accuracy lift; what matters
-    is whether a model fixes DIFFERENT errors (esp. on STAR, the 14% bottleneck).
-    "fixes X" = of the rows the anchor gets wrong, the fraction model gets right.
-    """
-    if ANCHOR not in oof_arrays:
-        return
-    anchor_pred = np.argmax(oof_arrays[ANCHOR], axis=1)
-    anchor_wrong = anchor_pred != y
-    print(f"\nDiversity report (anchor = {ANCHOR}):")
-    print(f"  {'model':<10} " + " ".join(f"rec_{c[:3]}" for c in class_names)
-          + "   fixes_anchor  anchor_fixes")
-    for m, arr in oof_arrays.items():
-        pred = np.argmax(arr, axis=1)
-        rec = recall_score(y, pred, average=None, labels=list(range(len(class_names))))
-        rec_str = " ".join(f"{r:.4f} " for r in rec)
-        if m == ANCHOR:
-            print(f"  {m:<10} {rec_str}   (anchor)")
-            continue
-        m_wrong = pred != y
-        fixes_anchor = float((pred[anchor_wrong] == y[anchor_wrong]).mean())
-        anchor_fixes = float((anchor_pred[m_wrong] == y[m_wrong]).mean())
-        print(f"  {m:<10} {rec_str}   {fixes_anchor:>8.3f}     {anchor_fixes:>8.3f}")
+def balanced_acc_argmax(y: np.ndarray, blended: np.ndarray) -> float:
+    """Blend metric: balanced accuracy on argmax (higher is better)."""
+    return float(balanced_accuracy_score(y, np.argmax(blended, axis=1)))
 
 
 def main() -> None:
@@ -124,22 +90,19 @@ def main() -> None:
         score = balanced_accuracy_score(y, np.argmax(oof_arrays[m], axis=1))
         print(f"  {m}: {score:.4f}")
 
-    diversity_report(oof_arrays, y, le.classes_.tolist())
+    if ANCHOR in oof_arrays:
+        print(f"\nDiversity report (anchor = {ANCHOR}):")
+        report = diversity_report(
+            oof_arrays, y, le.classes_.tolist(), anchor=ANCHOR
+        )
+        print(report.round(4).to_string())
 
-    # Optimise blend weights (logit space so they're unconstrained)
-    x0 = np.ones(len(model_names))
-    result = minimize(
-        objective,
-        x0,
-        args=(oof_list, y),
-        method="Nelder-Mead",
-        options={"maxiter": 5000, "xatol": 1e-6, "fatol": 1e-6},
-    )
-    w = np.exp(result.x) / np.exp(result.x).sum()
+    # Optimise blend weights (softmax parameterization, so they're unconstrained)
+    w = optimize_blend_weights(oof_list, y, balanced_acc_argmax, normalize="softmax")
     print(f"\nOptimal weights: {dict(zip(model_names, w.round(4)))}")
 
     # Evaluate raw blend
-    blended_oof = blend(result.x, oof_list)
+    blended_oof = blend(oof_list, w)
     oof_pred = np.argmax(blended_oof, axis=1)
     oof_score = float(balanced_accuracy_score(y, oof_pred))
     print(f"Ensemble OOF balanced_acc (argmax): {oof_score:.4f}")
@@ -154,7 +117,7 @@ def main() -> None:
     np.save(RESULTS_DIR / "oof_ensemble.npy", blended_oof)
 
     # Test predictions
-    blended_test = blend(result.x, test_list)
+    blended_test = blend(test_list, w)
     np.save(RESULTS_DIR / "test_ensemble.npy", blended_test)
 
     test_pred_labels = le.inverse_transform(np.argmax(blended_test * tw, axis=1))
