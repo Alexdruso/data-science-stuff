@@ -35,9 +35,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 from cv_results import save_cv_result
 from postprocess import optimize_thresholds, save_threshold_weights
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 SEED, N_SPLITS = 42, 5
 # RUN is derived from the learner in main(): catboost -> "chain_cascade" (preserves the live
 # 10-base stack files), xgboost -> "chain_cascade_xgb" (a distinct, decorrelated second cascade).
@@ -286,8 +286,7 @@ def main() -> None:
     save_threshold_weights(tw, CLASSES, RESULTS_DIR / f"threshold_weights_{run}.json")
     save_cv_result(RESULTS_DIR, run, [], best, metric_name="balanced_acc")
     labels = [CLASSES[i] for i in np.argmax(test_pred * tw, axis=1)]
-    SUBMISSIONS_DIR.mkdir(exist_ok=True)
-    pd.DataFrame({"id": test_ids, "class": labels}).to_csv(SUBMISSIONS_DIR / f"{run}.csv", index=False)
+    write_submission(SUBMISSIONS_DIR, f"{run}.csv", test_ids, "class", labels)
     print(f"Saved -> {run} (oof/test/threshold/submission). Next: add '{run}' to "
           f"build_lr_stack + build_gbdt_stack MODELS and re-run; gate on stack argmax vs "
           f"lrstack 0.97055 / metablend 0.97061. Also check the stacker assigns it nonzero weight.")

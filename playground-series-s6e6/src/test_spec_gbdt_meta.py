@@ -25,8 +25,9 @@ from features import EXCLUDE_COLS, TARGET, build_features
 from lgbm_device import get_lgbm_device
 from postprocess import optimize_thresholds
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 MODELS = ["lgbm", "xgboost", "catboost", "lgbm_fe",
           "xgb_deotte", "realmlp_deotte", "catboost_deotte"]
 SEEDS = [2024, 7, 13]

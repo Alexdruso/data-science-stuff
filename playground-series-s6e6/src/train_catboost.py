@@ -26,9 +26,9 @@ try:
 except ImportError as e:
     raise SystemExit("catboost not installed — run: uv pip install catboost") from e
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, load_params, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 
 N_FOLDS = 5
 CB_PARAMS: dict[str, object] = {
@@ -42,18 +42,6 @@ CB_PARAMS: dict[str, object] = {
     "random_seed": 42,
     "verbose": 0,
 }
-
-
-def load_params() -> dict[str, object]:
-    params_path = RESULTS_DIR / "best_params_catboost.json"
-    base: dict[str, object] = dict(CB_PARAMS)
-    if params_path.exists():
-        with params_path.open() as f:
-            tuned = json.load(f)
-        base.update(tuned)
-        print(f"Loaded tuned params from {params_path}")
-    return base
-
 
 def main() -> None:
     train_raw = pl.read_csv(DATA_DIR / "train.csv")
@@ -84,7 +72,7 @@ def main() -> None:
     y = le.fit_transform(train_pd[TARGET].to_numpy())
     print(f"Classes: {list(le.classes_)}")
 
-    params = load_params()
+    params = load_params(RESULTS_DIR, CB_PARAMS, "best_params_catboost.json")
 
     skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=42)
     oof_proba = np.zeros((len(X), len(le.classes_)))
@@ -132,9 +120,7 @@ def main() -> None:
     print(f"OOF/test arrays saved → {RESULTS_DIR}")
 
     test_pred_labels = le.inverse_transform(np.argmax(test_proba * threshold_weights, axis=1))
-    SUBMISSIONS_DIR.mkdir(exist_ok=True)
-    out_path = SUBMISSIONS_DIR / f"{run_name}.csv"
-    pd.DataFrame({"id": test_ids, TARGET: test_pred_labels}).to_csv(out_path, index=False)
+    out_path = write_submission(SUBMISSIONS_DIR, f"{run_name}.csv", test_ids, TARGET, test_pred_labels)
     print(f"Submission saved → {out_path}")
 
 

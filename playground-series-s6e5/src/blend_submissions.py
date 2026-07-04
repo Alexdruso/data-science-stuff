@@ -23,9 +23,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 from cv_results import save_cv_result
 from features import build_features, compute_group_features
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 TARGET = "PitNextLap"
 
 ANCHOR_OOF_PATH = RESULTS_DIR / "oof_ensemble.npy"
@@ -187,10 +187,7 @@ def main() -> None:
     save_cv_result(RESULTS_DIR, "blend_v1", [], best_auc)
     np.save(RESULTS_DIR / "oof_blend_v1.npy", best_oof)
 
-    SUBMISSIONS_DIR.mkdir(exist_ok=True)
-    submission = pd.DataFrame({"id": test_ids, TARGET: best_test})
-    out_path = SUBMISSIONS_DIR / "blend_v1.csv"
-    submission.to_csv(out_path, index=False)
+    out_path = write_submission(SUBMISSIONS_DIR, "blend_v1.csv", test_ids, TARGET, best_test)
     print(f"Submission saved → {out_path}")
 
 

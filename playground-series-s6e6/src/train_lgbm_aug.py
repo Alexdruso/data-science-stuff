@@ -34,14 +34,14 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import LabelEncoder
 
 sys.path.insert(0, str(Path(__file__).parent))
-from baseline import LGBM_PARAMS, load_params
+from baseline import LGBM_PARAMS
 from cv_results import save_cv_result
 from features import EXCLUDE_COLS, TARGET, build_features, compute_group_features
 from postprocess import optimize_thresholds, save_threshold_weights
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, load_params, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 N_FOLDS = 5
 CORE_FEATURES = ["alpha", "delta", "u", "g", "r", "i", "z", "redshift"]
 
@@ -94,7 +94,7 @@ def main() -> None:
     X_test = test_pd[feature_cols]
     test_ids = test_pd["id"].to_numpy()
 
-    params = load_params()
+    params = load_params(RESULTS_DIR, LGBM_PARAMS, "best_params.json")
     params["num_class"] = len(le.classes_)
 
     skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=42)
@@ -136,9 +136,7 @@ def main() -> None:
     np.save(RESULTS_DIR / f"test_{run}.npy", test_proba)
 
     labels = le.inverse_transform(np.argmax(test_proba * tw, axis=1))
-    SUBMISSIONS_DIR.mkdir(exist_ok=True)
-    out = SUBMISSIONS_DIR / f"{run}.csv"
-    pd.DataFrame({"id": test_ids, TARGET: labels}).to_csv(out, index=False)
+    out = write_submission(SUBMISSIONS_DIR, f"{run}.csv", test_ids, TARGET, labels)
     print(f"Submission saved → {out}")
 
 

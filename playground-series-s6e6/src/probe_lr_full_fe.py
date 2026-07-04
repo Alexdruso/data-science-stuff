@@ -48,7 +48,9 @@ from deotte_features import (
 def te_sources(top: list[str], cat_cols: list[str]) -> list[str]:
     return [c for c in cat_cols if any(f.startswith(f"TE_{c}_") for f in top)]
 
-DATA_DIR = Path(__file__).parent.parent / "data"
+from data_science_stuff.kaggle.io import competition_dirs
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 SEED = 42
 N_SPLITS = 3      # use 5 for more reliable estimates (slower)
 SUBSAMPLE = 100_000

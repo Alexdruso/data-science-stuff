@@ -28,9 +28,9 @@ from cv_results import save_cv_result
 from features import TARGET, build_features
 from postprocess import optimize_thresholds, save_threshold_weights
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 # Diverse base set (skip near-duplicate lgbm variants that add only collinearity).
 # Pruned to STRONG bases — ablation showed the 6 weak ~0.95 bases (mlp/mlp_la/realmlp/
 # realmlp_emb/extratrees/rf) add only +0.0001 = dead weight / overfit surface.
@@ -84,8 +84,7 @@ def main() -> None:
     np.save(RESULTS_DIR / "oof_lrstack.npy", oof)
     np.save(RESULTS_DIR / "test_lrstack.npy", test)
     labels = le.inverse_transform(np.argmax(test * tw, axis=1))
-    SUBMISSIONS_DIR.mkdir(exist_ok=True)
-    pd.DataFrame({"id": test_ids, TARGET: labels}).to_csv(SUBMISSIONS_DIR / "lrstack.csv", index=False)
+    write_submission(SUBMISSIONS_DIR, "lrstack.csv", test_ids, TARGET, labels)
     print("Saved → lrstack (oof/test/submission)")
 
 

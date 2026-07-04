@@ -34,8 +34,9 @@ from sklearn.preprocessing import LabelEncoder, PolynomialFeatures, StandardScal
 sys.path.insert(0, str(Path(__file__).parent))
 from features import TARGET, build_features
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 STACK_MODELS = ["lgbm", "xgboost", "catboost", "lgbm_fe",
                 "xgb_deotte", "realmlp_deotte", "catboost_deotte"]
 NUM_COLS = ["alpha", "delta", "u", "g", "r", "i", "z", "redshift",

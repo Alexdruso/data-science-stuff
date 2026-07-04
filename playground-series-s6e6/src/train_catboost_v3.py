@@ -29,9 +29,9 @@ from catboost_v3_features import CLASSES, build_features_cat_v3
 from cv_results import save_cv_result
 from postprocess import optimize_thresholds, save_threshold_weights
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 SEED = 42
 N_SPLITS = 5
 ORIGINAL_WEIGHT = 0.06
@@ -145,8 +145,7 @@ def main() -> None:
     save_threshold_weights(tw, CLASSES, RESULTS_DIR / "threshold_weights_catboost_v3.json")
     save_cv_result(RESULTS_DIR, "catboost_v3", [], best, metric_name="balanced_acc")
     labels = [CLASSES[i] for i in np.argmax(test_pred * tw, axis=1)]
-    SUBMISSIONS_DIR.mkdir(exist_ok=True)
-    pd.DataFrame({"id": test_ids, "class": labels}).to_csv(SUBMISSIONS_DIR / "catboost_v3.csv", index=False)
+    write_submission(SUBMISSIONS_DIR, "catboost_v3.csv", test_ids, "class", labels)
     print("Saved → catboost_v3 (oof/test/submission)")
 
 

@@ -37,8 +37,9 @@ from cv_results import save_cv_result
 from features import TARGET, build_features
 from lgbm_device import get_lgbm_device
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 STACK_MODELS = ["lgbm", "xgboost", "catboost", "lgbm_fe",
                 "xgb_deotte", "realmlp_deotte", "catboost_deotte"]
 NUM_COLS = ["alpha", "delta", "u", "g", "r", "i", "z", "redshift",

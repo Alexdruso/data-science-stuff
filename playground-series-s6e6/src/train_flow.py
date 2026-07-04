@@ -53,9 +53,9 @@ from features import TARGET, build_features
 from postprocess import optimize_thresholds, save_threshold_weights
 
 warnings.filterwarnings("ignore")
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 ID = "id"
 CLASSES = ["GALAXY", "QSO", "STAR"]            # sorted → matches LabelEncoder used by the stacker
 CLASS_MAP = {c: i for i, c in enumerate(CLASSES)}
@@ -203,8 +203,7 @@ def main() -> None:
         np.save(RESULTS_DIR / f"test_{RUN}_logdens.npy", test_logdens.astype(np.float32))
         print(f"Saved raw log-density arrays → oof_{RUN}_logdens.npy, test_{RUN}_logdens.npy")
     labels = [CLASSES[i] for i in np.argmax(test_proba * tw, axis=1)]
-    SUBMISSIONS_DIR.mkdir(exist_ok=True)
-    pl.DataFrame({ID: test_ids, TARGET: labels}).write_csv(SUBMISSIONS_DIR / f"{RUN}.csv")
+    write_submission(SUBMISSIONS_DIR, f"{RUN}.csv", test_ids, TARGET, labels, id_col=ID)
     print(f"Saved → {RUN}")
 
 

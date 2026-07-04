@@ -29,8 +29,9 @@ from sklearn.preprocessing import StandardScaler
 sys.path.insert(0, str(Path(__file__).parent))
 from deotte_features import CLASS_TO_INT, CLASSES
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 KS = [5, 10, 25, 200]
 
 

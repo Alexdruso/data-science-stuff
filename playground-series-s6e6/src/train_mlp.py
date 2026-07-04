@@ -31,9 +31,9 @@ from cv_results import save_cv_result
 from features import EXCLUDE_COLS, TARGET, build_features, compute_group_features
 from postprocess import optimize_thresholds, save_threshold_weights
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, load_params, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 
 N_FOLDS = 5
 N_CLASSES = 3
@@ -51,16 +51,6 @@ DEFAULT_PARAMS: dict[str, object] = {
     "weight_decay": 1e-4,
     "activation": "relu",
 }
-
-
-def load_params() -> dict[str, object]:
-    p = RESULTS_DIR / "best_params_mlp.json"
-    if p.exists():
-        with p.open() as f:
-            print(f"Loaded tuned params from {p}")
-            return json.load(f)  # type: ignore[no-any-return]
-    return DEFAULT_PARAMS
-
 
 def build_layer_sizes(params: dict[str, object]) -> list[int]:
     n = int(params["n_layers"])  # type: ignore[arg-type]
@@ -216,7 +206,7 @@ def train_fold(
 
 def main() -> None:
     print(f"Device: {DEVICE}")
-    params = load_params()
+    params = load_params(RESULTS_DIR, DEFAULT_PARAMS, "best_params_mlp.json")
     print(f"MLP params: {params}")
 
     train_raw = pl.read_csv(DATA_DIR / "train.csv")
@@ -273,9 +263,7 @@ def main() -> None:
     print(f"OOF/test arrays saved → {RESULTS_DIR}")
 
     test_pred_labels = le.inverse_transform(np.argmax(test_proba * threshold_weights, axis=1))
-    SUBMISSIONS_DIR.mkdir(exist_ok=True)
-    out_path = SUBMISSIONS_DIR / "mlp_v1.csv"
-    pd.DataFrame({"id": test_ids, TARGET: test_pred_labels}).to_csv(out_path, index=False)
+    out_path = write_submission(SUBMISSIONS_DIR, "mlp_v1.csv", test_ids, TARGET, test_pred_labels)
     print(f"Submission saved → {out_path}")
 
 

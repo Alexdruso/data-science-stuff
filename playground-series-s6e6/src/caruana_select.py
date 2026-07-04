@@ -28,8 +28,9 @@ from sklearn.preprocessing import LabelEncoder
 sys.path.insert(0, str(Path(__file__).parent))
 from features import TARGET, build_features
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 N_OUTER = 5
 N_STEPS = 50          # greedy picks (with replacement)
 INIT_TOPK = 3         # seed ensemble with the K best singletons (Caruana's bagged-start lite)

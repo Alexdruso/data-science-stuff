@@ -32,9 +32,9 @@ from cv_results import save_cv_result
 from features import TARGET, build_features
 from postprocess import optimize_thresholds, save_threshold_weights
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 
 MODELS = ["lgbm", "xgboost", "catboost", "mlp", "realmlp", "tabnet", "extratrees", "rf", "logreg", "knn", "nb"]
 # Anchor model the diversity report compares every other model against.
@@ -158,10 +158,8 @@ def main() -> None:
     np.save(RESULTS_DIR / "test_ensemble.npy", blended_test)
 
     test_pred_labels = le.inverse_transform(np.argmax(blended_test * tw, axis=1))
-    SUBMISSIONS_DIR.mkdir(exist_ok=True)
     run_name = f"ensemble_{'_'.join(model_names)}"
-    out_path = SUBMISSIONS_DIR / f"{run_name}.csv"
-    pd.DataFrame({"id": test_ids, TARGET: test_pred_labels}).to_csv(out_path, index=False)
+    out_path = write_submission(SUBMISSIONS_DIR, f"{run_name}.csv", test_ids, TARGET, test_pred_labels)
     print(f"Submission saved → {out_path}")
 
 

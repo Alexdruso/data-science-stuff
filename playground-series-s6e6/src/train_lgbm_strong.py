@@ -37,9 +37,9 @@ from features import EXCLUDE_COLS, TARGET, build_features, compute_group_feature
 from lgbm_device import get_lgbm_device
 from postprocess import optimize_thresholds, save_threshold_weights
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 N_FOLDS = 5
 
 LR = 0.02
@@ -127,9 +127,7 @@ def main() -> None:
     np.save(RESULTS_DIR / f"oof_{RUN}.npy", oof)
     np.save(RESULTS_DIR / f"test_{RUN}.npy", test_proba)
     labels = le.inverse_transform(np.argmax(test_proba * tw, axis=1))
-    SUBMISSIONS_DIR.mkdir(exist_ok=True)
-    pd.DataFrame({"id": test_ids, TARGET: labels}).to_csv(
-        SUBMISSIONS_DIR / f"{RUN}.csv", index=False)
+    write_submission(SUBMISSIONS_DIR, f"{RUN}.csv", test_ids, TARGET, labels)
     print(f"Saved oof/test/submission → {RUN}")
 
 

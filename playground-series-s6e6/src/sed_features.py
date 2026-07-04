@@ -29,9 +29,10 @@ import pandas as pd
 from astropy.io import fits
 from speclite import filters
 
-DATA_DIR = Path(__file__).parent.parent / "data"
+from data_science_stuff.kaggle.io import competition_dirs
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 TEMPL_DIR = DATA_DIR / "templates"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
 BANDS = ["u", "g", "r", "i", "z"]
 AB_OFF = np.array([-0.04, 0.0, 0.0, 0.0, 0.02])  # SDSS asinh mags -> AB
 ZGRID = np.arange(0.0, 7.111, 0.01)

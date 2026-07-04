@@ -17,8 +17,9 @@ from sklearn.preprocessing import TargetEncoder
 sys.path.insert(0, str(Path(__file__).parent))
 from features import DRIVER_COLS, build_features, compute_group_features, compute_race_lap_features, compute_race_stint_features
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, load_params
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 TARGET = "PitNextLap"
 
 LGBM_DEFAULTS: dict[str, object] = {
@@ -34,18 +35,6 @@ LGBM_DEFAULTS: dict[str, object] = {
     "n_jobs": -1,
     "device": "gpu",
 }
-
-
-def load_params() -> dict[str, object]:
-    p = RESULTS_DIR / "best_params.json"
-    base = dict(LGBM_DEFAULTS)
-    if p.exists():
-        with p.open() as f:
-            base.update(json.load(f))
-    base["n_estimators"] = 500  # fixed for exploration
-    base.pop("early_stopping_rounds", None)
-    return base
-
 
 def main() -> None:
     print("Loading data and building features...")
@@ -78,7 +67,9 @@ def main() -> None:
 
     # --- Train LGBM on full dataset (GPU) ---
     print("Training LGBM on full dataset (GPU, 500 trees)...")
-    params = load_params()
+    params = load_params(RESULTS_DIR, LGBM_DEFAULTS, "best_params.json")
+    params["n_estimators"] = 500  # fixed for exploration
+    params.pop("early_stopping_rounds", None)
     model = LGBMClassifier(**params)
     model.fit(X, y, categorical_feature=cat_cols)
     print("Done.")

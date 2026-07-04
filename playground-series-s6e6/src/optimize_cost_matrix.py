@@ -31,9 +31,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 from features import TARGET, build_features
 from postprocess import optimize_thresholds
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 # (j, k) pairs: cost C[j, k] of predicting k when the true class is j.
 OFF_DIAG: list[tuple[int, int]] = [(j, k) for j in range(3) for k in range(3) if j != k]
 N_SPLIT_SEEDS = 3
@@ -152,9 +152,7 @@ def main() -> None:
 
         if mean_delta >= 0 and cm_full > pc_full:
             labels = le.inverse_transform(cost_decide(test, cost))
-            SUBMISSIONS_DIR.mkdir(exist_ok=True)
-            sub = SUBMISSIONS_DIR / f"{run}_costmx.csv"
-            pd.DataFrame({"id": test_ids, TARGET: labels}).to_csv(sub, index=False)
+            sub = write_submission(SUBMISSIONS_DIR, f"{run}_costmx.csv", test_ids, TARGET, labels)
             print(f"GATE PASSED -> saved {sub.name}")
         else:
             print("GATE FAILED (holdout delta < 0 or no full-OOF gain) -> no submission")

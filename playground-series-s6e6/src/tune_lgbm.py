@@ -29,8 +29,9 @@ try:
 except ImportError as e:
     raise SystemExit("optuna not installed — run: uv pip install optuna") from e
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 
 N_TUNE_FOLDS = 3
 _DEVICE_TYPE, _N_JOBS = get_lgbm_device()

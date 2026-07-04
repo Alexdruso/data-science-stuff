@@ -30,9 +30,9 @@ from cv_results import save_cv_result
 from features import DRIVER_COLS, build_features, compute_group_features
 from positional_encoding import PE_FEATURE_NAMES, apply_fourier_np
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, load_params, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 
 TARGET = "PitNextLap"
 N_FOLDS = 5
@@ -51,17 +51,6 @@ _DEFAULTS: dict[str, object] = {
     "batch_size": 64,
     "fourier_L": 3,
 }
-
-
-def load_params() -> dict[str, object]:
-    params_path = RESULTS_DIR / "best_params_rnn.json"
-    base: dict[str, object] = dict(_DEFAULTS)
-    if params_path.exists():
-        with params_path.open() as f:
-            base.update(json.load(f))
-        print(f"Loaded tuned params from {params_path}", flush=True)
-    return base
-
 
 # ---------------------------------------------------------------------------
 # Model
@@ -327,7 +316,7 @@ def main() -> None:
     test_group_ids = make_group_ids(test_pl)
     print(f"Train sequences: {len(np.unique(train_group_ids))}", flush=True)
 
-    params = load_params()
+    params = load_params(RESULTS_DIR, _DEFAULTS, "best_params_rnn.json")
     fourier_L = int(params.get("fourier_L", 3))
     pe_indices = [num_cols.index(n) for n in PE_FEATURE_NAMES if n in num_cols]
     print(f"Params: {params}", flush=True)
@@ -384,10 +373,7 @@ def main() -> None:
     np.save(RESULTS_DIR / "test_rnn.npy", test_proba)
     print(f"OOF/test arrays saved → {RESULTS_DIR}", flush=True)
 
-    SUBMISSIONS_DIR.mkdir(exist_ok=True)
-    submission = pd.DataFrame({"id": test_ids, TARGET: test_proba})
-    out_path = SUBMISSIONS_DIR / "rnn_v3.csv"
-    submission.to_csv(out_path, index=False)
+    out_path = write_submission(SUBMISSIONS_DIR, "rnn_v3.csv", test_ids, TARGET, test_proba)
     print(f"Submission saved → {out_path}", flush=True)
 
 

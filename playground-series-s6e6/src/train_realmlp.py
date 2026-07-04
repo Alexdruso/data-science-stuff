@@ -44,9 +44,9 @@ from cv_results import save_cv_result
 from features import EXCLUDE_COLS, TARGET, build_features, compute_group_features
 from postprocess import optimize_thresholds, save_threshold_weights
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 
 N_FOLDS = 5
 N_CLASSES = 3
@@ -176,9 +176,7 @@ def main() -> None:
     test_pred_labels = le.inverse_transform(
         np.argmax(test_proba * threshold_weights, axis=1)
     )
-    SUBMISSIONS_DIR.mkdir(exist_ok=True)
-    out_path = SUBMISSIONS_DIR / "realmlp_v1.csv"
-    pd.DataFrame({"id": test_ids, TARGET: test_pred_labels}).to_csv(out_path, index=False)
+    out_path = write_submission(SUBMISSIONS_DIR, "realmlp_v1.csv", test_ids, TARGET, test_pred_labels)
     print(f"Submission saved → {out_path}")
 
 

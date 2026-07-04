@@ -32,9 +32,9 @@ from cv_results import save_cv_result
 from features import TARGET, build_features
 from postprocess import optimize_thresholds, save_threshold_weights
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 MODELS = ["lgbm", "xgboost", "catboost", "lgbm_fe",
           "xgb_deotte", "realmlp_deotte", "catboost_deotte"]
 SEEDS = [2024, 7, 13, 42, 99]
@@ -124,8 +124,7 @@ def main() -> None:
         np.save(RESULTS_DIR / "oof_ridgestack.npy", oof)
         np.save(RESULTS_DIR / "test_ridgestack.npy", test)
         labels = le.inverse_transform(np.argmax(test * tw, axis=1))
-        SUBMISSIONS_DIR.mkdir(exist_ok=True)
-        pd.DataFrame({"id": test_ids, TARGET: labels}).to_csv(SUBMISSIONS_DIR / "ridgestack.csv", index=False)
+        write_submission(SUBMISSIONS_DIR, "ridgestack.csv", test_ids, TARGET, labels)
         print("Saved → ridgestack (beat LR stack)")
     else:
         print("Did not beat LR stack — not saved as submission.")

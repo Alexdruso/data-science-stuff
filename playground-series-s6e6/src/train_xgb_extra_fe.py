@@ -36,9 +36,9 @@ from deotte_features import (
 )
 from postprocess import optimize_thresholds, save_threshold_weights
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 SEED, N_SPLITS = 42, 5
 RUN = "xgb_extra_fe"
 SHAP_SAMPLE = 5_000
@@ -219,10 +219,7 @@ def main() -> None:
     np.save(RESULTS_DIR / f"oof_{RUN}.npy", oof)
     np.save(RESULTS_DIR / f"test_{RUN}.npy", test_proba)
     labels = [INT_TO_CLASS[i] for i in np.argmax(test_proba * tw, axis=1)]
-    SUBMISSIONS_DIR.mkdir(exist_ok=True)
-    pd.DataFrame({ID_COL: test_ids, TARGET: labels}).to_csv(
-        SUBMISSIONS_DIR / f"{RUN}.csv", index=False
-    )
+    write_submission(SUBMISSIONS_DIR, f"{RUN}.csv", test_ids, TARGET, labels, id_col=ID_COL)
     print(f"Saved → {RUN}")
 
 

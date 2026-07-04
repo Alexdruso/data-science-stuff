@@ -29,9 +29,9 @@ from postprocess import optimize_thresholds, save_threshold_weights
 from realmlp_deotte import CONFIG, RealMLP_TD_Classifier
 
 warnings.filterwarnings("ignore")
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 CKPT_DIR = RESULTS_DIR / "_realmlp_deotte_ckpt"
 ID, TARGET = "id", "class"
 CLASS_MAP = {"GALAXY": 0, "QSO": 1, "STAR": 2}
@@ -171,8 +171,7 @@ def main() -> None:
     np.save(RESULTS_DIR / f"oof_{RUN}.npy", oof)
     np.save(RESULTS_DIR / f"test_{RUN}.npy", test_proba)
     labels = [INV_CLASS_MAP[i] for i in np.argmax(test_proba, axis=1)]
-    SUBMISSIONS_DIR.mkdir(exist_ok=True)
-    pd.DataFrame({ID: test_id, TARGET: labels}).to_csv(SUBMISSIONS_DIR / f"{RUN}.csv", index=False)
+    write_submission(SUBMISSIONS_DIR, f"{RUN}.csv", test_id, TARGET, labels, id_col=ID)
     print(f"Saved → {RUN}")
 
 

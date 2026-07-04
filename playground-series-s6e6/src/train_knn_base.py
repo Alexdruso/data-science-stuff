@@ -28,9 +28,9 @@ from cv_results import save_cv_result
 from deotte_features import CLASS_TO_INT, CLASSES, ID_COL, INT_TO_CLASS, TARGET
 from postprocess import optimize_thresholds, save_threshold_weights
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 SEED, N_SPLITS, K = 42, 5, 200
 KNN_FEATS = ["u", "g", "r", "i", "z", "redshift"]
 EPS = 1e-6
@@ -100,8 +100,7 @@ def main() -> None:
     save_threshold_weights(tw, CLASSES, RESULTS_DIR / "threshold_weights_knn.json")
     save_cv_result(RESULTS_DIR, "knn", fold_scores, best, metric_name="balanced_acc")
     labels = [INT_TO_CLASS[i] for i in np.argmax(test_proba * tw, axis=1)]
-    SUBMISSIONS_DIR.mkdir(exist_ok=True)
-    pd.DataFrame({ID_COL: test_ids, TARGET: labels}).to_csv(SUBMISSIONS_DIR / "knn.csv", index=False)
+    write_submission(SUBMISSIONS_DIR, "knn.csv", test_ids, TARGET, labels, id_col=ID_COL)
     print("Saved → knn + knnorig (oof/test). Add to stack to test decorrelation.")
 
 

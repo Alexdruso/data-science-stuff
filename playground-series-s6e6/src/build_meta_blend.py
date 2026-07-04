@@ -28,9 +28,9 @@ from cv_results import save_cv_result
 from features import TARGET, build_features
 from postprocess import optimize_thresholds, save_threshold_weights
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+from data_science_stuff.kaggle.io import competition_dirs, write_submission
+
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 METAS = ["lrstack", "gbdtstack", "altmeta_ridgecal-gbdt", "altmeta_nn"]
 GATE = 0.97055
 RUN = "metablend"
@@ -90,8 +90,7 @@ def main() -> None:
         np.save(RESULTS_DIR / f"oof_{RUN}.npy", oof)
         np.save(RESULTS_DIR / f"test_{RUN}.npy", test)
         labels = le.inverse_transform(np.argmax(test * tw, axis=1))
-        SUBMISSIONS_DIR.mkdir(exist_ok=True)
-        pd.DataFrame({"id": test_ids, TARGET: labels}).to_csv(SUBMISSIONS_DIR / f"{RUN}.csv", index=False)
+        write_submission(SUBMISSIONS_DIR, f"{RUN}.csv", test_ids, TARGET, labels)
         print(f"Saved → {RUN} ({name})")
     else:
         print("No blend beat the gate — nothing saved.")
