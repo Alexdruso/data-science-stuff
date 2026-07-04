@@ -62,6 +62,22 @@ def test_tune_decision_weights_recovers_rare_class() -> None:
     assert tuned_acc >= 0.99  # all three classes recoverable here
 
 
+def test_tune_decision_weights_custom_score_fn() -> None:
+    y, proba = _imbalanced_proba()
+
+    def rare_class_recall(
+        y_true: NDArray[np.int64], y_pred: NDArray[np.int64]
+    ) -> float:
+        rare = y_true == 2
+        return float((y_pred[rare] == 2).mean())
+
+    weights = tune_decision_weights(y, proba, n_restarts=4, score_fn=rare_class_recall)
+    assert weights.shape == (3,)
+    assert np.isclose(weights.max(), 1.0)
+    # Optimizing rare-class recall alone must recover every rare row.
+    assert rare_class_recall(y, weighted_predict(proba, weights)) == 1.0
+
+
 def test_classification_report_dict_keys() -> None:
     y, proba = _imbalanced_proba()
 

@@ -134,6 +134,10 @@ ignore = [
 # kaggle_utils exposes interactive reporting helpers whose job is to write to
 # stdout (e.g. print_classification_report, save_cv_result status line).
 "data_science_stuff/kaggle_utils.py" = ["T201"]
+# The kaggle subpackage follows sklearn-style naming (X_tr, X_test) in
+# signatures and locals — that convention beats PEP8 lowercase for feature
+# matrices in this domain.
+"data_science_stuff/kaggle/**" = ["N803", "N806"]
 
 # Formatting configuration
 [tool.ruff.format]
@@ -169,7 +173,7 @@ disallow_untyped_defs = false
 
 # Third-party scientific libraries that ship no type stubs / py.typed marker.
 [[tool.mypy.overrides]]
-module = ["scipy.*", "sklearn.*"]
+module = ["scipy.*", "sklearn.*", "lightgbm.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

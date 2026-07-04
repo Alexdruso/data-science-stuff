@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Union, cast
@@ -47,9 +47,14 @@ def tune_decision_weights(
     proba: NDArray[np.float64],
     *,
     seed: int = 42,
-    n_restarts: int = 8,
+    n_restarts: int = 15,
+    maxiter: int = 3000,
+    xatol: float = 1e-7,
+    fatol: float = 1e-7,
+    init_scale: float = 0.3,
+    score_fn: Callable[[NDArray[np.int64], NDArray[np.int64]], float] | None = None,
 ) -> NDArray[np.float64]:
-    """Find per-class weights maximizing balanced accuracy of argmax(proba * w).
+    """Find per-class weights maximizing the score of argmax(proba * w).
 
     Useful when the training objective (e.g. multiclass log-loss) is misaligned
     with a balanced-accuracy metric on imbalanced classes: plain argmax defaults
@@ -59,34 +64,50 @@ def tune_decision_weights(
 
     Optimization runs in log-weight space with class 0 fixed at log-weight 0
     (the problem is scale-invariant, so K-1 free degrees of freedom), via
-    Nelder-Mead with several random restarts for robustness.
+    Nelder-Mead with several random restarts for robustness. Defaults follow
+    the strongest settings proven on s6e6 (15 restarts, 1e-7 tolerances).
 
     Args:
         y_true: (n_samples,) integer class labels in [0, n_classes).
         proba: (n_samples, n_classes) predicted probabilities.
         seed: RNG seed for restart initial points.
         n_restarts: Number of restarts (the first starts at equal weights).
+        maxiter: Nelder-Mead iteration cap per restart.
+        xatol: Nelder-Mead absolute tolerance on the simplex.
+        fatol: Nelder-Mead absolute tolerance on the objective.
+        init_scale: Std-dev of the random restart initial log-weights.
+        score_fn: ``(y_true, y_pred) -> float``, higher is better; defaults
+            to balanced accuracy.
 
     Returns:
         (n_classes,) weight vector normalized so the max weight is 1.0.
     """
     n_classes = proba.shape[1]
     rng = np.random.default_rng(seed)
+    metric: Callable[[NDArray[np.int64], NDArray[np.int64]], float] = (
+        score_fn
+        if score_fn is not None
+        else lambda yt, yp: float(balanced_accuracy_score(yt, yp))
+    )
 
     def neg_score(log_w_free: NDArray[np.float64]) -> float:
         log_w = np.concatenate([[0.0], log_w_free])
-        pred = np.argmax(proba * np.exp(log_w), axis=1)
-        return -float(balanced_accuracy_score(y_true, pred))
+        pred = np.asarray(np.argmax(proba * np.exp(log_w), axis=1), dtype=np.int64)
+        return -float(metric(y_true, pred))
 
     best_log_free = np.zeros(n_classes - 1)
     best_score = neg_score(best_log_free)
     for i in range(n_restarts):
-        x0 = np.zeros(n_classes - 1) if i == 0 else rng.normal(0.0, 1.0, n_classes - 1)
+        x0 = (
+            np.zeros(n_classes - 1)
+            if i == 0
+            else rng.normal(0.0, init_scale, n_classes - 1)
+        )
         res = minimize(
             neg_score,
             x0,
             method="Nelder-Mead",
-            options={"xatol": 1e-4, "fatol": 1e-5, "maxiter": 2000},
+            options={"xatol": xatol, "fatol": fatol, "maxiter": maxiter},
         )
         if float(res.fun) < best_score:
             best_score = float(res.fun)
