@@ -2,7 +2,8 @@
 Per-competition CLAUDE.md template. Copy into a new `playground-series-<id>/CLAUDE.md`
 (the `new-competition` skill does this) and fill every <PLACEHOLDER>. Delete sections that
 don't apply yet, but KEEP the row-order invariant section and fill in the real sort keys.
-Model it on the worked example in `playground-series-s6e5/CLAUDE.md`.
+Model it on the worked examples in `playground-series-s6e5/CLAUDE.md` (regression/AUC) and
+`playground-series-s6e6/CLAUDE.md` (imbalanced multiclass, stacking).
 -->
 
 # <COMPETITION TITLE> (<id>)
@@ -29,6 +30,24 @@ test_ids = build_features(pl.read_csv(DATA_DIR / "test.csv"))["id"].to_numpy()
 # WRONG — raw CSV order ≠ npy order
 y = pl.read_csv(DATA_DIR / "train.csv")[TARGET].to_numpy()
 ```
+
+---
+
+## ⚠️ No data leakage — fold-aware rules
+
+Violating these produces inflated OOF scores that do not transfer to the leaderboard.
+
+1. **Target encoding is fold-aware, NEVER global.** Fit any `TargetEncoder` / smoothed
+   target-rate feature on the fold's training split only, then `transform` the val split:
+   ```python
+   # CORRECT                                  # WRONG — leaks val targets
+   te.fit_transform(X_tr[["c"]], y_tr)        # te.fit(X[["c"]], y)
+   te.transform(X_val[["c"]])
+   ```
+2. **Group stats over feature columns** (no per-row targets) may use the full raw train CSV as
+   global priors — if used, document that choice here explicitly.
+3. **Test features must be computable without the target.** Sequential/lag features on test
+   shift by ≥1 row.
 
 ---
 
@@ -89,6 +108,26 @@ All features implemented in `src/features.py::build_features()` (+ `compute_grou
   from each fold; call `torch.cuda.empty_cache()` after each fold/trial in the outer loop.
 - **Categoricals**: <category dtype for LGBM/XGB, cat_features for CatBoost, OHE for nets>.
 - **Tuned params**: <Optuna trials, key hyperparameters, which feature set they were tuned on>.
+
+<!-- For imbalanced classification, keep these (s6e6-proven); delete for regression: -->
+- **Imbalance**: `class_weight="balanced"` (or equivalent) in every run — the biggest cheap win
+  (+0.008 balanced_acc on s6e6). Prior correction on top of it is redundant; skip.
+- **OOF/test arrays store raw probabilities** (multiclass: shape n × n_classes) so stackers and
+  threshold optimization can work per class. `LabelEncoder` for the target; always
+  `le.inverse_transform` when writing submissions.
+- **Per-class threshold weights**: after CV, optimise `argmax(proba * w)` on OOF with
+  Nelder-Mead (multi-restart); save to `results/threshold_weights_*.json` and apply the
+  identical weights to test.
+
+---
+
+## Final submission selection
+
+At competition end, select finals with the `select-finals` skill: rank by **OOF CV, not public
+LB**. On a dense leaderboard the shiniest public score is often the one that memorized the
+public split (fingerprint: suspiciously small CV→LB gap on a submission whose
+calibration/threshold weights were fit post-hoc). Pick two *diverse* finals; if forced to one,
+prefer the ensemble/stack.
 
 ---
 
