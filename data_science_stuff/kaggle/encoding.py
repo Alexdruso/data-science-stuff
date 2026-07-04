@@ -42,7 +42,7 @@ def sorted_factorize(*series: pd.Series) -> tuple[NDArray[np.int32], ...]:
     keyed = [cat_key(s) for s in series]
     union = pd.concat(keyed, ignore_index=True)
     mapping = {category: code for code, category in enumerate(sorted(union.unique()))}
-    return tuple(k.map(mapping).fillna(-1).astype("int32").to_numpy() for k in keyed)
+    return tuple(np.asarray(k.map(mapping).fillna(-1), dtype=np.int32) for k in keyed)
 
 
 def te_source_columns(
