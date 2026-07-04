@@ -59,6 +59,7 @@ development = [
     "mypy>=1.0.0",
     "pre-commit>=3.0.0",
     "pandas-stubs>=2.0.0",
+    "scikit-learn-stubs>=0.0.3",
     "bandit>=1.7.0",
 ]
 
@@ -188,8 +189,10 @@ module = ["tests.*"]
 disallow_untyped_defs = false
 
 # Third-party scientific libraries that ship no type stubs / py.typed marker.
+# sklearn is covered by scikit-learn-stubs (development extra); scipy-stubs
+# exists but currently requires Python >= 3.12 while CI still tests 3.9-3.11.
 [[tool.mypy.overrides]]
-module = ["scipy.*", "sklearn.*", "lightgbm.*"]
+module = ["scipy.*", "lightgbm.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

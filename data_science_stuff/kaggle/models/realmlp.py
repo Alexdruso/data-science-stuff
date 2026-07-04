@@ -40,7 +40,7 @@ from data_science_stuff.kaggle.models.losses import smooth_ce_loss
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-class NumericalPreprocessor(BaseEstimator, TransformerMixin):  # type: ignore[misc]
+class NumericalPreprocessor(BaseEstimator, TransformerMixin):
     """Median-center / robust-scale / smooth-clip / l2-normalize pipeline."""
 
     def __init__(self, tfms: Sequence[str]) -> None:
@@ -332,7 +332,7 @@ def get_parameter_groups(model: RealMLP, p: dict[str, Any]) -> list[dict[str, An
     ]
 
 
-class RealMLP_TD_Classifier(BaseEstimator):  # type: ignore[misc]
+class RealMLP_TD_Classifier(BaseEstimator):
     """sklearn-style RealMLP-TD with the ``loss_prior_power`` imbalance knob.
 
     Construct with keyword overrides of :data:`REALMLP_TD_CONFIG`, e.g.

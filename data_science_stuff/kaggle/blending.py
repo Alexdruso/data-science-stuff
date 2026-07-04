@@ -151,7 +151,9 @@ def diversity_report(
     rows: dict[str, dict[str, float]] = {}
     for model, arr in oof_arrays.items():
         pred = np.argmax(arr, axis=1)
-        recalls = recall_score(y, pred, average=None, labels=class_ids)
+        # average=None always yields per-class recalls; asarray narrows the
+        # stub's array-or-scalar union.
+        recalls = np.asarray(recall_score(y, pred, average=None, labels=class_ids))
         row = {f"recall_{c}": float(r) for c, r in zip(class_names, recalls)}
         if model == anchor:
             row["fixes_anchor"] = float("nan")

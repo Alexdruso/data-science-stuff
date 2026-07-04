@@ -143,7 +143,9 @@ def classification_report_dict(
     class_ids = list(range(n_classes))
 
     def _recall(pred: NDArray[np.int64]) -> dict[str, float]:
-        rec = recall_score(y_true, pred, average=None, labels=class_ids)
+        # average=None always yields per-class recalls; asarray narrows the
+        # stub's array-or-scalar union.
+        rec = np.asarray(recall_score(y_true, pred, average=None, labels=class_ids))
         return {name: float(v) for name, v in zip(names, rec)}
 
     argmax_pred = np.asarray(np.argmax(proba, axis=1), dtype=np.int64)
