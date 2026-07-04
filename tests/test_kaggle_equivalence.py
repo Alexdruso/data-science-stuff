@@ -21,7 +21,7 @@ def _multiclass_fixture() -> "tuple[list[NDArray[np.float64]], NDArray[np.int64]
     oofs = []
     for seed in (1, 2, 3):
         local = np.random.default_rng(seed)
-        proba = np.full((n, 3), 0.15)
+        proba: NDArray[np.float64] = np.full((n, 3), 0.15)
         proba[np.arange(n), y] = 0.7
         proba += local.normal(0, 0.2, proba.shape)
         proba = np.clip(proba, 1e-3, None)

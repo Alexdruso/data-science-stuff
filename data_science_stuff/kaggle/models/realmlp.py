@@ -364,10 +364,14 @@ class RealMLP_TD_Classifier(BaseEstimator):
             ckpt_path = Path(tempfile.gettempdir()) / f"realmlp_ckpt_{os.getpid()}.pth"
         ckpt_path = Path(ckpt_path)
 
-        X_tr_num = X_train[num_col_names].to_numpy().astype(np.float32)
-        X_val_num = X_val[num_col_names].to_numpy().astype(np.float32)
-        X_tr_cat = X_train[cat_col_names].to_numpy().astype(np.int64)
-        X_val_cat = X_val[cat_col_names].to_numpy().astype(np.int64)
+        X_tr_num: NDArray[np.float32] = (
+            X_train[num_col_names].to_numpy().astype(np.float32)
+        )
+        X_val_num: NDArray[np.float32] = (
+            X_val[num_col_names].to_numpy().astype(np.float32)
+        )
+        X_tr_cat: NDArray[np.int64] = X_train[cat_col_names].to_numpy().astype(np.int64)
+        X_val_cat: NDArray[np.int64] = X_val[cat_col_names].to_numpy().astype(np.int64)
         y_tr = np.asarray(y_train)
         y_v = np.asarray(y_val)
 
@@ -602,7 +606,7 @@ class RealMLP_TD_Classifier(BaseEstimator):
         X_num = self.preprocessor_.transform(
             X[self.num_col_names_].to_numpy().astype(np.float32)
         )
-        X_cat = X[self.cat_col_names_].to_numpy().astype(np.int64)
+        X_cat: NDArray[np.int64] = X[self.cat_col_names_].to_numpy().astype(np.int64)
         if self.cat_dims_:
             X_cat = np.clip(X_cat, 0, np.array(self.cat_dims_) - 1)
         Xn = torch.as_tensor(X_num, dtype=torch.float32, device=self._dev)

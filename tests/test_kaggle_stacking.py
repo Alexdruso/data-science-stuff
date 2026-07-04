@@ -26,7 +26,7 @@ def _three_class_bases(
 
     def noisy_oof(noise: float, seed: int) -> "NDArray[np.float64]":
         local = np.random.default_rng(seed)
-        proba = np.full((n, 3), 0.1)
+        proba: NDArray[np.float64] = np.full((n, 3), 0.1)
         proba[np.arange(n), y] = 0.8
         proba += local.normal(0, noise, proba.shape)
         proba = np.clip(proba, 1e-3, None)

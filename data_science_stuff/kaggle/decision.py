@@ -216,7 +216,7 @@ def cascade_combine(
         raise ValueError(msg)
     n_rows = len(stage_probs[0])
     out = np.zeros((n_rows, len(class_order)))
-    rest = np.ones(n_rows)
+    rest: NDArray[np.float64] = np.ones(n_rows)
     for cls, p in zip(class_order, stage_probs):
         p_arr = np.asarray(p, dtype=np.float64)
         out[:, cls] = rest * p_arr

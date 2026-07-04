@@ -164,7 +164,9 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 
 [tool.mypy]
-python_version = "3.9"
+# No python_version pin: modern mypy rejects targets below 3.10, while the CI
+# matrix still runs 3.9 (whose job resolves an older mypy). Defaulting to the
+# running interpreter lets each matrix job type-check its own Python version.
 # Gate scoped to maintained code; `mypy .` walks the tree but skips the
 # experiment directories (see the ruff note above). `files` makes a bare
 # `mypy` (no args, as in `make py-static`) check the same scope.
@@ -184,6 +186,8 @@ warn_unused_configs = true
 
 disable_error_code = ["attr-defined"]
 
+# tests/__init__.py exists so mypy sees the files as tests.* modules; without
+# it they are top-level test_* modules and this pattern never matches anything.
 [[tool.mypy.overrides]]
 module = ["tests.*"]
 disallow_untyped_defs = false
