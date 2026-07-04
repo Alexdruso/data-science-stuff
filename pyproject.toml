@@ -138,6 +138,22 @@ ignore = [
 # signatures and locals — that convention beats PEP8 lowercase for feature
 # matrices in this domain.
 "data_science_stuff/kaggle/**" = ["N803", "N806"]
+# The models are research-grade ports kept faithful to their notebooks:
+# RealMLP_TD_Classifier keeps its upstream class name (N801), training loops
+# are long by nature (C901/PLR091x/PLR2004), progress prints sit behind a
+# verbosity flag (T201), and sklearn API stubs take unused y args (ARG002).
+"data_science_stuff/kaggle/models/*" = [
+    "ARG002",
+    "C901",
+    "N801",
+    "N803",
+    "N806",
+    "PLR0911",
+    "PLR0912",
+    "PLR0915",
+    "PLR2004",
+    "T201",
+]
 
 # Formatting configuration
 [tool.ruff.format]
