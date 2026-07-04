@@ -18,6 +18,19 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+# Generic encoding helpers were extracted to the shared package; the
+# re-exports below keep every existing `from deotte_features import ...`
+# call site working. Only the SDSS-specific recipe stays local.
+from data_science_stuff.kaggle.encoding import (
+    add_frequency_features,
+    cat_key,
+    qcut_codes,
+    select_low_cardinality_cols,
+)
+from data_science_stuff.kaggle.encoding import (
+    add_quantile_bin_features as _add_quantile_bin_features,
+)
+
 TARGET = "class"
 ID_COL = "id"
 EPS = 1e-6
@@ -29,10 +42,6 @@ BANDS = ["u", "g", "r", "i", "z"]
 TE_SMOOTH = 20.0
 TE_INNER_SPLITS = 5
 TE_MAX_CARDINALITY = 5000
-
-
-def cat_key(s: pd.Series) -> pd.Series:
-    return s.astype("str").fillna("__NA__")
 
 
 def spectral_type(g: pd.Series, r: pd.Series) -> pd.Series:
@@ -130,63 +139,20 @@ def add_pairwise_geometry_features(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def qcut_codes(values: np.ndarray, ref_values: np.ndarray, q: int) -> np.ndarray:
-    """Quantile-bin codes (edges from ref_values); replicates cdeotte's qcut_codes_gpu."""
-    ref = ref_values[~np.isnan(ref_values)]
-    if len(ref) < 2:
-        return np.full(len(values), -1, dtype=np.int16)
-    bins = np.unique(np.quantile(ref, np.linspace(0, 1, q + 1)).astype(np.float32))
-    if len(bins) <= 1:
-        return np.full(len(values), -1, dtype=np.int16)
-    codes = np.searchsorted(bins, values, side="left") - 1
-    codes = np.where(values == bins[0], 0, codes)
-    codes = np.where((values < bins[0]) | (values > bins[-1]) | np.isnan(values), -1, codes)
-    return np.clip(codes, -1, len(bins) - 2).astype(np.int16)
-
-
 def add_quantile_bin_features(df: pd.DataFrame, mask: np.ndarray) -> tuple[pd.DataFrame, list[str]]:
-    out = df.copy()
-    qbin_cols: list[str] = []
+    """cdeotte's qbin recipe over the shared helper: fixed cols, q=16/64/256, 3 crosses."""
     cols = RAW_NUM_COLS + [c for c in ["u_g", "g_r", "r_i", "i_z", "u_r", "mag_mean", "mag_range"]
-                           if c in out.columns]
-    for c in cols:
-        s = pd.to_numeric(out[c], errors="coerce").to_numpy(np.float32)
-        ref = s[mask]
-        for q in [16, 64, 256]:
-            name = f"{c}_qbin{q}"
-            out[name] = qcut_codes(s, ref, q).astype(np.int16).astype(str)
-            qbin_cols.append(name)
-    for a, b in [("alpha_qbin64", "delta_qbin64"), ("u_g_qbin64", "g_r_qbin64"),
-                 ("redshift_qbin64", "mag_mean_qbin64")]:
-        if a in out.columns and b in out.columns:
-            name = f"{a}__x__{b}"
-            out[name] = cat_key(out[a]) + "__" + cat_key(out[b])
-            qbin_cols.append(name)
-    return out, qbin_cols
+                           if c in df.columns]
+    return _add_quantile_bin_features(
+        df, mask, cols=cols, quantiles=(16, 64, 256),
+        crosses=[("alpha_qbin64", "delta_qbin64"), ("u_g_qbin64", "g_r_qbin64"),
+                 ("redshift_qbin64", "mag_mean_qbin64")],
+    )
 
 
 def select_te_cols(df: pd.DataFrame, cat_cols: list[str], max_card: int) -> list[str]:
-    cols = []
-    for c in cat_cols:
-        if c not in df.columns:
-            continue
-        if int(cat_key(df[c]).nunique(dropna=False)) > max_card:
-            continue
-        cols.append(c)  # TE_SOURCE == 'all' in the notebook → keep all under the cap
-    return cols
-
-
-def add_frequency_features(df: pd.DataFrame, cols: list[str], fit_mask: np.ndarray) -> pd.DataFrame:
-    out = df.copy()
-    for c in cols:
-        if c not in out.columns:
-            continue
-        s = cat_key(out[c])
-        vc = s[fit_mask].value_counts(dropna=False)
-        freq = s.map(vc).fillna(0).astype("float32")
-        out[f"{c}_freq"] = freq
-        out[f"{c}_freq_log1p"] = np.log1p(freq.to_numpy(np.float32)).astype("float32")
-    return out
+    # TE_SOURCE == 'all' in the notebook → keep every categorical under the cap.
+    return select_low_cardinality_cols(df, cat_cols, max_card)
 
 
 def add_original_prior_features(
