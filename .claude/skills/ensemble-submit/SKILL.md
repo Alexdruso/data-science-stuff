@@ -35,24 +35,28 @@ exactly as the training scripts do so the alignment matches.
    `MODELS = ["lgbm", "xgboost", "catboost", "mlp"]`, reading
    `results/oof_<m>.npy` and `results/test_<m>.npy`.
 2. **Reconstruct `y` and `test_ids`** via `build_features()` as above.
-3. **Optimize weights** with Nelder-Mead over the OOF predictions (objective = negative metric,
-   weights clipped ≥ 0 then normalized to sum to 1):
+3. **Optimize weights** with the shared Nelder-Mead search:
    ```python
-   from scipy.optimize import minimize
-   result = minimize(neg_ensemble_auc, x0=np.ones(n)/n, args=(oofs, y),
-                     method="Nelder-Mead", options={"maxiter": 5000, "xatol": 1e-6, "fatol": 1e-6})
-   w = np.clip(result.x, 0, None); w = w / w.sum()
+   from data_science_stuff.kaggle.blending import blend, optimize_blend_weights
+
+   w = optimize_blend_weights(oofs, y, score_fn, normalize="clip")   # or "softmax"
+   blended_oof = blend(oofs, w)
    ```
-   For regression/other metrics, swap `roc_auc_score` and the optimization direction accordingly.
-   Conditional blending (separate weights per data regime, e.g. an `is_2023` mask) is supported —
-   optimize per mask and combine, as in `ensemble.py`.
+   `score_fn(y, blended) -> float` (higher is better) carries the metric — AUC on 1-D probas,
+   `balanced_accuracy_score(y, blended.argmax(1))` for multiclass, negated RMSE for regression.
+   Conditional blending (separate weights per data regime, e.g. an `is_2023` mask) is the
+   caller's job: pre-slice per mask and optimize each slice, as in s6e5 `ensemble.py`.
+   Before pruning/adding bases, print
+   `kaggle.blending.diversity_report(oof_arrays, y, class_names, anchor=...)` — error overlap
+   vs the anchor predicts blend lift better than probability correlation.
    For multiclass balanced-accuracy tasks, after blending also optimise **per-class threshold
-   weights** (`argmax(proba * w)`, Nelder-Mead multi-restart) on the blended OOF and apply the
-   identical weights to test (s6e6: +0.0013; see `playground-series-s6e6/src/postprocess.py`).
+   weights** on the blended OOF and apply the identical weights to test (s6e6: +0.0013):
+   `from data_science_stuff.kaggle.decision import optimize_thresholds` → `(weights, score)`.
 4. **Report** the blended OOF score and the per-model weights; log via
    `cv_results.save_cv_result` if tracking the ensemble run.
-5. **Write the submission**: apply the weights to the test arrays, build
-   `pd.DataFrame({"id": test_ids, TARGET: blended_test})`, save to `submissions/<name>.csv`.
+5. **Write the submission**:
+   `write_submission(SUBMISSIONS_DIR, name, test_ids, TARGET, preds)` from
+   `data_science_stuff.kaggle.io` (owns the mkdir, returns the path).
 6. **Submit (only when the user asks)**:
    ```bash
    kaggle competitions submit -c <id> -f submissions/<name>.csv -m "<message>"
@@ -66,15 +70,26 @@ weak on another gets ~0 weight — no scalar captures "use its GALAXY column, ig
 column". When the blend stops moving:
 
 1. **Stack with a multinomial LR on the base models' probability LOGITS** — one weight per
-   (model, class), fold-honest OOF stacking (fit on 4 folds of the OOF rows, predict the 5th),
-   `class_weight="balanced"`, multi-seed averaged. Reference:
-   `playground-series-s6e6/src/build_lr_stack.py` (broke a 0.9662 plateau → 0.9705).
+   (model, class), fold-honest, multi-seed averaged:
+   ```python
+   from data_science_stuff.kaggle.stacking import stack_oof
+
+   oof, test = stack_oof(base_oofs, base_tests, y,
+                         lambda: LogisticRegression(C=1.0, class_weight="balanced", max_iter=2000),
+                         seeds=(2024, 7, 13, 42, 99), use_logits=True)
+   ```
+   Any fit/predict_proba meta works (Ridge-on-one-hot via a small wrapper, a regularized GBDT).
+   Worked example: `playground-series-s6e6/src/build_lr_stack.py` (broke a 0.9662 plateau →
+   0.9705).
 2. **Prune the base set to strong, diverse bases.** Near-duplicate variants add only
    collinearity; on s6e6 six weak ~0.95 bases added +0.0001 = dead weight / overfit surface.
-   Ablate before keeping.
+   Ablate before keeping (`diversity_report` shows who fixes whose errors).
 3. **If the stack itself is flat, the missing ingredient is a diverse base, not a better meta**
    — a different feature space, loss/model class, or problem decomposition (see the diversity
    section of the `add-model` skill). Adding more same-family models never moved it.
+4. **Close out the combiner axis with `kaggle.stacking.caruana_select`** (greedy forward
+   selection with replacement, honest outer CV) — if its held-out mean can't beat the stack,
+   probability re-weighting is exhausted and the next lever is a new base.
 
 ## Optional: post-ensemble blending
 

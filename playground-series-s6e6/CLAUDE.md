@@ -50,10 +50,10 @@ y = pl.read_csv(DATA_DIR / "train.csv")[TARGET].to_numpy()
 ## DRY Code — mandatory conventions
 
 - **`features.py` is the single source of truth** for all feature engineering. No training script may define its own transforms or constants (feature lists, column exclusions, sort keys).
-- **`cv_results.py` is a thin wrapper** around `data_science_stuff.kaggle_utils.save_cv_result`. Do not add logic to it; extend `kaggle_utils` if the shared utility needs changing.
-- All `train_*.py` scripts share the same CV loop structure: `StratifiedKFold` → per-fold fit → `save_cv_result` → `np.save` oof/test. If a 4th model is added, extract the loop to a shared helper.
+- **Shared utilities live in `data_science_stuff.kaggle`** (io / device / cv / blending / decision / encoding / stacking / models) — import, never copy. `postprocess.py`, `lgbm_device.py`, and `realmlp_deotte.py` are thin re-export shims onto the package; `cv_results.py` re-exports `kaggle_utils.save_cv_result`. Extend the package, not the shims.
+- The shared CV loop is `data_science_stuff.kaggle.cv.run_cv` (adopted by baseline / train_xgboost / train_catboost / train_mlp / train_mlp_la); long-tail experiment scripts with bespoke fold logic keep their own loops.
 - Categorical exclusion sets, sort keys, and the target name are constants in `features.py` — imported everywhere, never redefined.
-- Shared utilities (e.g. `save_cv_result`) live in `data_science_stuff.kaggle_utils` and are reused by all competitions in this repo.
+- **Refactored onto `data_science_stuff.kaggle` (2026-07-04).** All historical scores in this file were produced by the pre-refactor scripts. The threshold optimizer defaults changed with the extraction (max-normalized weights — invariant under `argmax(p·w)`; class-0-fixed parameterization; different restart RNG) — decision-rule-equivalent, not bit-identical. `results/` artifacts on disk are untouched.
 
 ---
 

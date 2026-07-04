@@ -7,7 +7,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A Python monorepo containing:
 - **`data_mining/`** — KTH ID2222 coursework (Shingling/LSH, A-priori, Triest, Spectral Clustering, JaBeJa)
 - **`playground-series-*/` / `playground_series_s5e1/`** — Kaggle Playground Series competition solutions
-- **`data_science_stuff/`** — Shared installable package (versioned via git tags through setuptools_scm)
+- **`data_science_stuff/`** — Shared installable package (versioned via git tags through
+  setuptools_scm). `kaggle_utils.py` holds the original helpers (`save_cv_result`,
+  `tune_decision_weights`, ...); the `kaggle/` subpackage holds the competition machinery
+  extracted from s6e5/s6e6: `io` (paths/params/submissions), `device` (LightGBM CUDA probe),
+  `cv` (`run_cv` fold loop), `blending` (Nelder-Mead blend weights, diversity report),
+  `decision` (threshold weights, Bayes cost matrix, cascade recombination), `encoding`
+  (fold-safe target encoding, quantile bins, frequency features), `stacking` (`stack_oof`,
+  Caruana selection), and `models` (MLP scaffold, RealMLP-TD, imbalance losses).
 
 ## Setup
 
@@ -81,6 +88,10 @@ for regression/AUC, `playground-series-s6e6/` for imbalanced multiclass + stacki
 features.py  →  baseline.py / train_<model>.py  →  tune_<model>.py  →  ensemble.py  →  submission
             (5-fold stratified CV, results/oof_<m>.npy + test_<m>.npy)  (Nelder-Mead)   (kaggle CLI)
 ```
+
+The pipeline is built on `data_science_stuff.kaggle`: `competition_dirs`/`load_params` →
+`run_cv` → `save_cv_result` + `optimize_thresholds` → `optimize_blend_weights`/`stack_oof` →
+`write_submission`. Competition scripts import these; they never copy them.
 
 Three invariants are critical and have each caused (or nearly caused) real failures:
 

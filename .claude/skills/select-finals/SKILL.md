@@ -33,7 +33,9 @@ pick (0.97119) fell to the **worst** private transfer (0.97033), while the CV-ve
 
 1. **Assemble the candidate table** from `results/cv_scores.csv` + the competition `CLAUDE.md`
    experiments log + `kaggle competitions submissions -c <id>`: for each candidate, OOF CV,
-   public LB, and the CV→LB gap.
+   public LB, and the CV→LB gap. Threshold-weight and cost-matrix candidates (outputs of
+   `data_science_stuff.kaggle.decision`) carry post-hoc fitted parameters — flag them for the
+   overfit check below.
 2. **Flag overfit suspects**: candidates whose gap is an outlier (small) versus the batch,
    especially those with post-hoc fitted weights or many LB probes behind them.
 3. **Rank by OOF CV** among the non-flagged candidates; break near-ties (within CV noise,

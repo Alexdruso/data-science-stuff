@@ -30,9 +30,15 @@ the idea is flat — partial reproductions of strong recipes score as noise (s6e
    directly. The `oof_*.npy` / `test_*.npy` arrays are saved in `build_features()` sort order;
    bypassing it silently misaligns predictions (see the row-order invariant — caused a 0.5-AUC
    submission once).
-2. **CV**: `StratifiedKFold(n_splits=5, shuffle=True, random_state=42)` for classification
-   (`KFold` for regression). The same `random_state=42` across all models keeps OOF folds aligned.
-3. **Outputs** written to `results/`:
+2. **CV**: `run_cv(X, y, X_test, fit_fold, ...)` from `data_science_stuff.kaggle.cv` — it owns
+   the `StratifiedKFold(n_splits=5, shuffle=True, random_state=42)` skeleton (`stratified=False`
+   → `KFold` for regression). The same `random_state=42` across all models keeps OOF folds
+   aligned. Your `fit_fold(X_tr, y_tr, X_va, y_va, X_test, fold)` returns
+   `(val_pred, test_pred)`; fold-aware transforms (target encoding, scalers) live INSIDE it,
+   and the `after_fold` hook is where `torch.cuda.empty_cache()` goes.
+3. **Outputs** written to `results/` (paths via
+   `DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)` from
+   `data_science_stuff.kaggle.io`; submissions via `write_submission(...)`):
    - `results/oof_<model>.npy` — out-of-fold predictions, length = n_train, in sort order.
    - `results/test_<model>.npy` — mean of per-fold test predictions, length = n_test.
    - Append a row via `save_cv_result(RESULTS_DIR, "<model>_vN", fold_scores, oof_score)` — the
@@ -47,17 +53,26 @@ the idea is flat — partial reproductions of strong recipes score as noise (s6e
      argmax labels — stackers and threshold optimization need the full distribution.
    - Target via `LabelEncoder`; always `le.inverse_transform` when writing submissions.
    - Set `class_weight="balanced"` (or the library's equivalent) — biggest cheap win on
-     imbalanced targets; prior correction on top of it adds nothing.
-   - After CV, optimise per-class threshold weights (`argmax(proba * w)`, Nelder-Mead with
-     random restarts) on OOF and apply the identical weights to test.
-6. **Fold-aware target encoding**: any `TargetEncoder`/target-rate feature is fit on the fold's
-   training split only, then transformed onto val/test. Never fit on all of `(X, y)`.
+     imbalanced targets; prior correction on top of it adds nothing. For NNs, prefer
+     `data_science_stuff.kaggle.models.losses.logit_adjustment` (balanced softmax) over class
+     weights — it was the s6e6 rare-class fix where weights/oversampling were flat.
+   - After CV, `from data_science_stuff.kaggle.decision import optimize_thresholds` →
+     `(weights, score)`; save with `kaggle.io.save_threshold_weights` and apply the identical
+     weights to test.
+6. **Fold-aware target encoding**: use
+   `data_science_stuff.kaggle.encoding.add_fold_safe_target_encoding(X_tr, y_tr, [X_va, X_test],
+   te_cols, class_map)` INSIDE the fold loop — it fits per-class binary TargetEncoders on the
+   fold's training split only (nested cv). Never fit on all of `(X, y)`. Quantile-bin TE
+   sources come from `kaggle.encoding.add_quantile_bin_features` / `qcut_codes`.
 
-Reference implementations to copy from:
-`playground-series-s6e5/src/train_xgboost.py`, `train_catboost.py`, `train_mlp.py`,
-`baseline.py` (LGBM), `cv_results.py`; multiclass + threshold optimization:
-`playground-series-s6e6/src/baseline.py`, `postprocess.py`, `train_realmlp_deotte.py` (custom
-loss NN), `train_chain_cascade.py` (decomposition).
+Worked examples of package usage (import the package, don't copy these):
+`playground-series-s6e6/src/baseline.py` (LGBM + run_cv + device probe),
+`train_mlp.py`/`train_mlp_la.py` (kaggle.models.mlp.fit_mlp_fold, logit adjustment),
+`train_xgb_deotte.py` (fold-safe TE recipe), `train_chain_cascade.py` (cascade_combine
+decomposition); `playground-series-s6e5/src/train_xgboost.py` (bespoke in-loop fold transforms
+where run_cv's contract doesn't fit). Reusable tabular NNs live in
+`data_science_stuff.kaggle.models` (`MLP`/`fit_mlp_fold`, `RealMLP_TD_Classifier` with the
+`loss_prior_power` knob).
 
 ## GPU memory rule (PyTorch models — mandatory)
 
@@ -80,10 +95,10 @@ This applies to both `train_*.py` and `tune_*.py`.
 ## Device selection gotchas (s6e6 lessons)
 
 - **LightGBM**: pip wheels are usually CPU-only — `device_type="cuda"` raises at fit time.
-  Probe once and fall back, sharing the result between train and tune scripts so they agree
-  (copy `playground-series-s6e6/src/lgbm_device.py::get_lgbm_device()` → `("cuda", 1)` or
-  `("cpu", -1)`; GPU wants `n_jobs=1`, CPU wants all cores). Never use `device="gpu"` (the
-  OpenCL backend) — it is slow / silently falls back on NVIDIA; probe `"cuda"` only.
+  `from data_science_stuff.kaggle.device import get_lgbm_device` probes once (cached) and
+  returns `("cuda", 1)` or `("cpu", -1)`; use it in both train and tune scripts so they agree
+  (GPU wants `n_jobs=1`, CPU wants all cores). Never use `device="gpu"` (the OpenCL backend)
+  — it is slow / silently falls back on NVIDIA; the helper probes `"cuda"` only.
 - **pytabkit**: check the constructor mixin in `sklearn_interfaces.py` before setting speed
   params — mixins have different param sets:
   - `TabM_D_Classifier` (TabMConstructorMixin): `compile_model=True` + `allow_amp=True` +
@@ -105,15 +120,17 @@ Mirror `playground-series-s6e5/src/tune.py` / `tune_mlp.py`:
   `N_TRIALS = 50`) and returns the OOF metric.
 - `study = optuna.create_study(direction="maximize")` (or `"minimize"` for error metrics).
 - Save the best params to `results/best_params_<model>.json`; the matching `train_<model>.py`
-  loads them via a `load_params()` that falls back to sane defaults when the file is absent.
+  loads them via `load_params(RESULTS_DIR, DEFAULTS, "best_params_<model>.json")` from
+  `data_science_stuff.kaggle.io` (returns the defaults when the file is absent).
 - Tree models can run on GPU (`device="gpu"`/`"cuda"`, `task_type="GPU"`); apply the GPU memory
   rule to any PyTorch tuning loop.
 
 ## Style
 
 Polars I/O → pandas at fit time; type hints everywhere (mypy strict); Python 3.9 lowercase
-generics; `Path(__file__).parent.parent / "data"` path pattern; cross-module imports via
-`sys.path.insert(0, str(Path(__file__).parent))`.
+generics; paths via `competition_dirs(__file__)`. `sys.path.insert(0,
+str(Path(__file__).parent))` is only for the competition's own modules (`features`,
+`cv_results`); shared utilities are normal `data_science_stuff.kaggle` imports.
 
 ## Verify
 

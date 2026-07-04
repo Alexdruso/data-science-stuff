@@ -102,7 +102,10 @@ All features implemented in `src/features.py::build_features()` (+ `compute_grou
 
 ## Modelling notes
 
-- **CV**: <5-fold stratified, random_state=42>. Scores logged to `results/cv_scores.csv`.
+- **Shared utilities live in `data_science_stuff.kaggle`** (io / device / cv / blending /
+  decision / encoding / stacking / models) — import, never copy, season-specific scripts.
+- **CV**: `run_cv` from `data_science_stuff.kaggle.cv` (<5-fold stratified, random_state=42>).
+  Scores logged to `results/cv_scores.csv`.
 - **GPU**: <which models use GPU and how>.
 - **GPU memory rule (all PyTorch scripts)**: `del` model + optimizer + tensors before returning
   from each fold; call `torch.cuda.empty_cache()` after each fold/trial in the outer loop.
@@ -115,9 +118,10 @@ All features implemented in `src/features.py::build_features()` (+ `compute_grou
 - **OOF/test arrays store raw probabilities** (multiclass: shape n × n_classes) so stackers and
   threshold optimization can work per class. `LabelEncoder` for the target; always
   `le.inverse_transform` when writing submissions.
-- **Per-class threshold weights**: after CV, optimise `argmax(proba * w)` on OOF with
-  Nelder-Mead (multi-restart); save to `results/threshold_weights_*.json` and apply the
-  identical weights to test.
+- **Per-class threshold weights**: after CV,
+  `data_science_stuff.kaggle.decision.optimize_thresholds(oof, y)` → `(weights, score)`;
+  save via `kaggle.io.save_threshold_weights` to `results/threshold_weights_*.json` and apply
+  the identical weights to test.
 
 ---
 
