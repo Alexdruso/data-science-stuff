@@ -167,6 +167,7 @@ data_science_stuff/_version.py
 # Large data / output files (use Git LFS or keep local)
 *.csv
 *.npy
+*.xls
 *.png
 *.jpg
 *.jpeg
