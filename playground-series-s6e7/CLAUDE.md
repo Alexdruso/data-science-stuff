@@ -214,6 +214,70 @@ Day-4; kNN-posterior features are bounded by the same result — matching carrie
 the marginal). The 2026-07-07 plan's Track 2 is DONE; tomorrow = breadth run (Track 1),
 ceiling-falsifier (Track 3), preservation (Track 4).
 
+### Day-4 night (2026-07-06, user-directed missingness EDA): ⚡ MASK-MECHANISM SHIFT FOUND
+
+`src/eda_missingness.py` → `results/eda_missingness.txt` + `results/figures/miss_*.png`.
+The old "missingness ≈ MCAR" claim (from class-conditional null rates only) is FALSE in a way
+that matters:
+
+- **In TRAIN, four masks are deterministic single-column trigger rules** (hard zeros
+  off-trigger): water_intake missing ⟺ gender=female (19.4%); physical_activity_level ⟺
+  smoking_alcohol=occasional (16.1%); bmi ⟺ sleep_quality=good (6.2%); diet_type ⟺
+  gender=other (3.0%). MAR-test AUCs 0.84–0.86 (`miss_mar_auc.png`); stress_level and
+  sleep_duration masks are clean MCAR (AUC 0.50).
+- **In TEST the SAME masks are UNIFORM** at the same marginal rates (e.g. water by gender:
+  6.3%/6.3%/6.3% vs train 19.4%/0/0) — `miss_mechanism_shift.png`. Marginal rates match
+  exactly, so rate-level checks never saw it.
+- Consequences: (1) trees learn train-only NaN↔trigger couplings (water-NaN ⇒ female;
+  activity-NaN ⇒ occasional-smoker — and activity is a KEY DRIVER) that misfire on ~2/3 of
+  test NaN rows (~13% of test rows have ≥1 of the 4 columns missing); (2) **3,703 test rows
+  (1.25%) have missingness patterns that never occur in train** (e.g. water+diet co-missing
+  is a train-impossible gender contradiction); (3) this plausibly explains part of adv-AUC
+  0.65 AND the water-drop flip fragility (water's NaN channel was a female flag in train —
+  dropping the column deleted a gender proxy, moving the fragile boundary).
+- Measured non-levers from the same session: indicators add ZERO about the drivers on
+  train-mechanism rows (Δacc 0.0000 — triggers are observed columns); exact trigger-recovery
+  (e.g. water-NaN ⇒ female when gender also masked) touches only ~0.5% of rows AND is
+  test-invalid (test masks are uniform ⇒ NO recovery inference in test — do NOT wire
+  train-rule recovery features; they'd inject WRONG values in test).
+- Class dependence of bmi-mask (fit 2.9% vs unhealthy 0.7%, V=0.031) is fully explained by
+  the sleep_quality=good trigger; patterns co-occur at independence otherwise.
+
+**⇒ NEW TOP LEVER (tomorrow #0): missingness-mechanism repair.** (a) Quantify damage: take
+OOF validation folds, RE-MASK them under the TEST mechanism (uniform at test rates), score
+the champion — the delta estimates what the mechanism shift costs (also fixes our broken
+evaluation: plain OOF validates under the WRONG missingness distribution). (b) Repair
+candidates, gated: R1 impute-the-4 (model-impute water/bmi/diet/activity; identical treatment
+train+test ⇒ mechanism difference vanishes); R2 uniform re-masking augmentation of train
+(break the trigger coupling by masking the 4 columns in off-trigger rows too); R3 retrain
+with the 4 columns' NaN semantics neutralized. Evaluate ALL candidates on the test-mechanism
+re-masked OOF from (a), not plain OOF.
+
+### Day-4 night part 2 (2026-07-06, user-directed): id-ordinality probe — target NULL, but masks are BLOCKWISE in test id
+
+`src/eda_id.py` → `results/eda_id.txt` + `results/figures/id_*.png`. Ids: train 0–690,087,
+test 690,088–985,841, both contiguous and file-sorted.
+
+- **id carries NO target signal** (all measured): class rate per id decile chi2 p=0.019 with
+  bin sds at binomial-noise level (`id_class_rates.png`); lag-1..10 target autocorrelation in
+  id order = shuffled null, |z|<1.1 (`id_lag_agreement.png`); LGBM on id+id%k alone = bal-acc
+  0.3328 ≈ chance. **Do NOT add id as a feature.**
+- **Numeric features do not drift** over id, and test bins continue train means (max |z| ≈ 2.8
+  over 50 bins = noise; `id_feature_drift.png`). Adv-AUC 0.65 is NOT id/segment drift.
+- **⚡ But the TEST masks for water_intake and diet_type are BLOCKWISE in id**
+  (`id_mask_regimes.png`, the money plot): long contiguous zero-missing runs (water: three
+  ~5k-row blocks, 3.5% of test; diet: ELEVEN blocks, **67% of test has diet-mask OFF**, the
+  rest bursts at 3–9%), with shared regime boundaries (both switch at test row 40,467). Train
+  is stationary for all masks; the other 4 test masks are stationary too. So "test masks are
+  uniform" (Day-4 part 1) refines to: **gender-independent everywhere** (inside active regions
+  female/male/other = 7.1%/7.1%/7.2%) **but non-stationary in id** — the test mask generator
+  ran in on/off segments.
+- **Segments are NOT exploitable**: features, gender, and stress composition are identical
+  across mask-active vs mask-zero segments (std-diffs ≤0.008), and trees never see id, so
+  block structure ≈ iid at marginal rates from the model's viewpoint. Consequence for
+  tomorrow's #0 instrument: **uniform re-masking at marginal rates remains the correct
+  test-mechanism emulation** — no need to simulate blocks.
+
 ### ⚠️ PROTOCOL (user-set, 2026-07-02 pm): work LEADERBOARD-BLIND
 The user watches the LB themselves; **Claude must not query submission scores**
 (`kaggle competitions submissions`) or design LB-probing/attribution submission plans. Rationale:
@@ -303,11 +367,14 @@ the only bottleneck is `at-risk↔minority`.
 **TIER C — KILLED (proven flat / wrong-for-metric, don't build):** rule-encoding / monotonic score
 (GBDT beats the rule); generic FE — interactions/ratios/sleep-debt/BMI-bands/missingness-count
 (ablation −0.0005/−0.0002 = noise, FE-saturated for trees); logit-adjust / prior-correction /
-effective-number weights / 3×3 cost matrix (subset of the decision-weight search); prior-matching
+effective-number weights (subset of the decision-weight search); prior-matching
 post-proc / pseudo-labeling / EM label-shift (shift is in P(x) not P(y|x), Δ<0.2pp); subset-specific
 decision weights (tested flat); hierarchical 2-stage (fit↔unhealthy already solved); CV-scheme
-overhaul / adversarial importance-weighting (problem is variance, not bias); Optuna sweep (tree
-params are 2nd-order behind the decision rule here).
+overhaul / adversarial importance-weighting (problem is variance, not bias).
+
+**⚠️ UN-KILLED 2026-07-06 (kill-audit — these were asserted, never measured; see the 07-07 plan):**
+the **3×3 cost matrix** ("subset of decision weights" was wrong math — it strictly generalizes
+them) and the **Optuna/HP sweep** (zero trials were ever run; "2nd-order" was advisor reasoning).
 
 **DEFERRED (user parked "other models"):** non-GBDT family (MLP/TabM) — agents agree this is the
 *actual* largest remaining lever (ensemble diversity), and the FE in Tier C only pays off as inputs
@@ -316,28 +383,45 @@ the 64-way combo). Revisit when ready to add model families.
 
 ---
 
-## ▶▶ PLAN for 2026-07-07 (full day)
+## ▶▶ PLAN for 2026-07-07 (full day) — REVISED 07-06 night after user pushback
 
-Priority order; Track 1 is background compute, start it first. All candidates face the standing
-gate (adv-weighted Δ>+0.001 AND test-like Δ>0); everything else is descriptive-only, LB-blind.
+User verdict on the old plan (breadth + falsifier + hygiene): intellectually lazy. Kill-audit
+agrees — three Tier-C "kills" were ASSERTED, never measured: (a) HP tuning (zero Optuna trials
+ever ran), (b) the 3×3 cost matrix ("subset of decision weights" is WRONG math — weights are
+argmax(w_c·p_c), 2 effective params; the full matrix argmax_c Σ_j p_j·C[j,c] has ~5 and strictly
+contains them), (c) "FE explored" = one probe with two transforms. The +0.0002 headroom oracle
+bounds recombination of EXISTING bases only — new bases / new decision families sit outside it.
+Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB-blind throughout.
 
-1. **Track 1 — resume the 8-seed breadth run (background, ~4–5 h, reboot-resumable).**
-   Two parallel shells: `src/run_breadth.sh lgbm hgbc` (CPU) and `src/run_breadth.sh xgboost
-   catboost` (GPU) — skip-if-exists, so just rerun after any reboot. When done:
-   `combine_breadth.py` → true 8-seed `final2_breadth`. Checks: OOF, flip-count vs champion,
-   missing-region flip share. This finishes final #2, the last sanctioned deliverable.
-2. ~~Track 2 — external↔competition CLONE-LINKAGE probe~~ **DONE 2026-07-06 evening: DEAD**
-   (see Day-4 section above; `results/probe_linkage.txt`). External dataset fully exhausted.
-3. **Track 3 — ceiling-falsifier (~1 h).** Predict champion OOF errors from features + champion
-   confidence. Error-AUC ≤0.55 ⇒ row-level limit confirmed (ceiling verified, not asserted);
-   materially higher ⇒ residual structure — inspect what it keys on before doing anything.
-4. **Track 4 — preservation (afternoon, while Track 1 runs).** `playground-series-s6e7/` is
-   entirely UNTRACKED in git — commit src/ + CLAUDE.md + README (data/, npy gitignored). Update
-   this file + memory with the day's outcomes. Confirm the two finals: #1 `champion_v1.csv`,
-   #2 8-seed `final2_breadth.csv`.
-
-If Track 2 hits (linkage validates on train), it preempts everything: build the
-impute-from-source pipeline, retrain the champion recipe on imputed drivers, re-gate.
+0. **⚡ MISSINGNESS-MECHANISM REPAIR (new #1 — see Day-4-night section).** Quantify via
+   test-mechanism re-masked OOF, then gate repairs R1/R2/R3. This targets ~13% of test rows
+   with a measured train/test difference — the only lever with a demonstrated mechanism AND
+   scale. All other candidates below should ALSO be scored on the re-masked OOF instrument.
+1. **Cost-matrix decision layer (~2 h, first).** Fit the full 3×3 on blended OOF with
+   CROSS-FITTED gain estimation (never trust in-sample NM on 5 params). Use
+   `data_science_stuff.kaggle.decision.fit_cost_matrix`/`make_cost_matrix`. Mechanism: tilts
+   the at-risk↔unhealthy boundary independently of at-risk↔fit — where 79% of flips live.
+2. **Driver-posterior features (~half day, the FE centerpiece).** Aux models P(stress|x_obs),
+   P(activity|x_obs), P(sleep_bucket|x_obs) trained on train+test observed rows (leak-free —
+   no label involved; transductive = shift-adapted), posteriors fed to label models as
+   features. Gives trees a "probably-high-stress" split exactly where the driver is NaN.
+   Distinct from the marginalization probes: those replaced predictions; this adds inputs.
+3. **HP tuning with the DEPLOYED objective (~half day, parallel).** Optuna, objective =
+   decision-weighted balanced acc (optionally missing-region-weighted), NOT logloss. Order:
+   hgbc first (~5 s/fold → 200+ trials/h on CPU), then LGBM, then XGB/Cat on GPU.
+4. **Missingness-semantics diversity (~2–3 h).** Same GBDTs, different NaN treatments
+   (median/model imputation; NaN-as-category for ordinal drivers) → decorrelates errors inside
+   the missing region where all current bases share the same default-direction routing. Cheap
+   add-on: cached adversarial score as a feature (shift-aware boundaries).
+5. ~~id/row-order artifact probe~~ **DONE 07-06 night** (`eda_id.py`, Day-4-night-part-2
+   section): id→target NULL, feature drift NULL — but found the test masks are blockwise in
+   id (not exploitable; confirms uniform re-masking is the right #0 instrument).
+6. **TabPFN-v2 missing-region specialist (~2–3 h, GPU-gated).** Subsample-ensembled TabPFN on
+   the 180k missing-driver rows only — the one genuinely different prior never priced; the
+   diversity oracle predates this base so does not bound it.
+7. **Background only: 8-seed breadth run** (`run_breadth.sh`, resumable — CPU half + GPU half
+   whenever the GPU is idle between items 3/4/6), then `combine_breadth.py` → final #2.
+   Ceiling-falsifier (error-AUC probe) demoted to filler.
 
 ## Experiments log
 
