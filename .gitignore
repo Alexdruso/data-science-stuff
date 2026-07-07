@@ -171,6 +171,8 @@ data_science_stuff/_version.py
 *.png
 *.jpg
 *.jpeg
+# The INR example's small sample image is deliberately committed
+!implicit_neural_representations/data/*.png
 
 # Training run logs and library scratch dirs
 *.log

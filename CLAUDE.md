@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A Python monorepo containing:
 - **`data_mining/`** — KTH ID2222 coursework (Shingling/LSH, A-priori, Triest, Spectral Clustering, JaBeJa)
+- **`implicit_neural_representations/`** — self-contained example (notebook + typed `src/` modules)
+  of coordinate networks fitting an image (ReLU MLP vs Fourier features vs SIREN) and using the
+  continuous representation for arbitrary-scale upscaling. Unlike the coursework/Kaggle dirs, its
+  `src/` **is** held to the ruff/mypy gate. Website-bound content — keep the notebook narrative clean.
 - **`playground-series-*/` / `playground_series_s5e1/`** — Kaggle Playground Series competition solutions
 - **`data_science_stuff/`** — Shared installable package (versioned via git tags through
   setuptools_scm). `kaggle_utils.py` holds the original helpers (`save_cv_result`,
