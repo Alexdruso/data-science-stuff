@@ -16,6 +16,12 @@ cd "$COMP_DIR" || exit 1
 PY="$REPO_ROOT/.venv/bin/python"
 [[ -x "$PY" ]] || { echo "no venv python at $PY"; exit 1; }
 
+# S6E7_TAG_PREFIX namespaces a variant run's artifacts (e.g. _r for the repaired
+# recipe -> oof_lgbm_r_s42.npy); required because skip-if-exists would otherwise
+# resume a repaired run from unrepaired arrays. S6E7_REPAIR passes through the
+# environment to the trainers untouched.
+TAG_PREFIX="${S6E7_TAG_PREFIX:-}"
+
 SEEDS=(42 7 123 2024 99 2025 31 7777)
 declare -A SCRIPT=( [lgbm]=src/baseline.py [hgbc]=src/train_hgbc.py \
                     [xgboost]=src/train_xgboost.py [catboost]=src/train_catboost.py )
@@ -26,17 +32,18 @@ if [[ $# -gt 0 ]]; then MODELS=("$@"); else MODELS=(lgbm hgbc xgboost catboost);
 export PYTHONUNBUFFERED=1
 for model in "${MODELS[@]}"; do
   for seed in "${SEEDS[@]}"; do
-    out="results/oof_${model}_s${seed}.npy"
+    tag="${TAG_PREFIX}_s${seed}"
+    out="results/oof_${model}${tag}.npy"
     if [[ -f "$out" ]]; then
-      echo "BREADTH skip ${model} s${seed} (exists)"
+      echo "BREADTH skip ${model}${tag} (exists)"
       continue
     fi
-    echo "BREADTH start ${model} s${seed}"
-    if S6E7_SEEDS="$seed" S6E7_RUN_TAG="_s${seed}" "$PY" "${SCRIPT[$model]}" \
-         > "results/log_breadth_${model}_s${seed}.txt" 2>&1; then
-      echo "BREADTH done ${model} s${seed} -> ${out}"
+    echo "BREADTH start ${model}${tag}"
+    if S6E7_SEEDS="$seed" S6E7_RUN_TAG="$tag" "$PY" "${SCRIPT[$model]}" \
+         > "results/log_breadth_${model}${tag}.txt" 2>&1; then
+      echo "BREADTH done ${model}${tag} -> ${out}"
     else
-      echo "BREADTH FAIL ${model} s${seed} (see results/log_breadth_${model}_s${seed}.txt)"
+      echo "BREADTH FAIL ${model}${tag} (see results/log_breadth_${model}${tag}.txt)"
     fi
   done
 done

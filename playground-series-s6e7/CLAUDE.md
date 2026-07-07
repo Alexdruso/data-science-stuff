@@ -278,6 +278,103 @@ test 690,088–985,841, both contiguous and file-sorted.
   tomorrow's #0 instrument: **uniform re-masking at marginal rates remains the correct
   test-mechanism emulation** — no need to simulate blocks.
 
+### Day-4 night part 3 (2026-07-07 00:xx): #0a DONE — mechanism-shift damage MEASURED, above gate
+
+`src/diag_mask_shift.py` → `results/diag_mask_shift.txt`. Baseline-LGBM folds scored on three
+val surfaces (weights fit on plain OOF, as deployed): plain 0.9487 / test-mechanism emulation
+0.9467 / volume-matched control 0.9477 (weighted bacc). **Total emulated damage −0.0020,
+splitting 50/50 into volume (−0.0010) and PLACEMENT (−0.0010, uniform vs on-trigger at equal
+NaN count).** On rows receiving a new NaN (13.3%), bacc drops 0.9498→0.9347. Real-test
+translation: test volume = train volume (marginals match) but ALL test NaNs are uniform while
+the emulation could only uniformize half (existing train-mechanism NaNs can't be unmasked) ⇒
+true cost ≈ −0.001..−0.002 — **clears the ≥0.001 gate; repair keeps #0.** R2 (uniform
+re-mask augmentation in training) targets exactly the placement term; verify on this
+instrument (rerun diag with the repaired model) BEFORE regenerating champion legs. Quick kills
+same night: exact-duplicate/train↔test-match probe = ZERO everywhere (match-and-copy is dead);
+champion's prediction mix on impossible-pattern rows is unremarkable; numerics are coarse
+grids (water 400 uniques, heart_rate exactly 1dp, calorie/steps integer) → frequency/count
+encodings are better-motivated for today's FE block.
+
+### Day-5 (2026-07-07): R2a repair GATED PASS + wired in; three avenues measured-dead
+
+**#0b — R2a repair (uniform re-mask of train) PASSES the instrument** (`src/diag_repair.py`
+→ `results/diag_repair_r2a.txt`, exactly paired with the baseline diag: same folds, same val
+remask RNG): testmech 0.9467→**0.9477 (+0.0011, gate ≥+0.001)**; repaired testmech = the
+volume-matched control (0.9478) ⇒ the placement/mechanism damage is recovered **in full**;
+plain surface +0.0001 (costless); newly-NaN'd rows 0.9347→0.9414. Weights-fit-on-testmech
+adds only +0.0001 ⇒ the value is the retraining, not the weight surface.
+
+**Wiring**: `S6E7_REPAIR=1` in `train_common.load_dataset()` applies `_uniform_remask` (the
+4 `MECHANISM_SHIFTED` columns, iid Bernoulli at the TEST marginal rates, fixed RNG) to the
+WHOLE train matrix — val rows included, so every base's OOF sits on the same test-mechanism
+-emulated surface and decision weights are fit on it. **Repaired OOF reads ~0.001–0.002 below
+plain-surface numbers by construction — only compare repaired to repaired.** Test is never
+re-masked. `run_breadth.sh`/`combine_breadth.py` take `S6E7_TAG_PREFIX=_r` so repaired
+artifacts (`*_r_s<seed>`) never mix with the unrepaired ones.
+
+**Repaired legs (seed 42, weighted OOF on the repaired surface)**: lgbm 0.9478 / xgb 0.9473 /
+cat 0.9479 → **`champion_repaired` blend 0.9484** (v1b recipe; weights ≈.33/.33/.35;
+`submissions/champion_repaired.csv`). vs the unrepaired champion's estimated ~0.9474 on this
+surface ⇒ +0.001, consistent with the instrument. Test-side: 566 flips vs `champion_v1.csv`
+(0.19%), shifted-col-NaN rows enriched 2.8× (32% vs 11.3% base), dominant move
+at-risk→unhealthy — mechanism-consistent, targeted, not a reshuffle. **User-directed
+submissions (2026-07-07 pm): `champion_repaired.csv` + `lgbm_r_s42.csv` — LB-blind protocol
+holds, user reads the scores.** Public-split sd ≈0.0015 ≈ the expected effect, so the public
+delta is suggestive only; the repair's case rests on the gated instrument.
+
+**Measured-dead today (all three properly gated, closing the 07-06 un-kills):**
+- **3×3 cost matrix — FAIL** (`src/cost_matrix_probe.py` → `results/cost_matrix.txt`):
+  in-sample +0.0000 over per-class weights (moves 0.125% of rows);
+  `decision.split_half_gate` mean **−0.00003** (sd 0.00007) over 6 seed/half swaps. The
+  un-kill was right procedurally, wrong empirically: per-class weights already saturate the
+  decision layer on this blend.
+- **HP tuning — FAIL** (`src/tune_hgbc.py` → `results/tune_hgbc.txt`, `optuna_hgbc.db`;
+  deployed objective = decision-weighted bacc, repaired surface, incumbent pinned as trial 0):
+  150 trials/90 min, best 0.9486 vs incumbent 0.9482 = **+0.0004** — and TPE converged (flat
+  optimum: depth 7, lr≈0.2, ~32 leaves, min_leaf≈130 all within ±0.0002). hgbc was the family
+  canary ⇒ no LGBM/XGB/Cat sweeps.
+- **Driver-posterior features — FAIL** (`src/train_dp.py` → `lgbm_dp_r_s42`): 3 transductive
+  aux LGBMs (stress/activity/sleep-bucket posteriors from train+test observed rows, label-free)
+  +9 features. Solo 0.9476 vs 0.9478 identical-leg baseline (**−0.0002**); blend-level
+  0.9485 vs 0.9484 (**+0.0001**, sub-gate; the NM giving dp the top weight is OOF-overfit on a
+  near-tie). Root cause measured: the drivers are ~unrecoverable from other features (aux acc:
+  stress 0.480 vs ~0.43 majority, sleep-bucket 0.557, activity 0.722) — same conclusion as the
+  Day-2 marginalization probes, reached from the input side. `champion_repaired_dp.csv` NOT queued.
+- **Frequency encoding — FAIL** (`src/train_freq.py` → `lgbm_freq_r_s42`): per-numeric value
+  counts over train+test pooled + 64-way driver-combo count (the one FE family that injects
+  dataset-level rather than row-wise information; motivated by the quantized-grid finding). Solo
+  0.9479 vs 0.9478 (**+0.0001** — the only FE probe not strictly worse); blend-level 0.9485 vs
+  0.9484 (+0.0001).
+- **Exact-value TE of the numerics — FAIL but closest** (`src/train_te_num.py` →
+  `lgbm_te_r_s42`; sourced from Mark Susol's public trail via the Mamarin notebook, claimed
+  +0.0009): cross-fitted P(class | exact grid value) for the 6 informative numerics (nested
+  inner 5-fold for train rows — invariant #3; NaN stays NaN; water excluded = noise). Solo
+  0.9480 vs 0.9478 (**+0.0002**); blend-level **0.9487 vs 0.9484 (+0.0003, the day's largest
+  blend delta, TE leg got top NM weight)** — still 3× under the gate, NOT queued. Susol's
+  effect size does not replicate against a decision-weighted repaired stack.
+  **FE is now fully measured: 6 families (row-wise transforms, rule-combo target encoding,
+  missingness indicators, driver posteriors, frequency stats, exact-value TE), 6 sub-gate
+  results, one mechanism** — an axis-aligned 3-feature label rule the trees already saturate,
+  with the residual error in deleted-information rows. Ranked residue if ever revisited:
+  TE (+0.0003 blend) > freq (+0.0001) > dp (+0.0001).
+
+**Notebook scrape (Mamarin, "quit chasing 0.950", 2026-07-07)**: independently confirms the
+wall thesis (4 model families within 0.0006; MLP blend +0.0001 at 99.1% agreement; public
+mirage per S6E6 shakeup), prior-correction b≈1 ≡ our decision weights ("weights in training
+and prior-correction are substitutes — stacking both fixed costs −0.045"), Kawamata measured
+value-snapping dead + external-50k harmful (matches our Day-3), nybbler's ceiling decomposition
+matches ours. Their missingness read is rate-level MCAR — the mechanism shift (our repair) is
+NOT in the public material. Reference floors: chance 0.3333 / stress-only rule ≈0.85 / naive
+argmax GBDT 0.8783 / decision-corrected anything ≈0.949 — regression alarm = any run <0.9488.
+
+**Day-5 wrap**: breadth run complete, 8 seeds × 4 bases, all repaired. Per-base combined
+weighted OOF (repaired surface): lgbm 0.9484 / hgbc 0.9484 / xgb 0.9481 / cat 0.9481 →
+**`final2_breadth_r` blend 0.9487** (weights ≈.25/.22/.27/.26, `submissions/final2_breadth_r.csv`)
+— the repaired-lineage final #2. Several user-directed curiosity submissions went to the LB
+today; per the user's instruction their scores are deliberately NOT recorded here or in memory.
+Finals shape unchanged: #1 v1b lineage, #2 repaired lineage; the repair's case rests on the
+instrument, not public reads.
+
 ### ⚠️ PROTOCOL (user-set, 2026-07-02 pm): work LEADERBOARD-BLIND
 The user watches the LB themselves; **Claude must not query submission scores**
 (`kaggle competitions submissions`) or design LB-probing/attribution submission plans. Rationale:
@@ -383,7 +480,12 @@ the 64-way combo). Revisit when ready to add model families.
 
 ---
 
-## ▶▶ PLAN for 2026-07-07 (full day) — REVISED 07-06 night after user pushback
+## ▶▶ PLAN for 2026-07-07 — OUTCOMES (see Day-5 section): #0 repair **PASS** (wired,
+## champion_repaired built); #1 cost-matrix **FAIL** (split-half); #2 driver-posteriors
+## **FAIL** (drivers unrecoverable); #3 HP tuning **FAIL** (hgbc canary +0.0004); #4
+## NaN-semantics diversity NOT RUN (partly superseded — the repair already changed the NaN
+## semantics globally; revisit only if a diversity gap shows); #6 TabPFN deferred (GPU
+## booked by breadth); #7 breadth rerun WITH the repair (`_r` tags) — in flight.
 
 User verdict on the old plan (breadth + falsifier + hygiene): intellectually lazy. Kill-audit
 agrees — three Tier-C "kills" were ASSERTED, never measured: (a) HP tuning (zero Optuna trials
@@ -444,6 +546,16 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-03 | lgbm_iw | Adversarial importance-weighted LGBM (`train_iw.py`). VETOED (advwt +0.0001). | 0.9489 |
 | 2026-07-03 | lgbm_fe | FE variant (`train_fe.py`). Worse — FE-saturation confirmed. | 0.9487 |
 | 2026-07-03 | headroom | Perfect-selector oracle over core+{mlp_la, lgbm_ext} in the transferable (complete ∩ test-like) region: **+0.0002** → base recombination measured-exhausted (`headroom.txt`). | — |
+| 2026-07-07 | diag_repair r2a | R2a uniform re-mask of train, paired instrument: testmech 0.9467→0.9477 (**PASS**, mechanism damage fully recovered), plain +0.0001. Wired as `S6E7_REPAIR=1`. | 0.9477 (testmech) |
+| 2026-07-07 | cost_matrix_probe | Full 3×3 Bayes matrix on champion blend, split-half gated: mean holdout **−0.00003** → measured-dead. | — |
+| 2026-07-07 | tune_hgbc | Optuna 150 trials, deployed objective, repaired surface: best +0.0004 vs incumbent → tuning measured-dead for the GBDT family. | 0.9486 (repaired surf.) |
+| 2026-07-07 | lgbm/xgb/cat `_r_s42` | Repaired champion legs (seed 42). Weighted 0.9478 / 0.9473 / 0.9479 on the repaired surface. | 0.9478 / 0.9473 / 0.9479 |
+| 2026-07-07 | champion_repaired | v1b-recipe blend of the `_r_s42` legs (≈.33/.33/.35). 566 test flips vs champion, 2.8× NaN-enriched. **Submitted (user-directed) with `lgbm_r_s42`.** | **0.9484 (repaired surf.)** |
+| 2026-07-07 | lgbm_dp_r_s42 | Driver-posterior features (+9 transductive aux posteriors): solo −0.0002, blend +0.0001 → **vetoed**; drivers measured ~unrecoverable (aux acc 0.48/0.56/0.72). | 0.9476 (repaired surf.) |
+| 2026-07-07 | lgbm_freq_r_s42 | Frequency-encoding features (+7 pooled value-counts + combo count): solo +0.0001, blend +0.0001 → **vetoed**. | 0.9479 (repaired surf.) |
+| 2026-07-07 | hgbc_r_s42..7777 | 8 repaired hgbc seeds, weighted 0.9481–0.9483 — near-zero seed variance; best single base on the repaired surface. | 0.9482 (repaired surf.) |
+| 2026-07-07 | lgbm_te_r_s42 | Exact-value TE of 6 numerics (nested cross-fit, notebook-sourced): solo +0.0002, blend +0.0003 (day's best FE, still sub-gate) → **not queued**. | 0.9480 (repaired surf.) |
+| 2026-07-07 | final2_breadth_r | **Repaired final #2**: 8-seed × 4-base breadth blend (32 fits; lgbm/hgbc/xgb/cat combined 0.9484/0.9484/0.9481/0.9481). | **0.9487 (repaired surf.)** |
 
 **LB**: lgbm 0.94886, xgboost 0.94894, **ensemble_v1b 0.94970 (best)**. The blend lifts once
 models are pre-corrected to their deployed surface. Next lever for a bigger jump is a non-GBDT base

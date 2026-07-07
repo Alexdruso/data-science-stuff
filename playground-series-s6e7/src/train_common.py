@@ -48,6 +48,40 @@ SEEDS: list[int] = (
     else [42, 7, 123]
 )
 RUN_TAG: str = os.environ.get("S6E7_RUN_TAG", "")
+# S6E7_REPAIR=1 applies the R2a missingness-mechanism repair (see below); gated
+# PASS on the re-masked instrument 2026-07-07 (results/diag_repair_r2a.txt).
+REPAIR: bool = os.environ.get("S6E7_REPAIR", "") not in ("", "0")
+
+# The 4 columns whose train masks are deterministic trigger rules but whose test
+# masks are uniform (results/eda_missingness.txt). Train-only NaN<->trigger
+# couplings misfire on ~2/3 of test NaN rows.
+MECHANISM_SHIFTED = ["water_intake", "physical_activity_level", "bmi", "diet_type"]
+
+
+def _uniform_remask(train: pd.DataFrame, test: pd.DataFrame) -> pd.DataFrame:
+    """R2a repair: iid Bernoulli re-mask of the mechanism-shifted columns.
+
+    Masks observed train values at each column's TEST marginal NaN rate, so the
+    training mechanism matches test (uniform NaNs on top of the trigger NaNs)
+    and the NaN<->trigger coupling is broken. Applied to the WHOLE train matrix
+    (val rows included): every base then produces OOF on the same test-mechanism
+    -emulated surface, which is the surface decision weights should be fit on.
+    Consequence: repaired OOF scores read ~0.001-0.002 below plain-surface runs
+    by construction -- compare repaired runs to repaired runs only.
+
+    The RNG is fixed (not per-seed) so all bases/seeds share one mask and their
+    OOF arrays stay blendable on a single surface. Test is NEVER re-masked: it
+    already has the uniform mechanism.
+    """
+    rng = np.random.default_rng(20260707)
+    out = train.copy()
+    for col in MECHANISM_SHIFTED:
+        if col not in out.columns:  # e.g. water dropped via S6E7_DROP_WATER
+            continue
+        rate = float(test[col].isna().mean())
+        hit = out[col].notna().to_numpy() & (rng.random(len(out)) < rate)
+        out.loc[out.index[hit], col] = np.nan
+    return out
 
 # fit_fold(train_idx, val_idx, seed, fold) -> (val_proba (n_val, K), test_proba (n_test, K)).
 FitFold = Callable[
@@ -88,9 +122,14 @@ def load_dataset() -> Dataset:
     test_pd = test_pl.to_pandas()
 
     y = train_pd[TARGET].map({c: i for i, c in enumerate(CLASSES)}).to_numpy()
+    train_X = train_pd[feature_cols].copy()
+    test_X = test_pd[feature_cols].copy()
+    if REPAIR:
+        train_X = _uniform_remask(train_X, test_X)
+        print("S6E7_REPAIR=1: R2a uniform re-mask applied to train")
     return Dataset(
-        train=train_pd[feature_cols].copy(),
-        test=test_pd[feature_cols].copy(),
+        train=train_X,
+        test=test_X,
         y=y.astype(np.int64),
         test_ids=test_pd["id"].to_numpy(),
         feature_cols=feature_cols,
