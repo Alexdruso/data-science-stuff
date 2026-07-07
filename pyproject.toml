@@ -132,6 +132,9 @@ ignore = [
 # Allow assert and "magic" constants in the test suite.
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "PLR2004"]
+# Notebooks are narrative: stdout prints and the `torch.nn.functional as F`
+# convention are idiomatic there.
+"*.ipynb" = ["N812", "T201"]
 # kaggle_utils exposes interactive reporting helpers whose job is to write to
 # stdout (e.g. print_classification_report, save_cv_result status line).
 "data_science_stuff/kaggle_utils.py" = ["T201"]
