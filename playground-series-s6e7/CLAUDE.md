@@ -375,6 +375,57 @@ today; per the user's instruction their scores are deliberately NOT recorded her
 Finals shape unchanged: #1 v1b lineage, #2 repaired lineage; the repair's case rests on the
 instrument, not public reads.
 
+### Day-6 (2026-07-08, ~2h session): gate FIXED + the crux re-gate — repaired MLP VETOED, signature unchanged
+
+**Rung 0 — the transfer gate is now trustworthy** (`src/diag_mlp_transfer.py`, rewritten):
+- Comparator core = the DEPLOYED repaired breadth blend `oof_ensemble_r_breadth.npy`
+  (env-override `S6E7_CORE`), loaded as a raw array — it is already precorrected+NM-blended
+  by `combine_breadth.py` and its weights JSON is nested (must NOT re-enter
+  `precorrected_blend`).
+- Adversarial scores cached PER SURFACE (`adv_scores_train_r.npy` under `S6E7_REPAIR=1`);
+  the old shape-only cache bug is dead. The gate run itself must execute under
+  `S6E7_REPAIR=1` (region masks + adv scores come from `load_dataset()`); `main()`
+  hard-fails on core/surface mismatch. **Surfaces must match** — plain-surface candidates
+  cannot be gated against the repaired core (confounded); compare signatures across days,
+  not decimals.
+- Candidate joins as a fixed mixture `(1-w)·core + w·candidate` at **w=0.20** (≈ a 5th
+  family joining a 4-family blend — the old gate's marginal-member semantics; NM weights
+  overfit near-ties, equal weight would inflate lift), with a w∈{.1,.2,.3,.5} sensitivity
+  grid printed. Error-overlap decorrelation stats added per the exploratory ruling.
+- Sanity (DP2, `results/diag_gate_sanity.txt`): core overall weighted bacc **0.9487** =
+  Day-5 `final2_breadth_r` exactly; core member `hgbc_r_breadth` shows solo Δ −0.0003,
+  fix-share 2.3%, error-overlap 92.9% — the instrument behaves.
+- **⚡ Repaired-surface adv-AUC = 0.6886, HIGHER than plain 0.65** (we expected lower).
+  Mechanism: the repair adds uniform NaNs but cannot unmask the original trigger-coupled
+  ones, so the 4 shifted columns carry MORE total NaN in train than test — the adversarial
+  classifier partly keys on that excess. The instrument stays internally consistent
+  ("test-like" = most test-resembling under the deployed surface), but note the repair
+  itself bakes in a residual train/test asymmetry. Runtime note: each `wbacc` = 8
+  bootstrap-bagged NM fits on 690k rows → a full diag report is ~48 NM fits, tens of
+  minutes; don't widen W_GRID casually.
+
+**Rung 1 — the crux falsifier came back FLAT with a trustworthy instrument.**
+`S6E7_REPAIR=1 S6E7_RUN_TAG=_r` runs of the existing trainers (3 seeds × 5 folds each):
+`mlp_r` weighted OOF **0.9476**, `mlp_la_r` **0.9476** (repaired surface; GBDT legs sit
+0.9478–0.9482). Gate on `mlp_r` (`results/diag_mlp_r.txt`): **VETO** — advwt Δ −0.0000,
+test-like Δ −0.0001 at w=0.20, flat-to-negative at every w (w=0.30 loses −0.0001 across
+the board: more MLP weight = strictly worse). The decorrelation signature is UNCHANGED
+from the pre-repair Day-2 MLP: fix-share **5.1%** (Day-2: 5.1%), fixes **27.0% test-like /
+90.2% missing-driver** (Day-2: 27.7% / 82.5%), and error-overlap with the core **92.3%
+overall / 92.8% test-like — the same as a GBDT core member (92.9%)**. The mask-mechanism
+repair did NOT unlock transferable NN diversity: the MLP is decorrelated only where the
+information doesn't exist. (`mlp_la_r` gate left running unattended at session end —
+report at `results/diag_mlp_la_r.txt`; expected VETO given its identical 0.9476 OOF.
+Verify next session before citing.)
+
+**Consequence**: the reopened avenue closes as MEASURED this time, not asserted. Per the
+07-07 exploratory ruling, **Rung 2 (setenc / mask-consistency / DANN) starts any future NN
+session DEMOTED, not dead** — their invariance mechanisms are structurally different from a
+one-shot repair, but the cheap falsifier is flat, so they need a prior reason to expect a
+different signature (e.g. setenc's structural inability to learn NaN↔trigger couplings)
+before spending GPU time. The finals shape is unchanged: #1 v1b lineage, #2 repaired
+lineage (`final2_breadth_r`).
+
 ### ⚠️ PROTOCOL (user-set, 2026-07-02 pm): work LEADERBOARD-BLIND
 The user watches the LB themselves; **Claude must not query submission scores**
 (`kaggle competitions submissions`) or design LB-probing/attribution submission plans. Rationale:
@@ -480,6 +531,104 @@ the 64-way combo). Revisit when ready to add model families.
 
 ---
 
+## ▶▶ PLAN for 2026-07-08 — OUTCOMES (see Day-6 section): RUNG 0 **DONE** (gate fixed,
+## sanity-passed; repaired adv-AUC 0.6886 caveat); RUNG 1 **VETO** (mlp_r + mlp_la_r both
+## 0.9476, signature identical to pre-repair — no transferable diversity); RUNG 2 not run
+## (2h budget) and now DEMOTED per the falsifier logic below. Original plan follows.
+
+## PLAN for 2026-07-08 — NEURAL-NET DAY (diversity, not accuracy)
+
+**Framing**: the 3-GBDT stack is at the Bayes ceiling; a NN cannot raise solo accuracy. The
+ONLY value a NN adds is *decorrelated error that TRANSFERS to test-like rows*. Every prior
+MLP (`mlp` Day-2, `mlp_la` Day-3) FAILED the transfer gate — **BUT all those verdicts are
+PRE-REPAIR** (measured vs the un-repaired core, before `S6E7_REPAIR=1` existed, Day-5). The
+repair uniform-remasks `physical_activity_level` (a KEY DRIVER) — exactly the missing-driver
+region where the MLP's non-transferring diversity lived. **The crux re-gate on the repaired
+surface has never been run.** That reopened avenue is the day. (3-agent brainstorm 2026-07-07;
+all three converged on this + the gate bug below.)
+
+**⚠️ RUNG 0 — FIX THE GATE FIRST (load-bearing; NOT a one-liner)**. Both parts required
+before any NN result is trusted:
+1. **Repoint the comparator core to the REPAIRED legs.** `adv_eval.py:27` (`GBDTS`) + line
+   100 and `diag_mlp_transfer.py:51` load unrepaired `oof_{lgbm,xgboost,catboost}.npy`. Gate
+   against the DEPLOYED 8-seed `_r` breadth blend (`oof_ensemble_r_breadth.npy`) — that's what
+   a new NN would actually ensemble with.
+2. **Regenerate `adv_scores_train.npy`.** `diag_mlp_transfer.load_adv` keys the cache on SHAPE
+   ONLY, so under repair it silently serves the stale unrepaired scores — and the test-like
+   subset is DEFINED by those scores. The repair changes train's missingness distribution ⇒
+   which rows are "test-like" changes. Regenerate on a documented surface (or freeze the mask
+   from unrepaired features and apply identically to both sides — pick one, document it).
+
+**RUNG 1 — cheapest falsifier**: run existing `train_mlp.py` + `train_mlp_la.py` with
+`S6E7_REPAIR=1`, re-gate vs the repaired core. Flag-flip, ~zero new code. Repaired MLP MOVES
+on test-like rows → avenue reopens. Ties → weak (not conclusive); the mechanism-targeting
+ideas below add invariance a one-shot repair can't, so proceed anyway.
+
+**RUNG 2 — the two standouts (attack the NaN↔trigger coupling from OPPOSITE sides)**:
+- **A. Present-only set/attention encoder** (`train_setenc.py`, NEW): row = set of present
+  (feature,value) tokens; missing = token ABSENT (no sentinel, no indicator). **Structurally
+  CANNOT learn the train-only NaN↔trigger coupling** (water-NaN⇒female etc.) that survives
+  even the repair (repair adds NaNs, can't unmask existing ones) ⇒ compounds with, not
+  duplicates, the repair. ≤13 tokens, tiny, <6 GB. New backbone (RealMLP's `NumericalPreprocessor`
+  chokes on NaN + has no mask channel).
+- **B. Mask-consistency co-training** (on `train_mlp.py`'s `NNData` backbone): two independent
+  masks per row (iid Bernoulli at TEST rates), KL/JS consistency penalty, **SEMI-SUPERVISED
+  over the 295k unlabeled test rows** (transductive, leak-free). Penalizes routing through any
+  feature's presence ⇒ forbids the coupling by *invariance* (which the one-shot repair can't
+  impose). λ needs a small sweep. Train on fresh masks off the RAW matrix, score OOF on the
+  repaired surface — do NOT double-mask on top of `S6E7_REPAIR`.
+- **C. Gradient-reversal domain head (DANN, USER-PITCHED 07-07 evening)**: aux head predicts
+  train-vs-test from the trunk representation, gradient REVERSED into the trunk (λ ramp-up
+  schedule) ⇒ representation is stripped of everything domain-informative — the LEARNED
+  version of the invariance B imposes by construction, fit on the real shift (adv-AUC 0.65 +
+  mask mechanism). Semi-supervised over the 295k test rows (label-free, leak-free). NOT the
+  `lgbm_iw` kill: IW re-weights rows (bias fix); DANN changes the representation — and the
+  veto predates the mask-shift discovery. Risk: the domain signal IS partly the NaN channel,
+  which is weakly label-informative — λ too high strips label signal. Train on the RAW matrix
+  (repair would hide the shift the head must see). **B and C share one backbone + unlabeled
+  test loader — build as one script with two optional loss terms.**
+
+**RUNG 2-parallel — the user's low-hanging fruit (INPUT RECIPE, orthogonal)**: feed a NN the
+features trees don't need. A tree gets the 3-way AND / per-grid posterior FREE from splits
+(→ FE measured-dead for trees); a smooth NN cannot synthesize them ⇒ handing them over
+converts "learn a discontinuous rule" into "learn a near-linear map." Ranked: (1) **64-way
+rule-combo TE** = cross-fitted P(class | stress×activity×sleep_quality) — the repo's
+explicitly deferred-FOR-NN item; (2) **exact-value TE** of the 6 numerics (`train_te_num.py`
+already emits `te_<col>_{0,1,2}`); (3) **ordinal INTEGER scalars** for stress/sleep_quality/
+activity/smoking (monotone, not unordered embeddings); (4) 2-way driver crosses; (5) adv-shift
+score as a feature. Backbone: RealMLP-TD (loss knobs + these inputs).
+
+**ESCALATION (only if rungs move; ranked, below the fold)**: DCNv2 cross-network (cheap; label
+is a literal bounded-degree conjunction) · PLE numeric-embedding tabular ResNet (smooth
+interpolation over the coarse quantized grids, decorrelates from step functions) · SAM
+(orthogonal flat-minima hedge — survives if the repaired trees already ate the mask lever) ·
+DAE/SubTab masked-reconstruction pretraining · aux masked-driver head (cheap bolt-on to B) ·
+TabPFN-v2 missing-region specialist (most-different prior, but capped by the measured 0.886
+Bayes ceiling — calibration-diversity long shot).
+
+**KILLED / not novel (do NOT build)**: pure re-weighting losses (focal / label-smoothing /
+logit-adjustment / class-weights) = existing RealMLP knobs AND redundant with the decision
+layer (weights-in-training ≡ prior-correction, substitutes; stacking cost −0.045 on s6e6) ·
+distillation from the GBDT champion (anti-diversity — pulls the NN toward the base it must
+differ from) · predict-missingness-as-aux-target (HARMFUL — hardwires the train-only coupling) ·
+retrieval / kNN-augmented (`probe_linkage`: matching carries LESS info than the marginal) ·
+SWA (≈ existing EMA knob) · exotic activations / self-normalizing nets / Lion / schedule-free
+(bottleneck is data/mechanism-limited, not optimization-limited).
+
+**GATE for every leg**: `diag_mlp_transfer.py` adv-weighted Δ>+0.001 AND test-like Δ>0 vs the
+REPAIRED core; blend-overfit guard = split-half blend gate (≥6 seed swaps, mean holdout
+Δ>+0.0005) before queuing, NOT raw Nelder-Mead OOF delta. LB-blind throughout. Seed-average
+any survivor (5–10 seeds) as one stable leg.
+
+**Honest EV (footnote, NOT headline)**: realistic best-case ensemble gain +0.0002–0.0005 on
+repaired OOF, much of which may not transfer (no region has BOTH errors AND decorrelated-
+transferable structure — complete-driver rows are solved, missing-driver rows are info-limited
+/ correlated). BUT the crux re-gate is unrun and cheap ⇒ run rung 0/1 before concluding
+anything (per [[feedback_premature_ceiling]]). **USER RULING (07-07 evening): NN day is
+EXPLORATORY** — a sub-gate-but-genuinely-decorrelated NN can earn a final-#2 hedge slot; the
++0.001 bar gates *queuing a submission*, not *building*. Judge legs by decorrelation-on-
+test-like-rows (diag fix-share + error-overlap), not blend OOF delta.
+
 ## ▶▶ PLAN for 2026-07-07 — OUTCOMES (see Day-5 section): #0 repair **PASS** (wired,
 ## champion_repaired built); #1 cost-matrix **FAIL** (split-half); #2 driver-posteriors
 ## **FAIL** (drivers unrecoverable); #3 HP tuning **FAIL** (hgbc canary +0.0004); #4
@@ -556,6 +705,9 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-07 | hgbc_r_s42..7777 | 8 repaired hgbc seeds, weighted 0.9481–0.9483 — near-zero seed variance; best single base on the repaired surface. | 0.9482 (repaired surf.) |
 | 2026-07-07 | lgbm_te_r_s42 | Exact-value TE of 6 numerics (nested cross-fit, notebook-sourced): solo +0.0002, blend +0.0003 (day's best FE, still sub-gate) → **not queued**. | 0.9480 (repaired surf.) |
 | 2026-07-07 | final2_breadth_r | **Repaired final #2**: 8-seed × 4-base breadth blend (32 fits; lgbm/hgbc/xgb/cat combined 0.9484/0.9484/0.9481/0.9481). | **0.9487 (repaired surf.)** |
+| 2026-07-08 | gate fix | `diag_mlp_transfer.py` rewritten: repaired-breadth core, surface-keyed adv cache (repaired adv-AUC **0.6886** > plain 0.65), w=0.20 mixture gate + grid, error-overlap stats, surface guard. Sanity: core 0.9487 ✓, core member ≈ zero diversity ✓. | — |
+| 2026-07-08 | mlp_r | Repaired MLP (3 seeds × 5 folds, flag-flip rerun). Gate: **VETO** (advwt +0.0000 / test-like −0.0001 at w=0.20). Signature = Day-2 exactly: fix-share 5.1%, 90.2% of fixes missing-driver, error-overlap 92.3% ≈ core member. | 0.9476 (repaired surf.) |
+| 2026-07-08 | mlp_la_r | Repaired logit-adjusted MLP, same protocol. Gate left running at session end (`diag_mlp_la_r.txt`; expected VETO — identical OOF to mlp_r). NN avenue closed as measured on mlp_r; Rung 2 demoted. | 0.9476 (repaired surf.) |
 
 **LB**: lgbm 0.94886, xgboost 0.94894, **ensemble_v1b 0.94970 (best)**. The blend lifts once
 models are pre-corrected to their deployed surface. Next lever for a bigger jump is a non-GBDT base

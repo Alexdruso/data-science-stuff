@@ -8,6 +8,8 @@ resembling the test distribution, to (a) check whether it ranks configs closer t
 (b) see which models transfer to the test-like region (is the MLP the LB regression culprit?).
 
 Read-only over existing results/oof_*.npy — no training of the competition models, no submit.
+NOTE (2026-07-08): this is the historical Day-2 tool on the plain surface; the live transfer
+gate is diag_mlp_transfer.py, which compares against the repaired breadth core.
 """
 
 from __future__ import annotations
