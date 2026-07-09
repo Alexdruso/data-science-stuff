@@ -72,13 +72,19 @@ def _uniform_remask(train: pd.DataFrame, test: pd.DataFrame) -> pd.DataFrame:
     The RNG is fixed (not per-seed) so all bases/seeds share one mask and their
     OOF arrays stay blendable on a single surface. Test is NEVER re-masked: it
     already has the uniform mechanism.
+
+    S6E7_REPAIR_MULT scales the re-mask rates (default 1.0 = the gated R2a).
+    Train/test marginal NaN rates are ~equal per column, so mult 1.0 roughly
+    DOUBLES train NaN volume in the shifted columns vs test (the Day-6 adv-AUC
+    0.6886 overshoot); mult<1 trades coupling dilution for volume match.
     """
+    mult = float(os.environ.get("S6E7_REPAIR_MULT", "1.0"))
     rng = np.random.default_rng(20260707)
     out = train.copy()
     for col in MECHANISM_SHIFTED:
         if col not in out.columns:  # e.g. water dropped via S6E7_DROP_WATER
             continue
-        rate = float(test[col].isna().mean())
+        rate = float(test[col].isna().mean()) * mult
         hit = out[col].notna().to_numpy() & (rng.random(len(out)) < rate)
         out.loc[out.index[hit], col] = np.nan
     return out
@@ -168,6 +174,13 @@ def bagged_cv(
     return oof, test, fold_scores
 
 
+def _bag_log_weights(
+    y_bag: NDArray[np.int64], proba_bag: NDArray[np.float64]
+) -> NDArray[np.float64]:
+    """One bootstrap bag's log decision weights (module-level for joblib pickling)."""
+    return np.asarray(np.log(tune_decision_weights(y_bag, proba_bag)))
+
+
 def robust_decision_weights(
     y: NDArray[np.int64],
     proba: NDArray[np.float64],
@@ -179,12 +192,18 @@ def robust_decision_weights(
     A single Nelder-Mead fit on the full OOF has ~0.004 balanced-acc variance depending on
     the slice it sees (measured); bagging over bootstrap resamples of the OOF stabilises the
     weight vector without touching the shared kaggle_utils helper.
+
+    Bags run in parallel processes (Day-7): the sequential version left 11 cores idle for
+    ~30 min per call (8 bags x 15 NM restarts x 690k-row objective evals). Bootstrap
+    indices are drawn sequentially first, so results are bit-identical to the old loop.
     """
+    from joblib import Parallel, delayed
+
     rng = np.random.default_rng(seed)
-    log_ws = []
-    for _ in range(n_bags):
-        idx = rng.integers(0, len(y), len(y))
-        log_ws.append(np.log(tune_decision_weights(y[idx], proba[idx])))
+    idxs = [rng.integers(0, len(y), len(y)) for _ in range(n_bags)]
+    log_ws = Parallel(n_jobs=min(n_bags, os.cpu_count() or 1))(
+        delayed(_bag_log_weights)(y[idx], proba[idx]) for idx in idxs
+    )
     w = np.exp(np.mean(log_ws, axis=0))
     return np.asarray(w / w.max(), dtype=np.float64)
 

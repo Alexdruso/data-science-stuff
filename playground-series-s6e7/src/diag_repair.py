@@ -24,6 +24,14 @@ deployable on its own even if retraining is a wash.
 
 Run: ../.venv/bin/python src/diag_repair.py r2a | tee results/diag_repair_r2a.txt
 Env: S6E7_REPAIR_MULT (float, default 1.0) scales the re-mask rates.
+
+Day-7 addition — the TESTVOL read (volume-honest, Day-6 adv-AUC 0.6886 follow-up):
+train/test marginal NaN rates are ~EQUAL per column, so both the r2a repair and the
+testmech val surface roughly double NaN volume in the 4 columns vs true test. But for
+val rows COMPLETE in all 4 columns, the testmech re-mask is exactly the true-test
+surface: uniform mechanism at exact test volume. "testvol" = testmech restricted to
+that subset (~86% of rows; biased toward the non-triggered population, identical
+subset across mult runs -> paired). Compare mult runs on it; no stored baseline.
 """
 
 import os
@@ -88,12 +96,19 @@ def main() -> None:
     n = len(ds.y)
     oof = {m: np.zeros((n, N_CLASSES)) for m in ["plain", "testmech", "control"]}
     changed = np.zeros(n, dtype=bool)  # rows that received >=1 new NaN (testmech)
+    complete4 = np.zeros(n, dtype=bool)  # rows fully observed in the 4 shifted cols
 
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     for fold, (tr_idx, val_idx) in enumerate(skf.split(ds.y, ds.y), 1):
         X_tr, y_tr = repair_train(
             X.iloc[tr_idx], ds.y[tr_idx], rates, np.random.default_rng(3000 + fold), mode
         )
+        if fold == 1:  # overshoot diagnostic: repaired-train NaN volume vs test
+            print("  repaired-train NaN rates vs test marginal:")
+            for col in TRIGGERS:
+                if col in X.columns:
+                    print(f"    {col:<26} {X_tr[col].isna().mean():.4f} "
+                          f"vs test {test_rates()[col]:.4f}")
         model = LGBMClassifier(**{**params, "random_state": 42})
         model.fit(
             X_tr,
@@ -112,14 +127,16 @@ def main() -> None:
         changed[val_idx] = (
             val_test[cols].isna().to_numpy() & X_val[cols].notna().to_numpy()
         ).any(axis=1)
+        complete4[val_idx] = X_val[cols].notna().all(axis=1).to_numpy()
 
         for m, xv in [("plain", X_val), ("testmech", val_test), ("control", val_ctrl)]:
             oof[m][val_idx] = model.predict_proba(xv)
         b = balanced_accuracy_score(ds.y[val_idx], oof["plain"][val_idx].argmax(1))
         print(f"  fold {fold}: plain argmax bacc {b:.4f} (best_iter {model.best_iteration_})")
 
+    tag = "" if mult == 1.0 else f"_m{int(round(mult * 100)):03d}"
     for m, arr in oof.items():
-        np.save(RESULTS_DIR / f"oof_repair_{mode}_{m}.npy", arr)
+        np.save(RESULTS_DIR / f"oof_repair_{mode}{tag}_{m}.npy", arr)
 
     # deployment-style: weights fit on the repaired model's PLAIN oof
     weights = robust_decision_weights(ds.y, oof["plain"])
@@ -137,6 +154,20 @@ def main() -> None:
     tm_tm = balanced_accuracy_score(ds.y, weighted_predict(oof["testmech"], weights_tm))
     print(f"\nweights fit on TESTMECH oof -> testmech surface: {tm_tm:.4f} "
           f"(vs plain-fit {scores['testmech']:.4f}; weights {weights_tm.round(4)})")
+
+    # TESTVOL: volume-honest read = testmech restricted to rows complete in the
+    # 4 shifted columns (uniform mechanism at EXACT test volume there). Paired
+    # across mult runs (same subset, same RNG streams); no stored baseline.
+    c4 = complete4
+    print(f"\nTESTVOL (complete-in-4 rows: {c4.sum():,} = {c4.mean():.1%}):")
+    for wname, wvec in [("plain-fit", weights), ("testmech-fit", weights_tm)]:
+        tv = balanced_accuracy_score(
+            ds.y[c4], weighted_predict(oof["testmech"][c4], wvec)
+        )
+        pv = balanced_accuracy_score(
+            ds.y[c4], weighted_predict(oof["plain"][c4], wvec)
+        )
+        print(f"  {wname:<13} testvol={tv:.4f}  (plain-surface same rows: {pv:.4f})")
 
     delta = max(scores["testmech"], tm_tm) - BASELINE["testmech"]
     verdict = "PASS" if delta >= GATE else "FAIL"

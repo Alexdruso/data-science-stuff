@@ -426,6 +426,63 @@ different signature (e.g. setenc's structural inability to learn NaN↔trigger c
 before spending GPU time. The finals shape is unchanged: #1 v1b lineage, #2 repaired
 lineage (`final2_breadth_r`).
 
+### Day-7 (2026-07-09/10): overshoot mult sweep — repair VALIDATED, mult 0.5 marginally better (sub-gate, no rebuild); TabPFN priced DEAD; mlp_la_r VETO confirmed
+
+**1. The Day-6 adv-AUC anomaly is resolved: the repair survives a volume-honest instrument.**
+Train/test marginal NaN rates are ~EQUAL per column, so R2a (re-mask at full test rates on
+top of trigger NaNs) ~DOUBLES train NaN volume in the 4 columns (water 0.122 vs test 0.063,
+activity 0.103/0.053, bmi 0.040/0.020, diet 0.020/0.010) — and the testmech val surface
+overshoots identically, so the Day-5 gate was measured on a surface sharing the flaw.
+New instrument in `diag_repair.py`: **TESTVOL** = the testmech OOF restricted to val rows
+complete in the 4 columns (86.0%, 593,550 rows) — on those rows the re-mask IS the true test
+surface (uniform mechanism at exact test volume); biased toward the non-triggered population
+but identical across runs (paired, fixed RNG streams). Sweep via `S6E7_REPAIR_MULT` (now also
+wired into `train_common._uniform_remask`, default 1.0), reports
+`results/diag_repair_r2a_tv_m{100,050,000}.txt`:
+
+| training repair | testvol | testmech | plain |
+|---|---|---|---|
+| m000 none       | 0.9476 | 0.9468 | 0.9487 |
+| m100 deployed   | 0.9484 | 0.9476 | 0.9488 |
+| m050 half       | **0.9486** | **0.9478** | **0.9489** |
+
+Conclusions: (a) **the repair is real** — +0.0008 testvol over no-repair; the coupling damage
+is genuine, `final2_breadth_r` stands validated; (b) **mult 0.5 ≥ mult 1.0 on every surface
+but only by ~+0.0002** — sub-gate, does NOT justify a breadth rebuild alone; if a rebuild
+ever happens for another reason, set `S6E7_REPAIR_MULT=0.5` for free. Repro note: the m100
+rerun reads testmech +0.0009 vs Day-5's +0.0011 — the 0.001 gate line flickers on rerun
+noise; the mult comparison is paired within-chain and unaffected. adv-AUC on the mult-0.5
+surface: **0.6704** (`results/adv_auc_r_m050.txt`) — between plain 0.65 and m100's 0.6886,
+corroborating the volume mechanism (less overshoot → surface closer to test).
+m000 report note: killed after table 1 (redundant NM tail); its TESTVOL computed post-hoc
+from the saved OOF arrays and appended.
+
+**2. TabPFN-v2 missing-region specialist: PRICED, DEAD** (`src/probe_tabpfn.py`,
+`results/probe_tabpfn.txt`). Feasible on the 6 GB card (peak 2.17 GiB, fit 14.5s, predict
+1.9s/1k rows ≈ 7 min per full region-OOF context) — but on 20k held-out missing-driver rows
+(10k context, repaired surface) it scores 0.8827 WITH in-sample-fit decision weights (a
+generous upper bound) vs the deployed core's 0.8970 on the same rows, per-class recalls
+strictly dominated. −0.014 in-region with no complementary error structure → no blend case;
+the transfer gate would veto. Consistent with the deleted-information mechanism. NOTE:
+current `tabpfn` 8.x (TabPFN-2.5) is license-gated (needs `TABPFN_TOKEN` from
+ux.priorlabs.ai); the probe used `tabpfn==2.2.1` in an isolated venv because it pins
+sklearn <1.7 — ⚠️ installing it into the main venv silently downgrades sklearn (happened,
+reverted). The "still live" list from Day-5/6 is now empty of model-family levers.
+
+**3. mlp_la_r gate rerun (Day-6 loose end): VETO**, as predicted (`results/diag_mlp_la_r.txt`):
+advwt Δ +0.0000 / test-like Δ +0.0001 at w=0.20; fix-share 4.6%, 88.3% of fixes
+missing-driver, error-overlap 92.2% — the same signature as mlp_r. NN closure is now
+measured for both repaired variants.
+
+**4. Infra (iteration-speed rule, user-set)**: `train_common.robust_decision_weights` bags
+now run in parallel processes (bit-identical results; the sequential version burned ~30-60
+min per call with 11 cores idle — it was the wall-clock bottleneck of every diag/combine
+run). Before queueing any multi-run chain, estimate per-run wall-clock and parallelize the
+bottleneck first; run the decisive comparison earliest in the chain.
+
+**Finals unchanged: #1 `champion_v1.csv` (v1b), #2 `final2_breadth_r.csv` — now with the
+repair's instrument-anomaly resolved in its favor.**
+
 ### ⚠️ PROTOCOL (user-set, 2026-07-02 pm): work LEADERBOARD-BLIND
 The user watches the LB themselves; **Claude must not query submission scores**
 (`kaggle competitions submissions`) or design LB-probing/attribution submission plans. Rationale:
@@ -708,6 +765,9 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-08 | gate fix | `diag_mlp_transfer.py` rewritten: repaired-breadth core, surface-keyed adv cache (repaired adv-AUC **0.6886** > plain 0.65), w=0.20 mixture gate + grid, error-overlap stats, surface guard. Sanity: core 0.9487 ✓, core member ≈ zero diversity ✓. | — |
 | 2026-07-08 | mlp_r | Repaired MLP (3 seeds × 5 folds, flag-flip rerun). Gate: **VETO** (advwt +0.0000 / test-like −0.0001 at w=0.20). Signature = Day-2 exactly: fix-share 5.1%, 90.2% of fixes missing-driver, error-overlap 92.3% ≈ core member. | 0.9476 (repaired surf.) |
 | 2026-07-08 | mlp_la_r | Repaired logit-adjusted MLP, same protocol. Gate left running at session end (`diag_mlp_la_r.txt`; expected VETO — identical OOF to mlp_r). NN avenue closed as measured on mlp_r; Rung 2 demoted. | 0.9476 (repaired surf.) |
+| 2026-07-09 | mlp_la_r gate rerun | Day-6 loose end closed: **VETO** (advwt +0.0000 / test-like +0.0001 at w=0.20; fix-share 4.6%, 88.3% missing-driver, overlap 92.2%). Same signature as mlp_r. | — |
+| 2026-07-09 | probe_tabpfn | TabPFN-v2 (10k ctx, 6 GB OK, 2.2 GiB peak) on 20k held-out missing-driver rows: 0.8827 w/ in-sample weights vs core 0.8970 same rows, recalls dominated → **priced DEAD**. | 0.8827 (region) |
+| 2026-07-09/10 | mult sweep m000/m050/m100 | R2a overshoot probe (repair ~2× test NaN volume) + new volume-honest **TESTVOL** read. testvol 0.9476/0.9486/0.9484 → repair VALIDATED (+0.0008 vs none); mult 0.5 best on every surface but only +0.0002 (sub-gate) → **deployment stays mult 1.0, no rebuild**; `S6E7_REPAIR_MULT` wired for any future rebuild. | 0.9486 (testvol, m050) |
 
 **LB**: lgbm 0.94886, xgboost 0.94894, **ensemble_v1b 0.94970 (best)**. The blend lifts once
 models are pre-corrected to their deployed surface. Next lever for a bigger jump is a non-GBDT base
