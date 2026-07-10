@@ -611,10 +611,27 @@ _r2 strong five) 0.9499 own / **0.9512 intersection = exact tie with metablend_r
 The Day-7 "mult 0.5 sub-gate, no rebuild" call is confirmed end-to-end; the diag
 chain's +0.0002 does not survive to deployed blends. Do NOT chase m050 further.
 
-**FINALS (end of Day-8): #1 `champion_v1.csv` · #2 `metablend_r.csv`** — 9/10 curiosity
-submissions used (scores unrecorded, LB-blind holds); 10th slot unspent (final5r2 lost
-its instrument read). TabM retry still queued on GPU overnight; overnight tail refreshes
-the _r2 combines with full seeds (record-keeping only — lineage is priced dead).
+**FINALS (end of Day-8): #1 `champion_v1.csv` · #2 `metablend_r.csv`** — all 10
+curiosity submissions used (scores unrecorded, LB-blind holds; final5r2 submitted
+user-directed as the 10th). TabM retry still queued on GPU overnight; overnight tail
+refreshes the _r2 combines with full seeds (record-keeping only — lineage is priced dead).
+
+**▶▶ TOMORROW #1 (user-flagged, 2026-07-10 night): CHAINED BINARY CASCADE — the last
+assertion-kill standing.** s6e6's `chain_cascade`/`chain_cascade_xgb` (binary stages,
+multiplicative recombination via `data_science_stuff.kaggle.decision`) earned seats in
+its winning LR stack. Here "hierarchical 2-stage" was Tier-C-killed by the reasoning
+"fit↔unhealthy already solved" — but that evaluates the WRONG stage. The case: **stage 1
+= at-risk vs minority as a dedicated BINARY problem** attacks the one live boundary (79%
+of consequential flips; all residual error is at-risk↔minority placement), and a binary
+objective changes what the trees LEARN — not covered by the cost-matrix kill (decision
+layer only, measured dead) for the same reason class weights ≠ decision weights.
+Build `train_cascade.py`: stage 1 lgbm at-risk-vs-rest (class-weighted binary), stage 2
+fit-vs-unhealthy on minority rows, recombine P(c) = P(stage1)·P(c|minority); through
+`zoo_cv`/`finalize` on the m100 surface (S6E7_REPAIR=1, tag `_r_s42`), ~30 min CPU.
+Gates: diag signature + add as base to the LR-combiner tournament (the per-class meta is
+the consumer that extracted value from mlp_la_r where scalar NM couldn't). Honest EV:
+solo ~0.948x like everything; the question is differently-placed errors ON the live
+boundary. Expected verdict either way closes the last un-measured Tier-C kill.
 
 ### ⚠️ PROTOCOL (user-set, 2026-07-02 pm): work LEADERBOARD-BLIND
 The user watches the LB themselves; **Claude must not query submission scores**
