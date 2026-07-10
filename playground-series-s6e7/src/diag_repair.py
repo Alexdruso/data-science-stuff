@@ -47,6 +47,8 @@ from sklearn.model_selection import StratifiedKFold
 sys.path.insert(0, str(Path(__file__).parent))
 from baseline import load_params
 from diag_mask_shift import TRIGGERS, remask, test_rates
+from features import NUM_COLS
+from train_te_num import encode_fold, with_te
 from train_common import (
     N_CLASSES,
     RESULTS_DIR,
@@ -69,14 +71,14 @@ def repair_train(
     rng: np.random.Generator,
     mode: str,
 ) -> tuple[pd.DataFrame, np.ndarray]:
-    """Return the repaired training fold for `mode` ('r2a'|'r2b')."""
+    """Return the repaired training fold for `mode` ('r2a'|'r2a_te'|'r2b')."""
     remasked = remask(X_tr, rates, rng, "testmech")
-    if mode == "r2a":
+    if mode in ("r2a", "r2a_te"):
         return remasked, y_tr
     if mode == "r2b":
         X_aug = pd.concat([X_tr, remasked], ignore_index=True)
         return X_aug, np.concatenate([y_tr, y_tr])
-    raise SystemExit(f"unknown repair mode {mode!r} (expected r2a|r2b)")
+    raise SystemExit(f"unknown repair mode {mode!r} (expected r2a|r2a_te|r2b)")
 
 
 def main() -> None:
@@ -109,19 +111,39 @@ def main() -> None:
                 if col in X.columns:
                     print(f"    {col:<26} {X_tr[col].isna().mean():.4f} "
                           f"vs test {test_rates()[col]:.4f}")
-        model = LGBMClassifier(**{**params, "random_state": 42})
-        model.fit(
-            X_tr,
-            y_tr,
-            eval_set=[(X.iloc[val_idx], ds.y[val_idx])],
-            callbacks=[early_stopping(50, verbose=False), log_evaluation(0)],
-        )
-        assert list(model.classes_) == list(range(N_CLASSES))
-
         # identical val surfaces to diag_mask_shift.py (same RNG streams)
         X_val = X.iloc[val_idx]
         val_test = remask(X_val, test_rates(), np.random.default_rng(1000 + fold), "testmech")
         val_ctrl = remask(X_val, test_rates(), np.random.default_rng(2000 + fold), "control")
+
+        X_val_fit = X_val
+        if mode == "r2a_te":
+            # Exact-value numeric TE (train_te_num protocol: inner cross-fit for the
+            # training rows, full-fold maps for val/test) computed on the REPAIRED
+            # matrix — exactly what a mult-scaled TE rebuild would deploy. Val
+            # surfaces are TE-mapped with the same full-fold maps so the paired
+            # TESTVOL/testmech reads stay comparable to the m050/m100 chains.
+            num_cols = [c for c in NUM_COLS if c in X.columns]
+            # encode_fold only reads numeric columns; the repair remasks bmi (and
+            # water, which TE excludes), so hand it a numeric-only frame whose
+            # training rows carry the repaired values.
+            X_rep = X[num_cols].copy()
+            X_rep.iloc[tr_idx] = X_tr[num_cols].to_numpy()
+            te_tr, full_maps, prior = encode_fold(X_rep, ds.y, tr_idx, num_cols, 42)
+            X_tr = pd.concat([X_tr, te_tr], axis=1)
+            X_val_fit = with_te(X_val, full_maps, prior)
+            val_test = with_te(val_test, full_maps, prior)
+            val_ctrl = with_te(val_ctrl, full_maps, prior)
+            X_val = X_val_fit
+
+        model = LGBMClassifier(**{**params, "random_state": 42})
+        model.fit(
+            X_tr,
+            y_tr,
+            eval_set=[(X_val_fit, ds.y[val_idx])],
+            callbacks=[early_stopping(50, verbose=False), log_evaluation(0)],
+        )
+        assert list(model.classes_) == list(range(N_CLASSES))
 
         cols = [c for c in TRIGGERS if c in X.columns]
         changed[val_idx] = (

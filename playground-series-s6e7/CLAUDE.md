@@ -483,6 +483,71 @@ bottleneck first; run the decisive comparison earliest in the chain.
 **Finals unchanged: #1 `champion_v1.csv` (v1b), #2 `final2_breadth_r.csv` — now with the
 repair's instrument-anomaly resolved in its favor.**
 
+### Day-8 (2026-07-10): ARCHITECTURE ZOO — ⚡ RealMLP-TD + TE recipe BREAKS the solo ceiling; FINAL #2 SWAPPED to `final3_realmlp`
+
+**The user's mandate: stop consolidating, explore architectures.** Six families run
+through a shared harness (`src/zoo_common.py`: single-seed 5-fold `zoo_cv` with per-fold
+reboot checkpoints + `te_block_for_fold`, the cached deferred-for-NN input recipe =
+exact-value TE of 6 numerics + rule-combo TE + 4 ordinals, inner-cross-fit per invariant
+#3, cache keyed (surface, seed, fold)). All on the repaired surface, gateable vs the
+deployed core `ensemble_r_breadth` (0.9487).
+
+**Zoo scoreboard (repaired surface, weighted OOF; signature = fix-share / %fixes
+missing-driver / error-overlap):**
+
+| cand | OOF | signature | verdict |
+|---|---|---|---|
+| **realmlp** (RealMLP-TD + TE recipe, `train_realmlp_td.py`) | **0.9492/seed** (s42=s7=s123 — seed-robust) | 5.9% / 77.6% / **94.5%, but solo BEATS core on EVERY subset** (+0.0005 overall, +0.0005 test-like, +0.0010 miss-driver) | formal w=0.2 gate veto (+0.0003) — **superseded by blend evidence below** |
+| ftt (FT-Transformer, ABSENT missing tokens = setenc-lite, `train_ftt.py`) | 0.9478 | 3.8% / 77.1% / 91.9% | VETO — **the mlp_r signature; the Rung-2A structural prior is measured-dead in its cheap form** |
+| rf (`train_trees.py`) | 0.9480 | 4.7% / 80.3% / 95.0% | VETO (core-member-like, weaker) |
+| extratrees | 0.9219 | 23% / **97.7%** / 50.9% | VETO — maximally decorrelated exactly where information doesn't exist |
+| tabm (pytabkit, `train_tabm.py`) | (ran evening — see log) | | |
+| dann+mask-consistency (`train_dann.py`, built+smoke-tested) | NOT RUN (GPU budget) — queued overnight | | |
+
+**⚡ THE FIND — `realmlp`: RealMLP-TD (package `realmlp.py`, balanced-softmax
+`loss_prior_power=1.075`, train_bs=512+AMP+fused) fed the TE input recipe.** Mechanism
+as predicted by the Rung-2-parallel note: TE posteriors convert the discontinuous
+3-feature rule into a near-linear map; the s6e6 lesson ("the break came from porting
+STRONG bases; RealMLP gave +0.0019") replicates here at this dataset's scale. NOT the
+mlp_r pattern: improvement is UNIFORM across regions (transfers), error-overlap high
+(94.5%) = mostly-nested-but-stronger, and fixed-w core+realmlp mixtures improve
+MONOTONICALLY to w=0.5 on plain/test-like/advwt (no NM fitting — cannot be
+blend-overfit). Three seeds all 0.9492 weighted.
+
+**Blend + gates → the finals swap:**
+- `final3_realmlp` = `blend_named` over {lgbm,hgbc,xgboost,catboost}`_r_breadth` +
+  `realmlp_r_breadth` (3-seed avg 0.9493): NM collapses onto realmlp (**w=0.845**),
+  OOF **0.9494** (repaired surface; incumbent final #2 = 0.9487).
+- **Split-half blend gate** (`probe_blend_gate.py`, NEW: NM + decision weights fit on
+  half rows, scored on holdout, 6 splits x 2 directions): **12/12 cells positive, mean
+  +0.00042** — real, not NM overfit; below the +0.0005 submission-queue bar.
+- **Volume-honest subset** (complete-in-4 on the repaired matrix, paired):
+  all +0.0007 / complete4 +0.0006 / miss4 +0.0008 vs incumbent — sign-consistent.
+- **⇒ FINALS: #1 `champion_v1.csv` (v1b, unchanged); #2 = `submissions/final3_realmlp.csv`**
+  (CV-decided on three concordant instruments; LB-blind protocol intact — curiosity
+  submissions of realmlp_r_s42/rf_r_s42/ftt_r_s42/final3_realmlp went up user-directed,
+  scores unrecorded).
+
+**Also measured today:**
+- **Error-AUC ceiling falsifier** (`probe_error_auc.py`, Day-2 item 4 finally run):
+  predicting core OOF errors — conf-only AUC 0.9538, features+conf 0.9560, **increment
+  +0.0021 ≈ nothing** ⇒ row-level limit independently corroborated. (realmlp's +0.0005
+  is boundary calibration everywhere, not error-picking — consistent.)
+- **mult0.5+TE stacks** (`diag_repair.py r2a_te`, paired chain): testvol
+  0.9476(m000)/0.9484(m100)/0.9486(m050)/**0.9488(m050+TE)**; +0.0004 vs deployed m100 =
+  at the pre-registered rebuild gate ⇒ `_r2` rebuild (mult 0.5) justified; runs
+  overnight (xgb s42 done; skip-if-exists). NOTE: realmlp already carries the TE block
+  as inputs, so the blend delivers the TE residue through a stronger vehicle — TE-in-
+  GBDT-trainers wiring deferred unless the `_r2`+realmlp reblend wants it.
+- Seed plumbing fix: zoo scripts originally hardcoded `zoo_cv(seed=42)` and ignored
+  `S6E7_SEEDS` — caught because a "seed 7" run reproduced seed-42 folds bit-identically;
+  all 5 zoo trainers now use `SEEDS[0]` + seed-tagged checkpoints.
+
+**Tomorrow's open items:** overnight `_r2` lane verdict (reblend `_r2` bases + realmlp,
+paired vs final3); DANN/mask-consistency run + gate (built, smoke-tested); TabM verdict
+if timeboxed out tonight; more realmlp seeds (marginal but free GPU); consider
+realmlp-recipe variants ONLY if a mechanism argues a different signature (no HP fishing).
+
 ### ⚠️ PROTOCOL (user-set, 2026-07-02 pm): work LEADERBOARD-BLIND
 The user watches the LB themselves; **Claude must not query submission scores**
 (`kaggle competitions submissions`) or design LB-probing/attribution submission plans. Rationale:
@@ -768,6 +833,12 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-09 | mlp_la_r gate rerun | Day-6 loose end closed: **VETO** (advwt +0.0000 / test-like +0.0001 at w=0.20; fix-share 4.6%, 88.3% missing-driver, overlap 92.2%). Same signature as mlp_r. | — |
 | 2026-07-09 | probe_tabpfn | TabPFN-v2 (10k ctx, 6 GB OK, 2.2 GiB peak) on 20k held-out missing-driver rows: 0.8827 w/ in-sample weights vs core 0.8970 same rows, recalls dominated → **priced DEAD**. | 0.8827 (region) |
 | 2026-07-09/10 | mult sweep m000/m050/m100 | R2a overshoot probe (repair ~2× test NaN volume) + new volume-honest **TESTVOL** read. testvol 0.9476/0.9486/0.9484 → repair VALIDATED (+0.0008 vs none); mult 0.5 best on every surface but only +0.0002 (sub-gate) → **deployment stays mult 1.0, no rebuild**; `S6E7_REPAIR_MULT` wired for any future rebuild. | 0.9486 (testvol, m050) |
+| 2026-07-10 | probe_error_auc | Ceiling falsifier: predict core OOF errors. conf 0.9538 / feat 0.9520 / both 0.9560 → **increment +0.0021 ≈ 0**; row-level limit corroborated. | — |
+| 2026-07-10 | diag_repair r2a_te m050 | mult0.5 + exact-value TE on the paired chain: testvol **0.9488** (+0.0004 vs deployed m100) → residues stack; `_r2` rebuild gate PASS (runs overnight). | 0.9488 (testvol) |
+| 2026-07-10 | extratrees/rf `_r_s42` | Zoo Z5 (`train_trees.py`): ET 0.9219 (veto; 97.7% of fixes missing-driver, overlap 50.9%); RF 0.9480 (veto; core-member signature). | 0.9219 / 0.9480 |
+| 2026-07-10 | ftt_r_s42 | Zoo Z2 (`train_ftt.py`): FT-Transformer with ABSENT missing tokens (key_padding_mask; setenc-lite). Solo −0.0009; signature = mlp_r (77% miss-driver fixes, overlap 91.9%) → **VETO; Rung-2A structural prior measured-dead in cheap form**. | 0.9478 |
+| 2026-07-10 | **realmlp `_r_s42/s7/s123`** | **Zoo Z1 (`train_realmlp_td.py`): RealMLP-TD + TE input recipe. 0.9492 weighted EVERY seed — first solo leg above the core (+0.0005, uniform across regions incl. test-like). Formal w=0.2 gate veto (+0.0003) but fixed-w mixtures monotone-improve to w=0.5.** | **0.9492 (solo, repaired surf.)** |
+| 2026-07-10 | **final3_realmlp** | **NM blend {4 GBDT `_r_breadth`} + `realmlp_r_breadth` (3 seeds): realmlp w=0.845, OOF 0.9494. Split-half gate 12/12 positive (mean +0.00042); complete-in-4 +0.0006 paired. ⇒ NEW FINAL #2.** | **0.9494 (repaired surf.)** |
 
 **LB**: lgbm 0.94886, xgboost 0.94894, **ensemble_v1b 0.94970 (best)**. The blend lifts once
 models are pre-corrected to their deployed surface. Next lever for a bigger jump is a non-GBDT base
