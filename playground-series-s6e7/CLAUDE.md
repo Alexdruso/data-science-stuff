@@ -633,6 +633,31 @@ the consumer that extracted value from mlp_la_r where scalar NM couldn't). Hones
 solo ~0.948x like everything; the question is differently-placed errors ON the live
 boundary. Expected verdict either way closes the last un-measured Tier-C kill.
 
+**▶▶ TOMORROW #2 (user idea, 07-10 night): EXACT-RULE DEDUCTION FEATURES.**
+discussion/717222 (broccoli beef) proved the original's label is an EXACT depth-4 tree:
+sleep<6 → (stress=high → unh, else ar); sleep≥6 → (stress≠low → ar; stress=low &
+act≠active → ar; active & sleep≥7 → fit, sleep∈[6,7) → ar). **Two dual sleep thresholds
+(6 AND 7).** Built tonight: `rule_features.py` = THREE-VALUED DEDUCTION — per row, the
+set of labels reachable over completions of missing drivers (6 distinct sets;
+stress=medium ALONE forces at-risk). This is the one thing prior FE lacked: a NOISE-FREE
+logical prior on partially-missing rows, aimed exactly at the at-risk↔minority boundary.
+Marginalization/rule-encoding kills DON'T cover it (those replaced predictions or
+targeted complete rows). lgbm canary (`train_rule.py`) launched tonight — read
+vs lgbm_r_s42 0.9478 paired. If ≥ +0.0002: feed rule_set to REALMLP (one-hot; the
+NN consumer is where the recipe pays) + fix the combo TE triple — **audit finding:
+train_fe/zoo TE used sleep_QUALITY; the true rule triple is sleep_DURATION-buckets
+(6/7) × stress × activity** — never measured with the right third feature.
+
+**▶▶ TOMORROW #3 (user idea, 07-10 night, lower priority): TABM FROM SCRATCH.** The
+0.9411 verdict was config, not architecture (no loss hook). A pure-PyTorch TabM is
+small: shared MLP backbone + BatchEnsemble rank-1 per-member adapters (r,s vectors) +
+per-member biases; reuse `models.losses.smooth_ce_loss` (balanced softmax — the knob
+that made realmlp work), fp16 AMP + GradScaler (FTT pattern), fused AdamW, torch.compile
+(triton 3.2 present), whole-dataset GPU tensors, optionally PBLD embeddings from
+`realmlp.py`. ~5 min/fold est. Honest EV: same family slot as realmlp (expect ±0.001,
+high overlap); value = one more leg for the LR combiner, which extracts whiskers from
+near-redundant legs (mlp_la_r precedent). Run AFTER cascade + rule-realmlp.
+
 ### ⚠️ PROTOCOL (user-set, 2026-07-02 pm): work LEADERBOARD-BLIND
 The user watches the LB themselves; **Claude must not query submission scores**
 (`kaggle competitions submissions`) or design LB-probing/attribution submission plans. Rationale:
@@ -930,6 +955,8 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-10 | combiner tournament | 8 arms × 12 split-half cells: lr6 wins (+0.00040 vs NM, 11/12; mlp_la_r earns its seat per-class); gbdtmeta/nnmeta positive but lose to LR; lr6 vs metablend_r +0.00008 = below displacement gate → final #2 unchanged. | lrstack6_r 0.9495 (honest) |
 | 2026-07-10 | dann_r_s42 | Zoo Z4 (grad-reversal + dual-mask consistency, semi-supervised over test): solo 0.9472; **VETO** — 95.2% of fixes missing-driver, overlap 91.7% = the universal NN signature. **Rung 2 closed by measurement (4 mechanisms).** | 0.9472 (repaired surf.) |
 | 2026-07-10 | _r2 lineage endgame | Full mult-0.5 rebuild priced at deployed level via intersection reads: ensemble_r2_gbdt 0.9505 vs core 0.9506 (wash); final5r2_r 0.9512 = tie with metablend_r. Own-surface +0.0005 = inflation. **m050 lineage dead; do not chase.** | final5r2_r 0.9499 own / 0.9512 inter. |
+| 2026-07-10 | tabm_r_s42 | Zoo Z3 (overnight retry, ~24 min/fold): argmax 0.8774, weighted **0.9411**. NOT an architecture verdict — pytabkit TabM has NO class-weight/loss hook (s6e6 lesson repeating): plain CE on 86/8/6 majority-walls the minorities and decision weights can't fully rescue a train-time miscalibration. A "fixed" TabM ≈ what realmlp already is (deep ensemble + balanced softmax), so not worth rehabilitating. **Zoo scoreboard complete: 6 families priced, one survivor (realmlp).** | 0.9411 (repaired surf.) |
+| 2026-07-10 | lgbm_rule | Exact-rule three-valued deduction features (`rule_features.py`, from discussion/717222's proven generation tree; 89.1% of rows logically determined incl. 63.5% of missing-driver rows): **flat for trees** (−0.0002 vs paired lgbm_r_s42 0.9478) — they had it statistically. Realmlp consumer stays live (tomorrow #2). | 0.9476 (repaired surf.) |
 
 **LB**: lgbm 0.94886, xgboost 0.94894, **ensemble_v1b 0.94970 (best)**. The blend lifts once
 models are pre-corrected to their deployed surface. Next lever for a bigger jump is a non-GBDT base
