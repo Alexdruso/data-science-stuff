@@ -548,6 +548,40 @@ paired vs final3); DANN/mask-consistency run + gate (built, smoke-tested); TabM 
 if timeboxed out tonight; more realmlp seeds (marginal but free GPU); consider
 realmlp-recipe variants ONLY if a mechanism argues a different signature (no HP fishing).
 
+### Day-8 EVENING (2026-07-10): COMBINER UPGRADE — the s6e6 LR stacker replicates; FINAL #2 → `metablend_r`
+
+User asked whether s6e6's best combiner (NOT NM) applies here — it does. All three
+combiners run over the same strong-5 bases ({4 GBDT}`_r_breadth` + `realmlp_r_breadth`):
+
+- **`build_lr_stack.py` (NEW, port)**: `data_science_stuff.kaggle.stacking.stack_oof`
+  (per-(model,class) logit columns → multinomial LR C=1.0 balanced, honest 5-seed × 5-fold
+  outer cross-fit) + `robust_decision_weights` after. Both variants identical — raw
+  0.9494/0.9513/0.9442 (weighted/complete4/miss4), precorrected 0.9494/0.9512/0.9443:
+  the LR meta relearns any per-class pre-scaling, so precorrection is irrelevant to it.
+  ⚠️ Face-value tie with `final3_realmlp` (0.9494) is NOT a tie: the stack OOF is
+  honestly cross-fitted, final3's NM weights are full-fit-optimistic.
+- **`probe_combiner_gate.py` (NEW)**: the honest ranking — 12 split-half cells, each
+  combiner + decision layer refit on half A, scored on half B. **LR−NM +0.00032
+  (10/12 positive); metablend−NM +0.00032 (11/12, lowest sd); metablend−LR ±0.00000.**
+  NM's scalar-per-model limit is real here, worth ~+0.0003 — the s6e6 pattern at this
+  dataset's compressed scale.
+- **`run_caruana.py` (NEW)**: greedy selection over ALL 12 repaired legs (incl. vetoed
+  zoo/FE legs) — honest holdout 0.94938 ≈ tie with LR; picks = **realmlp 62%**, hgbc 12%,
+  mlp_la_r 10% (only vetoed leg earning a seat; noise-level), rest scraps. Third
+  independent confirmation of realmlp dominance; Caruana adds nothing over LR.
+- **`metablend_r` artifact** = uniform avg(final3_realmlp, lrstack_r) probs + decision
+  weights: 0.9494 / complete4 0.9512 / **miss4 0.9443 (best)**.
+- **⇒ FINAL #2 = `submissions/metablend_r.csv`** (gate-preferred on sign-consistency
+  11/12; s6e6 precedent — its best LB was exactly this avg-of-two-metas shape). #1
+  unchanged (`champion_v1`). Curiosity submissions (user-directed, scores unrecorded):
+  lrstack_r, final2_breadth_r (incumbent calibration read), metablend_r — daily cap is
+  10, not 5.
+- **Overnight re-armed** (`overnight_day8.sh`): `_r2` xgb/cat remainder → **realmlp
+  `_r2` (mult 0.5) × 3 seeds** (SURFACE_TAG now env-aware: TE cache tag "r2" under
+  mult≠1) → DANN → TabM retry; CPU lane lgbm/hgbc `_r2`; final combine includes
+  realmlp. Tomorrow's decisive comparison: all-m050 candidate × best combiner vs
+  `metablend_r` (never mix m100/m050 arrays in one combiner — surface rule).
+
 ### ⚠️ PROTOCOL (user-set, 2026-07-02 pm): work LEADERBOARD-BLIND
 The user watches the LB themselves; **Claude must not query submission scores**
 (`kaggle competitions submissions`) or design LB-probing/attribution submission plans. Rationale:
@@ -838,7 +872,10 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-10 | extratrees/rf `_r_s42` | Zoo Z5 (`train_trees.py`): ET 0.9219 (veto; 97.7% of fixes missing-driver, overlap 50.9%); RF 0.9480 (veto; core-member signature). | 0.9219 / 0.9480 |
 | 2026-07-10 | ftt_r_s42 | Zoo Z2 (`train_ftt.py`): FT-Transformer with ABSENT missing tokens (key_padding_mask; setenc-lite). Solo −0.0009; signature = mlp_r (77% miss-driver fixes, overlap 91.9%) → **VETO; Rung-2A structural prior measured-dead in cheap form**. | 0.9478 |
 | 2026-07-10 | **realmlp `_r_s42/s7/s123`** | **Zoo Z1 (`train_realmlp_td.py`): RealMLP-TD + TE input recipe. 0.9492 weighted EVERY seed — first solo leg above the core (+0.0005, uniform across regions incl. test-like). Formal w=0.2 gate veto (+0.0003) but fixed-w mixtures monotone-improve to w=0.5.** | **0.9492 (solo, repaired surf.)** |
-| 2026-07-10 | **final3_realmlp** | **NM blend {4 GBDT `_r_breadth`} + `realmlp_r_breadth` (3 seeds): realmlp w=0.845, OOF 0.9494. Split-half gate 12/12 positive (mean +0.00042); complete-in-4 +0.0006 paired. ⇒ NEW FINAL #2.** | **0.9494 (repaired surf.)** |
+| 2026-07-10 | **final3_realmlp** | **NM blend {4 GBDT `_r_breadth`} + `realmlp_r_breadth` (3 seeds): realmlp w=0.845, OOF 0.9494. Split-half gate 12/12 positive (mean +0.00042); complete-in-4 +0.0006 paired. ⇒ final #2 (superseded same evening by metablend_r).** | **0.9494 (repaired surf.)** |
+| 2026-07-10 | lrstack_r / lrstack_pc_r | s6e6 LR-on-logits stacker ported (`build_lr_stack.py`, honest 25-fit cross-fit + decision weights). Variants identical; honest OOF ties final3's optimistic OOF ⇒ genuinely ahead. Combiner gate: LR−NM +0.00032 (10/12). | 0.9494 (honest, repaired surf.) |
+| 2026-07-10 | run_caruana | Greedy selection over 12 repaired legs: holdout 0.94938 ≈ LR tie; picks realmlp 62% (third confirmation); vetoed legs earn only noise-level seats. | 0.94938 (holdout argmax) |
+| 2026-07-10 | **metablend_r** | **avg(final3_realmlp, lrstack_r) + decision weights — combiner gate 11/12 positive vs NM (+0.00032, lowest sd); miss4 best (0.9443). ⇒ NEW FINAL #2 (s6e6 best-LB shape).** | **0.9494 (repaired surf.)** |
 
 **LB**: lgbm 0.94886, xgboost 0.94894, **ensemble_v1b 0.94970 (best)**. The blend lifts once
 models are pre-corrected to their deployed surface. Next lever for a bigger jump is a non-GBDT base

@@ -17,6 +17,7 @@ Run (zoo protocol, repaired surface):
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -31,7 +32,10 @@ from zoo_common import clear_ckpt, te_block_for_fold, zoo_cv
 
 from data_science_stuff.kaggle.models.realmlp import RealMLP_TD_Classifier
 
-SURFACE_TAG = "r"  # REPAIR=1 mult 1.0 — must match the deployed core's surface
+# TE cache tag must identify the training surface: TE maps depend on which rows
+# are NaN, so the m100 (_r) and m050 (_r2) lineages must never share cache entries.
+_MULT = float(os.environ.get("S6E7_REPAIR_MULT", "1.0"))
+SURFACE_TAG = "r" if _MULT == 1.0 else "r2"
 CFG = dict(
     train_bs=512,
     fused_optimizer=True,
