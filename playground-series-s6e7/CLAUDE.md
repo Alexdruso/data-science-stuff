@@ -611,10 +611,14 @@ _r2 strong five) 0.9499 own / **0.9512 intersection = exact tie with metablend_r
 The Day-7 "mult 0.5 sub-gate, no rebuild" call is confirmed end-to-end; the diag
 chain's +0.0002 does not survive to deployed blends. Do NOT chase m050 further.
 
-**FINALS (end of Day-8): #1 `champion_v1.csv` · #2 `metablend_r.csv`** — all 10
-curiosity submissions used (scores unrecorded, LB-blind holds; final5r2 submitted
-user-directed as the 10th). TabM retry still queued on GPU overnight; overnight tail
-refreshes the _r2 combines with full seeds (record-keeping only — lineage is priced dead).
+**FINALS (updated 07-11 am): #1 `champion_v1.csv` · #2 `lrstack6_r.csv`** (was
+metablend_r for ~12h). Basis: lrstack6 leads every honest instrument — best honest OOF
+(0.9495), combiner-tournament best mean (+0.00040, 11/12), best intersection read
+(0.9513) — and a user-directed 07-11 LB read broke the metablend-vs-lr6 near-tie the
+same direction (paired deltas between near-identical candidates are low-variance;
+metablend publicly underperformed BOTH its parents; scores themselves unrecorded per
+protocol). #1 stays the realmlp-free hedge. All 10 daily curiosity submissions were
+used 07-10. TabM retry + overnight tail completed (see log).
 
 **▶▶ TOMORROW #1 (user-flagged, 2026-07-10 night): CHAINED BINARY CASCADE — the last
 assertion-kill standing.** s6e6's `chain_cascade`/`chain_cascade_xgb` (binary stages,
