@@ -18,6 +18,7 @@ Default keys: the strong five (4 GBDT _r_breadth + realmlp_r_breadth).
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -62,8 +63,11 @@ def main() -> None:
     test_raw = {k: np.load(RESULTS_DIR / f"test_{k}.npy") for k in keys}
     oof_pc, test_pc = precorrect(dict(oof_raw), dict(test_raw))
 
-    for tag, oof_d, test_d in [("raw", oof_raw, test_raw), ("pc", oof_pc, test_pc)]:
-        name = "lrstack_r" if tag == "raw" else "lrstack_pc_r"
+    base_name = os.environ.get("S6E7_STACK_NAME", "lrstack")
+    variants = os.environ.get("S6E7_STACK_VARIANTS", "raw,pc").split(",")
+    all_variants = [("raw", oof_raw, test_raw), ("pc", oof_pc, test_pc)]
+    for tag, oof_d, test_d in [v for v in all_variants if v[0] in variants]:
+        name = f"{base_name}_r" if tag == "raw" else f"{base_name}_pc_r"
         s_oof, s_test = stack_oof(
             [oof_d[k] for k in keys],
             [test_d[k] for k in keys],

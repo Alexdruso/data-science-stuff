@@ -1,15 +1,21 @@
-"""Split-half combiner ranking: NM blend vs LR stack vs their average (metablend).
+"""Split-half combiner tournament: NM / LR / LR6 / ridgecal-GBDT / NN metas + averages.
 
-Same honest protocol as probe_blend_gate.py, but the arms are COMBINERS over the
-same base set, not with/without a base. Per cell (6 stratified splits x 2
-directions): fit each combiner + its decision weights on half A, score half B.
-  nm — precorrect + Nelder-Mead blend + decision weights (today's final3 recipe)
-  lr — LR on per-(model,class) logits of the raw probs + decision weights
-  mb — s6e6 'metablend': uniform average of the two half-fit prob arrays,
-       decision weights fit on the averaged fit-half probs (no extra fitting)
-Paired deltas vs nm. Swap standard: mean holdout delta >= +0.0003, sign-consistent.
+Same honest protocol as probe_blend_gate.py, generalized to N arms. Per cell
+(6 stratified splits x 2 directions): fit EVERY combiner + its decision weights
+on half A, score half B. Uniform averages of arm outputs are computed post-hoc
+inside the cell (no extra fitting — the s6e6 'metablend' move).
 
-Run: S6E7_REPAIR=1 python src/probe_combiner_gate.py [key1 key2 ...]
+Arms:
+  nm       — precorrect + Nelder-Mead blend (the final3 recipe)
+  lr       — LR on per-(model,class) logits, strong-5 bases
+  lr6      — lr + mlp_la_r as 6th base (Caruana hinted a per-class seat)
+  gbdtmeta — per-base ridge 3->3 calibration -> regularized LGBM meta (s6e6 altmeta)
+  nnmeta   — small MLP meta over standardized logits, inv-freq oversampled
+  mb_*     — uniform averages: lr+nm (current final #2 recipe), lr+gbdtmeta
+             (the literal s6e6 best-LB pairing), lr+nm+gbdtmeta
+Paired deltas vs nm. Swap standard: mean holdout delta and sign-consistency.
+
+Run: S6E7_REPAIR=1 python src/probe_combiner_gate.py
 """
 
 from __future__ import annotations
@@ -25,6 +31,7 @@ from sklearn.metrics import balanced_accuracy_score
 from sklearn.model_selection import StratifiedShuffleSplit
 
 sys.path.insert(0, str(Path(__file__).parent))
+from build_alt_meta import fit_gbdtmeta, fit_nnmeta
 from build_lr_stack import DEFAULT_KEYS
 from ensemble import RESULTS_DIR, blend, objective, precorrect
 from train_common import load_dataset
@@ -34,24 +41,37 @@ from data_science_stuff.kaggle_utils import tune_decision_weights, weighted_pred
 
 N_SPLITS = 6
 SWAP_GATE = 0.0003
+EXTRA_KEY = "mlp_la_r"  # lr6's sixth base
+AVERAGES = {
+    "mb_lr_nm": ("lr", "nm"),
+    "mb_lr_gbdt": ("lr", "gbdtmeta"),
+    "mb3": ("lr", "nm", "gbdtmeta"),
+}
 
 
-def _decide(
-    y_fit, probs_fit, probs_eval, y_eval
-) -> tuple[float, np.ndarray, np.ndarray]:  # noqa: ANN001
+def _decide(y_fit, probs_fit, probs_eval, y_eval) -> float:  # noqa: ANN001
     dw = np.asarray(tune_decision_weights(y_fit, probs_fit))
-    score = balanced_accuracy_score(y_eval, weighted_predict(probs_eval, dw))
-    return float(score), probs_fit, probs_eval
+    return float(balanced_accuracy_score(y_eval, weighted_predict(probs_eval, dw)))
+
+
+def _fit_lr(blocks, y, fit_idx, eval_idx):  # noqa: ANN001, ANN202
+    X_fit = np.hstack([b[fit_idx] for b in blocks])
+    X_eval = np.hstack([b[eval_idx] for b in blocks])
+    lr = LogisticRegression(C=1.0, class_weight="balanced", max_iter=2000)
+    lr.fit(X_fit, y[fit_idx])
+    return lr.predict_proba(X_fit), lr.predict_proba(X_eval)
 
 
 def cell(
     oof_pc: list[np.ndarray],
-    oof_raw: list[np.ndarray],
+    blocks5: list[np.ndarray],
+    blocks6: list[np.ndarray],
     y: np.ndarray,
     fit_idx: np.ndarray,
     eval_idx: np.ndarray,
-) -> tuple[float, float, float]:
-    # nm: precorrected NM blend
+) -> dict[str, float]:
+    pairs: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+
     fit_pc = [o[fit_idx] for o in oof_pc]
     res = minimize(
         objective,
@@ -60,35 +80,34 @@ def cell(
         method="Nelder-Mead",
         options={"maxiter": 3000, "xatol": 1e-5, "fatol": 1e-6},
     )
-    nm_fit = blend(res.x, fit_pc)
-    nm_eval = blend(res.x, [o[eval_idx] for o in oof_pc])
-    nm_score, _, _ = _decide(y[fit_idx], nm_fit, nm_eval, y[eval_idx])
-
-    # lr: logits of raw probs, one LR fit on the fit half (eval half is honest holdout)
-    X_fit = np.hstack([clipped_logit(o[fit_idx]) for o in oof_raw])
-    X_eval = np.hstack([clipped_logit(o[eval_idx]) for o in oof_raw])
-    lr = LogisticRegression(C=1.0, class_weight="balanced", max_iter=2000)
-    lr.fit(X_fit, y[fit_idx])
-    lr_fit = lr.predict_proba(X_fit)
-    lr_eval = lr.predict_proba(X_eval)
-    lr_score, _, _ = _decide(y[fit_idx], lr_fit, lr_eval, y[eval_idx])
-
-    # mb: uniform average of the two combiners' probs
-    mb_fit = 0.5 * (nm_fit + lr_fit)
-    mb_eval = 0.5 * (nm_eval + lr_eval)
-    mb_score, _, _ = _decide(y[fit_idx], mb_fit, mb_eval, y[eval_idx])
-    return nm_score, lr_score, mb_score
+    pairs["nm"] = (blend(res.x, fit_pc), blend(res.x, [o[eval_idx] for o in oof_pc]))
+    pairs["lr"] = _fit_lr(blocks5, y, fit_idx, eval_idx)
+    pairs["lr6"] = _fit_lr(blocks6, y, fit_idx, eval_idx)
+    pairs["gbdtmeta"] = fit_gbdtmeta(blocks5, y, fit_idx, eval_idx)
+    pairs["nnmeta"] = fit_nnmeta(blocks5, y, fit_idx, eval_idx)
+    for name, members in AVERAGES.items():
+        pairs[name] = (
+            np.mean([pairs[m][0] for m in members], axis=0),
+            np.mean([pairs[m][1] for m in members], axis=0),
+        )
+    return {
+        name: _decide(y[fit_idx], pf, pe, y[eval_idx])
+        for name, (pf, pe) in pairs.items()
+    }
 
 
 def main() -> None:
-    keys = sys.argv[1:] or DEFAULT_KEYS
+    keys = DEFAULT_KEYS
     ds = load_dataset()
     y = ds.y
-    oof_raw_d = {k: np.load(RESULTS_DIR / f"oof_{k}.npy") for k in keys}
-    test_d = {k: np.load(RESULTS_DIR / f"test_{k}.npy") for k in keys}
-    oof_pc_d, _ = precorrect(dict(oof_raw_d), test_d)
+    oof_raw_d = {k: np.load(RESULTS_DIR / f"oof_{k}.npy") for k in keys + [EXTRA_KEY]}
+    test_d = {k: np.load(RESULTS_DIR / f"test_{k}.npy") for k in keys + [EXTRA_KEY]}
+    oof_pc_d, _ = precorrect(
+        {k: oof_raw_d[k] for k in keys}, {k: test_d[k] for k in keys}
+    )
     oof_pc = [oof_pc_d[k] for k in keys]
-    oof_raw = [oof_raw_d[k] for k in keys]
+    blocks5 = [clipped_logit(oof_raw_d[k]) for k in keys]
+    blocks6 = blocks5 + [clipped_logit(oof_raw_d[EXTRA_KEY])]
 
     cells = []
     for seed in range(N_SPLITS):
@@ -97,27 +116,26 @@ def main() -> None:
         cells.append((a, b))
         cells.append((b, a))
 
-    results = Parallel(n_jobs=min(len(cells), 12))(
-        delayed(cell)(oof_pc, oof_raw, y, f, e) for f, e in cells
+    results = Parallel(n_jobs=4)(
+        delayed(cell)(oof_pc, blocks5, blocks6, y, f, e) for f, e in cells
     )
-    nm = np.array([r[0] for r in results])
-    lr = np.array([r[1] for r in results])
-    mb = np.array([r[2] for r in results])
-    print(f"combiners over {keys}")
-    print(
-        f"holdout weighted-bacc means: nm={nm.mean():.4f} lr={lr.mean():.4f} mb={mb.mean():.4f}"
-    )
-    for name, arr in [("lr-nm", lr - nm), ("mb-nm", mb - nm), ("mb-lr", mb - lr)]:
+    arms = list(results[0].keys())
+    scores = {a: np.array([r[a] for r in results]) for a in arms}
+    print(f"combiner tournament over {keys} (+{EXTRA_KEY} in lr6); {len(cells)} cells")
+    print("mean holdout weighted-bacc per arm:")
+    for a in sorted(arms, key=lambda a: -scores[a].mean()):
+        d = scores[a] - scores["nm"]
         print(
-            f"  {name}: mean {arr.mean():+.5f}  sd {arr.std():.5f}  "
-            f"positive {int((arr > 0).sum())}/{len(arr)}  "
-            f"cells {np.round(arr, 5).tolist()}"
+            f"  {a:<11} {scores[a].mean():.5f}   vs nm {d.mean():+.5f} "
+            f"(sd {d.std():.5f}, positive {int((d > 0).sum())}/{len(d)})"
         )
-    best = max([("lr", (lr - nm).mean()), ("mb", (mb - nm).mean())], key=lambda t: t[1])
-    verdict = f"{best[0]} beats nm by {best[1]:+.5f} -> " + (
-        "SWAP-WORTHY" if best[1] >= SWAP_GATE else "below swap gate"
+    best = max((a for a in arms if a != "nm"), key=lambda a: scores[a].mean())
+    d = scores[best] - scores["nm"]
+    print(
+        f"\nBEST: {best}  vs nm {d.mean():+.5f}  "
+        f"{'SWAP-WORTHY' if d.mean() >= SWAP_GATE else 'below swap gate'} "
+        f"(gate +{SWAP_GATE})"
     )
-    print(f"VERDICT: {verdict} (swap gate +{SWAP_GATE})")
 
 
 if __name__ == "__main__":

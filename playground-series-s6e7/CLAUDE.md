@@ -582,6 +582,40 @@ combiners run over the same strong-5 bases ({4 GBDT}`_r_breadth` + `realmlp_r_br
   realmlp. Tomorrow's decisive comparison: all-m050 candidate × best combiner vs
   `metablend_r` (never mix m100/m050 arrays in one combiner — surface rule).
 
+### Day-8 LATE (2026-07-10, 16:00–21:00): combiner tournament, NN-closure completed, the m050 lineage priced DEAD at blend level
+
+**Combiner tournament** (`probe_combiner_gate.py` generalized to 8 arms, 12 split-half
+cells; `build_alt_meta.py` NEW = s6e6 ridgecal-GBDT + NN metas ported): every meta beats
+scalar NM; **winner `lr6` = LR-on-logits + `mlp_la_r` as 6th base, +0.00040 (11/12)** —
+the twice-vetoed leg earns a real seat through per-class weighting, exactly as Caruana
+hinted. Tree/NN metas positive but lose to LR (+0.00016-18: no regional trust structure
+to exploit, consistent with region_blend FLAT). lr6 full honest build (`lrstack6_r`)
+**0.9495** = best m100 number; but only +0.00008 over `metablend_r` → below the +0.0003
+displacement gate ⇒ **final #2 stays `metablend_r`**. `read_lineage.py` NEW = the
+cross-lineage instrument: m050 masks are NESTED subsets of m100 masks (same RNG stream),
+so the intersection = complete-in-4-under-m100 (510,866 rows) with identical val inputs
+across lineages.
+
+**DANN + mask-consistency: VETO — NN closure is now TOTAL.** Solo 0.9472 (invariance
+tax vs mlp_r 0.9476); signature: fixes **95.2% missing-driver**, overlap 91.7% — the
+same fingerprint as every NN. Four mechanisms measured (plain, logit-adjust,
+absent-token attention, learned domain-invariance + dual-mask consistency): ALL
+concentrate their diversity where information was deleted. Rung 2 is closed by
+measurement across its whole design space.
+
+**The m050 (`_r2`) lineage: DEAD at the deployed level.** Full rebuild completed (4
+GBDT × 8 seeds + realmlp × 3, mult 0.5). Own-surface numbers read +0.0005 high (less
+remasking = easier surface — inflation, not lift): `ensemble_r2_gbdt` 0.9492 own /
+**0.9505 intersection vs m100 core 0.9506** (wash); `final5r2_r` (lr5 stack over the
+_r2 strong five) 0.9499 own / **0.9512 intersection = exact tie with metablend_r**.
+The Day-7 "mult 0.5 sub-gate, no rebuild" call is confirmed end-to-end; the diag
+chain's +0.0002 does not survive to deployed blends. Do NOT chase m050 further.
+
+**FINALS (end of Day-8): #1 `champion_v1.csv` · #2 `metablend_r.csv`** — 9/10 curiosity
+submissions used (scores unrecorded, LB-blind holds); 10th slot unspent (final5r2 lost
+its instrument read). TabM retry still queued on GPU overnight; overnight tail refreshes
+the _r2 combines with full seeds (record-keeping only — lineage is priced dead).
+
 ### ⚠️ PROTOCOL (user-set, 2026-07-02 pm): work LEADERBOARD-BLIND
 The user watches the LB themselves; **Claude must not query submission scores**
 (`kaggle competitions submissions`) or design LB-probing/attribution submission plans. Rationale:
@@ -876,6 +910,9 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-10 | lrstack_r / lrstack_pc_r | s6e6 LR-on-logits stacker ported (`build_lr_stack.py`, honest 25-fit cross-fit + decision weights). Variants identical; honest OOF ties final3's optimistic OOF ⇒ genuinely ahead. Combiner gate: LR−NM +0.00032 (10/12). | 0.9494 (honest, repaired surf.) |
 | 2026-07-10 | run_caruana | Greedy selection over 12 repaired legs: holdout 0.94938 ≈ LR tie; picks realmlp 62% (third confirmation); vetoed legs earn only noise-level seats. | 0.94938 (holdout argmax) |
 | 2026-07-10 | **metablend_r** | **avg(final3_realmlp, lrstack_r) + decision weights — combiner gate 11/12 positive vs NM (+0.00032, lowest sd); miss4 best (0.9443). ⇒ NEW FINAL #2 (s6e6 best-LB shape).** | **0.9494 (repaired surf.)** |
+| 2026-07-10 | combiner tournament | 8 arms × 12 split-half cells: lr6 wins (+0.00040 vs NM, 11/12; mlp_la_r earns its seat per-class); gbdtmeta/nnmeta positive but lose to LR; lr6 vs metablend_r +0.00008 = below displacement gate → final #2 unchanged. | lrstack6_r 0.9495 (honest) |
+| 2026-07-10 | dann_r_s42 | Zoo Z4 (grad-reversal + dual-mask consistency, semi-supervised over test): solo 0.9472; **VETO** — 95.2% of fixes missing-driver, overlap 91.7% = the universal NN signature. **Rung 2 closed by measurement (4 mechanisms).** | 0.9472 (repaired surf.) |
+| 2026-07-10 | _r2 lineage endgame | Full mult-0.5 rebuild priced at deployed level via intersection reads: ensemble_r2_gbdt 0.9505 vs core 0.9506 (wash); final5r2_r 0.9512 = tie with metablend_r. Own-surface +0.0005 = inflation. **m050 lineage dead; do not chase.** | final5r2_r 0.9499 own / 0.9512 inter. |
 
 **LB**: lgbm 0.94886, xgboost 0.94894, **ensemble_v1b 0.94970 (best)**. The blend lifts once
 models are pre-corrected to their deployed surface. Next lever for a bigger jump is a non-GBDT base
