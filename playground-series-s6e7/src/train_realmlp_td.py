@@ -40,7 +40,11 @@ _MULT = float(os.environ.get("S6E7_REPAIR_MULT", "1.0"))
 # Z1 recipe. Distinct model name + TE cache tag; everything else identical so the
 # read vs realmlp_r_s<seed> is paired.
 RULE = os.environ.get("S6E7_RULE", "") not in ("", "0")
-SURFACE_TAG = ("r" if _MULT == 1.0 else "r2") + ("_rule" if RULE else "")
+# "u" = UNREPAIRED surface (Day-9 evening, discussion/719199): REPAIR=0 must not
+# reuse the "r" TE cache — those blocks were computed on the remasked matrix.
+_REPAIR = os.environ.get("S6E7_REPAIR", "") not in ("", "0")
+_BASE_TAG = ("r" if _MULT == 1.0 else "r2") if _REPAIR else "u"
+SURFACE_TAG = _BASE_TAG + ("_rule" if RULE else "")
 MODEL_NAME = "realmlp_rule" if RULE else "realmlp"
 CFG = dict(
     train_bs=512,

@@ -763,6 +763,58 @@ orderings within ±0.0005 are mush (PP-2 theorem, corr=0.000).
   surface" class is measured dead at its cheap end; DL-1 synthetic pretraining
   deprioritized (same channel, 10× cost).**
 
+### Day-9 EVENING (2026-07-11, ~15:30–21:00): discussion/719199 — THE UNREPAIRED SURFACE + THE v0.7 RECIPE
+
+**User shared Mark Susol's research-trail post (719199; repo msusol/kaggle-playground-
+series-s6e7, cloned + notebooks read).** His plain-surface numbers publicly beat our
+entire repaired lineage: HGBC-TE OOF 0.9502 → LB 0.95036 (NO haircut), RealMLP 0.95062 →
+0.95048, blend LB 0.95065. His trail independently confirms our closures (blend/
+threshold/OvR plateau ~0.949 pre-TE; NN-vs-tree blend adds ~0; "believe the CV").
+
+**Hypothesis tested and REFUTED in its first form — then the real recipe found by
+reading his notebook:**
+- repair-eats-TE: our TE (fixed smooth=20, numerics-only) on the UNREPAIRED surface =
+  hgbc_te_u 0.9496 (+0.0002, same whisker as repaired) → surface is NOT the TE story.
+- sklearn EB encoder alone (hgbc_te2, numerics-only): 0.9494 → encoder alone isn't it.
+- **`train_hgbc_te3.py` = EXACT v0.7 replica** (from the notebook): TE over **ALL 13
+  columns CAST TO STRINGS** (cats too; numeric NaN = its own 'nan' TE level; water
+  included — audit: `features.NUM_COLS` never had water, so every prior TE skipped it)
+  via TargetEncoder(cv=5, smooth='auto', multiclass) = 39 TE cols, **+ his TUNED HGBC**
+  (lr 0.0627, 300 iters, 33 leaf nodes, min_samples_leaf 298, l2 0.029, bins 237,
+  max_features 0.82). **REPLICATED: 0.9504/0.9505/0.9503 (s42/7/123), breadth 0.9504.**
+- **Ablation (`hgbc_te3d`)**: v0.7 features + OUR default HGBC = 0.9496 ⇒ **the tuned
+  config carries ~+0.0007 of the +0.0009** — heavy regularization (shallow, big leaves,
+  feature subsample) is what converts 39 smooth posterior columns into generalization.
+  Also explains the Day-7 tuning kill: we tuned WITHOUT TE features on the repaired
+  surface — config × features × surface interact; single-axis kills don't compose.
+- **realmlp UNREPAIRED (`_u` namespace, new SURFACE_TAG "u")**: **0.9501/0.9503/0.9503
+  per seed, breadth 0.9503** vs repaired 0.9492 — the repaired-OOF handicap confirmed
+  at the NN level. First ≥0.950 OOF artifacts of the campaign.
+- **Surface question reframed**: repaired OOF reads low by construction AND the public
+  sweep says repaired candidates transfer fine — but Susol's unrepaired models score
+  HIGHER publicly. The repair was validated on the testmech INSTRUMENT (Day-7, +0.0008)
+  — that instrument evaluates against an EMULATED test surface; the actual public split
+  now suggests deployment-level repair value is smaller than instrument-level, or
+  negative for strong TE models. Adjudicator = user's public reads of the new artifacts.
+- **`lrstack_u` = 0.9506 honest weighted OOF** (complete4 0.9515, miss4 0.9456) — best
+  honest number of the campaign, +0.0002 over its best base (hgbc_te3 breadth). LR stack
+  over unrepaired {lgbm/hgbc/xgboost/catboost _bagw, hgbc_te3_u_breadth,
+  realmlp_u_breadth, mlp}. ⚠️ Artifact/file name is `lrstack_u_r` — the `_r` suffix is
+  build_lr_stack's raw-logits-variant tag, NOT repaired; the surface is UNREPAIRED.
+  **NEW FINAL-#2 CANDIDATE**, pending the user's public reads.
+- **FINALS view going into Day-10**: if the public reads confirm the 0.950x band
+  (Susol's no-haircut precedent + our champion's own no-haircut history say they
+  should), finals become **#1 lrstack_u_r · #2 lrstack6b_r** — mean-dominant unrepaired
+  stack + the repaired stack as the decorrelated hedge (two-surface pair ≈ the
+  E[max]-optimal shape). champion_v1 would drop out (dominated on mean by both, and its
+  independence no longer pays once a stronger uncorrelated hedge exists). User decides.
+- **User-directed submissions (scores unread)**: `hgbc_te3_u_s42.csv`,
+  `realmlp_u_s42.csv`, `lrstack_u_r.csv` (the day's 3rd–5th, after lrstack6b_r and
+  realmlp_rule_r_breadth).
+- lgbm_te_u (our TE, lgbm consumer, unrepaired): 0.9491 weighted — LGBM extracts the
+  same +0.0003 whisker as always; the v0.7 gain is the HGBC-config × TE pairing, not
+  generic TE.
+
 ### ⚠️ PROTOCOL (user-set, 2026-07-02 pm): work LEADERBOARD-BLIND
 The user watches the LB themselves; **Claude must not query submission scores**
 (`kaggle competitions submissions`) or design LB-probing/attribution submission plans. Rationale:
@@ -1077,6 +1129,12 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-11 | probe_finals_pairs | Pairwise E[max] MC over 6 candidates: champion_v1+lrstack6_r optimal (0.94951) among comparable surfaces; final5r2_r face-value dominance = known m050 inflation, rejected. | — |
 | 2026-07-11 | probe_combiner_rule | Focused seat test: lr6r +0.00000 (6/12), lr6s −0.00006 → no seat. 5th consecutive LR-seat veto ⇒ combiner axis saturated for this inventory. | lr6 0.94939 holdout |
 | 2026-07-11 | distill_r_s42 | DL-2 transductive distillation (teacher lrstack6b_r test probs, real test rows, TabMScratch student): solo = twin exactly, signature identical to the decimal → **VETO; "different training surface" class closed cheap; DL-1 deprioritized.** | 0.9489 |
+| 2026-07-11 | hgbc_te_u / hgbc_te2_u | Our TE (smooth=20, numerics-only) and sklearn-EB TE (numerics-only) on the UNREPAIRED surface: +0.0002 / +0.0000 → repair-eats-TE hypothesis refuted; surface and encoder alone aren't the v0.7 story. | 0.9496 / 0.9494 |
+| 2026-07-11 | **hgbc_te3_u s42/7/123** | **EXACT Susol v0.7 replica** (all-13 string TE incl. cats+water, NaN-as-level, EB smoothing + his tuned HGBC): **replicated, +0.0009 over hgbc_bagw**. Breadth 0.9504. **Submitted (user-directed).** | **0.9504/0.9505/0.9503** |
+| 2026-07-11 | hgbc_te3d_u_s42 | Ablation — v0.7 features + our default HGBC config: 0.9496 ⇒ **the tuned config carries ~+0.0007**; config × features × surface interact (Day-7 single-axis tuning kill doesn't compose). | 0.9496 |
+| 2026-07-11 | **realmlp_u s42/7/123** | realmlp on the UNREPAIRED surface (new "u" TE cache): **0.9501/0.9503/0.9503**, breadth 0.9503, vs repaired 0.9492 — repaired-OOF handicap confirmed at NN level. **s42 submitted (user-directed).** | **0.9503 (breadth)** |
+| 2026-07-11 | lgbm_te_u_s42 | Our TE, lgbm consumer, unrepaired: +0.0003 as always — the v0.7 gain is HGBC-config-specific. | 0.9491 |
+| 2026-07-11 | **lrstack_u (file: lrstack_u_r)** | **Honest LR stack over unrepaired bases: 0.9506 / c4 0.9515 / miss4 0.9456 — best honest number of the campaign.** NEW final-#2 candidate. **Submitted (user-directed).** | **0.9506 (honest)** |
 
 **LB**: lgbm 0.94886, xgboost 0.94894, **ensemble_v1b 0.94970 (best)**. The blend lifts once
 models are pre-corrected to their deployed surface. Next lever for a bigger jump is a non-GBDT base
