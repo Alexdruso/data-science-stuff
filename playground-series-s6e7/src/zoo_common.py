@@ -31,6 +31,7 @@ from sklearn.model_selection import StratifiedKFold
 
 sys.path.insert(0, str(Path(__file__).parent))
 from features import NUM_COLS
+from rule_features import RULE_SETS, rule_label_set, sleep_bucket
 from train_common import N_CLASSES, N_FOLDS, RESULTS_DIR, Dataset
 from train_fe import ORDINAL, combo_key
 from train_te_num import encode_fold, with_te
@@ -84,6 +85,31 @@ def clear_ckpt(ckpt_name: str) -> None:
 
 
 COMBO_COL = "_combo"
+# Day-9 fix: the TRUE generation-rule triple is sleep_DURATION-buckets(6/7) x
+# stress x activity (train_fe.COMBO used sleep_QUALITY — never the rule's third
+# feature). TE'd alongside _combo when rule=True; NA tokens make each partial
+# pattern its own TE category (the empirical posterior of the partial pattern).
+COMBO2_COL = "_combo2"
+
+
+def combo2_key(df: pd.DataFrame) -> pd.Series:
+    parts = [
+        sleep_bucket(df),
+        df["stress_level"].astype("string").fillna("NA"),
+        df["physical_activity_level"].astype("string").fillna("NA"),
+    ]
+    return parts[0].astype("string") + "|" + parts[1] + "|" + parts[2]
+
+
+def _rule_block(df: pd.DataFrame) -> tuple[NDArray[np.float32], list[str]]:
+    """rule_set one-hots (fixed RULE_SETS vocab) + determined flag — noise-free
+    logical prior from the exact generation tree (rule_features)."""
+    rs = rule_label_set(df)
+    out = np.zeros((len(df), len(RULE_SETS) + 1), dtype=np.float32)
+    for i, v in enumerate(RULE_SETS):
+        out[:, i] = (rs == v).to_numpy(dtype=np.float32)
+    out[:, -1] = (~rs.str.contains(r"\|")).to_numpy(dtype=np.float32)
+    return out, [f"rule_{v}" for v in RULE_SETS] + ["rule_determined"]
 
 
 def te_block_for_fold(
@@ -92,6 +118,7 @@ def te_block_for_fold(
     seed: int,
     fold: int,
     tag: str,
+    rule: bool = False,
 ) -> tuple[NDArray[np.float32], NDArray[np.float32], list[str]]:
     """The NN input recipe for one fold, cached: (train_full, test, names).
 
@@ -101,6 +128,10 @@ def te_block_for_fold(
     TE NaN (source value missing) is filled with the fold class prior — the
     marginalized posterior — so NN consumers get a NaN-free block; the ordinals
     keep NaN (consumers impute; missingness indicators live in NNData).
+
+    rule=True (Day-9) additionally TEs the TRUE rule triple (_combo2) and
+    appends the rule_set one-hot block — callers must pass a distinct `tag`
+    (e.g. "r_rule") so recipes never share a cache entry.
 
     `tag` must identify the surface (e.g. "r" for REPAIR=1 mult 1.0): TE maps
     depend on which rows are NaN, so surfaces must never share a cache entry.
@@ -117,6 +148,10 @@ def te_block_for_fold(
     src_tr[COMBO_COL] = combo_key(ds.train)
     src_te[COMBO_COL] = combo_key(ds.test)
     cols = num_cols + [COMBO_COL]
+    if rule:
+        src_tr[COMBO2_COL] = combo2_key(ds.train)
+        src_te[COMBO2_COL] = combo2_key(ds.test)
+        cols.append(COMBO2_COL)
 
     te_tr, full_maps, prior = encode_fold(src_tr, ds.y, tr_idx, cols, seed)
     te_names = [f"te_{c}_{k}" for c in cols for k in range(N_CLASSES)]
@@ -136,9 +171,17 @@ def te_block_for_fold(
 
     ord_tr = _ordinal_block(ds.train)
     ord_te = _ordinal_block(ds.test)
-    train_out = np.concatenate([train_block, ord_tr], axis=1)
-    test_out = np.concatenate([test_block, ord_te], axis=1)
+    train_parts = [train_block, ord_tr]
+    test_parts = [test_block, ord_te]
     names = te_names + [f"{c}_ord" for c in ORDINAL]
+    if rule:
+        rule_tr, rule_names = _rule_block(ds.train)
+        rule_te, _ = _rule_block(ds.test)
+        train_parts.append(rule_tr)
+        test_parts.append(rule_te)
+        names += rule_names
+    train_out = np.concatenate(train_parts, axis=1)
+    test_out = np.concatenate(test_parts, axis=1)
     np.savez_compressed(cache, train=train_out, test=test_out, names=np.array(names))
     return train_out, test_out, names
 

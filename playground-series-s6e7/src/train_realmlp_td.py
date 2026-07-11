@@ -35,7 +35,13 @@ from data_science_stuff.kaggle.models.realmlp import RealMLP_TD_Classifier
 # TE cache tag must identify the training surface: TE maps depend on which rows
 # are NaN, so the m100 (_r) and m050 (_r2) lineages must never share cache entries.
 _MULT = float(os.environ.get("S6E7_REPAIR_MULT", "1.0"))
-SURFACE_TAG = "r" if _MULT == 1.0 else "r2"
+# S6E7_RULE=1 (Day-9): corrected-recipe variant — TRUE rule triple TE (_combo2,
+# sleep_DURATION buckets x stress x activity) + rule_set one-hots on top of the
+# Z1 recipe. Distinct model name + TE cache tag; everything else identical so the
+# read vs realmlp_r_s<seed> is paired.
+RULE = os.environ.get("S6E7_RULE", "") not in ("", "0")
+SURFACE_TAG = ("r" if _MULT == 1.0 else "r2") + ("_rule" if RULE else "")
+MODEL_NAME = "realmlp_rule" if RULE else "realmlp"
 CFG = dict(
     train_bs=512,
     fused_optimizer=True,
@@ -71,7 +77,7 @@ def main() -> None:
         np.random.seed(fold_seed)  # noqa: NPY002 — library-internal RNG expects it
 
         te_tr_full, te_te, _names = te_block_for_fold(
-            ds, tr_idx, seed, fold, SURFACE_TAG
+            ds, tr_idx, seed, fold, SURFACE_TAG, rule=RULE
         )
         # median-impute raw numerics + the ordinal tail of the TE block (train-fold stats)
         num_med = np.nanmedian(nd.Xnum_tr[tr_idx], axis=0)
@@ -107,10 +113,10 @@ def main() -> None:
         return val_proba, test_proba
 
     oof, test, fold_scores = zoo_cv(
-        ds, fit_fold, ckpt_name=f"realmlp_s{SEEDS[0]}", seed=SEEDS[0]
+        ds, fit_fold, ckpt_name=f"{MODEL_NAME}_s{SEEDS[0]}", seed=SEEDS[0]
     )
-    finalize("realmlp", ds, oof, test, fold_scores)
-    clear_ckpt(f"realmlp_s{SEEDS[0]}")
+    finalize(MODEL_NAME, ds, oof, test, fold_scores)
+    clear_ckpt(f"{MODEL_NAME}_s{SEEDS[0]}")
 
 
 if __name__ == "__main__":

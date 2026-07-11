@@ -59,6 +59,18 @@ _TABLE: dict[tuple[int, int, int], str] = {
     for a in (MISSING, 0, 1, 2)
 }
 
+# Fixed one-hot vocabulary for NN consumers (order-stable across surfaces/folds).
+RULE_SETS: list[str] = sorted(set(_TABLE.values()))
+
+
+def sleep_bucket(df: pd.DataFrame) -> pd.Series:
+    """Rule-threshold sleep buckets as strings: b0 (<6) / b1 ([6,7)) / b2 (>=7) / NA."""
+    sleep = df["sleep_duration"]
+    lab = np.where(
+        sleep.isna(), "NA", np.where(sleep < 6, "b0", np.where(sleep < 7, "b1", "b2"))
+    )
+    return pd.Series(lab, index=df.index, name="sleep_bucket")
+
 
 def rule_label_set(df: pd.DataFrame) -> pd.Series:
     """Per-row reachable-label-set string ('at-risk', 'at-risk|fit', ...)."""

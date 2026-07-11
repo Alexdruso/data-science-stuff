@@ -611,7 +611,10 @@ _r2 strong five) 0.9499 own / **0.9512 intersection = exact tie with metablend_r
 The Day-7 "mult 0.5 sub-gate, no rebuild" call is confirmed end-to-end; the diag
 chain's +0.0002 does not survive to deployed blends. Do NOT chase m050 further.
 
-**FINALS (updated 07-11 am): #1 `champion_v1.csv` · #2 `lrstack6_r.csv`** (was
+**FINALS (updated 07-11 pm): #1 `champion_v1.csv` · #2 `lrstack6_r.csv` — prefer the
+`lrstack6b_r.csv` file for #2 (same recipe, 5-seed realmlp base, honest wash = pure
+variance reduction). Confirmed twice on 07-11: pairs-E[max] MC + combiner saturation.**
+(Older note follows.) (was
 metablend_r for ~12h). Basis: lrstack6 leads every honest instrument — best honest OOF
 (0.9495), combiner-tournament best mean (+0.00040, 11/12), best intersection read
 (0.9513) — and a user-directed 07-11 LB read broke the metablend-vs-lr6 near-tie the
@@ -661,6 +664,95 @@ that made realmlp work), fp16 AMP + GradScaler (FTT pattern), fused AdamW, torch
 `realmlp.py`. ~5 min/fold est. Honest EV: same family slot as realmlp (expect ±0.001,
 high overlap); value = one more leg for the LR combiner, which extracts whiskers from
 near-redundant legs (mlp_la_r precedent). Run AFTER cascade + rule-realmlp.
+
+### Day-9 (2026-07-11, 10:00–21:00): the queue measured out; finals CONFIRMED by independent instruments
+
+**All three committed levers built, run and priced in the morning; every Day-9 backlog
+probe answered. Finals unchanged and now multiply confirmed: #1 `champion_v1`, #2
+`lrstack6_r`.**
+
+- **Cascade (`train_cascade.py` NEW, queue #1 — the last assertion-kill, now measured)**:
+  stage-1 binary at-risk-vs-minority + stage-2 fit-vs-unhealthy, `cascade_combine`
+  recombination. Solo **0.9482/0.9480/0.9482 (s42/7/123)** = +0.0004 vs paired lgbm_r,
+  ties hgbc as best GBDT-family leg; argmax at-risk recall 0.955 (the binary objective
+  DOES move the trained boundary). BUT diag signature = core-member (fix-share 3.7%,
+  overlap 94.3%, mixtures flat at every w) and the LR-combiner seat test (below) is
+  negative ⇒ **better solo leg, same errors — Tier-C kill now measured, avenue closed.**
+- **Rule→realmlp (`S6E7_RULE=1`, queue #2)**: corrected combo-TE triple
+  (sleep_DURATION-buckets 6/7 × stress × activity via `combo2_key`) + rule-set one-hots
+  into the Z1 recipe. **0.9493 vs 0.9492 paired = flat**; diag = realmlp clone (95.1%
+  overlap, uniform +0.0006 vs core, same formal veto). The models had the rule
+  statistically; the noise-free logical prior adds nothing a 690k-row TE didn't. Closed.
+- **TabM from scratch (`train_tabm_scratch.py` NEW, queue #3)**: BatchEnsemble k=8 +
+  balanced softmax (tau=1.075) + the TE recipe, ~3 min/fold. **0.9489/0.9490/0.9490
+  (s42/7/123)** — rehabilitates the architecture (+0.0078 vs pytabkit's no-loss-hook
+  0.9411; Day-8 "config not architecture" read confirmed). Second-best NN family, dead
+  seed-stable; kept as base inventory (`tabms_r_s*`).
+- **Day-9 combiner tournament (`probe_combiner_day9.py` NEW; 12 split-half cells)**:
+  challengers lr6+{cascade, tabms, both, +realmlp_rule} ALL read −0.00002..−0.00009 vs
+  incumbent lr6 (best 6/12) ⇒ **no new leg earns a seat; adding legs only dilutes; final
+  #2 stays lrstack6_r**. nm −0.00040 vs lr6 (1/12) reconfirms Day-8.
+- **Leak-hunter probes (`probe_leaks_day9.py` NEW) — all NULL**: (LH-2) no test id-segment
+  shows trigger-mode masking (148 segs × 4 cols, nothing past Bonferroni) — uniform test
+  mechanism holds everywhere, segment routing dead; (LH-3) gender drifts smoothly WITHIN
+  train (female .324→.267 over last 100k ids), boundary step is the drift continuing, not
+  a two-generator-run seam; (LH-5) label noise homogeneous in id (sd ratio 1.14, CUSUM
+  p=0.93). **Side-fact: generator noise on rule-determined rows = 0.78%** (620,947 rows,
+  raw surface).
+- **E[max] portfolio (`probe_emax_portfolio.py` NEW, prob-purist #1) — flipping DEAD**:
+  exact cell-MC (multinomial + mv-hypergeometric over class×correctness cells, B=20k).
+  Indifference-band flips toward minorities in final #2: mean cost kicks in immediately
+  (−0.00003 @K=500 → −0.0012 @K=8000 — the tuned weights already price the boundary) and
+  added variance is an order too small; **no K raises E[max]**. Baselines: E[S1(champ)]
+  =0.94935, E[S2(lr6)]=0.94946 private, sd(S1−S2)=0.00026, P(lr6>champ)=0.66,
+  two-finals E[max] bonus +0.00005.
+- **Paired-delta calculus (prob-purist #2) — the LB-tiebreak theorem, MEASURED**:
+  lrstack6_r vs metablend_r (616 disagreement rows): **corr(Δ_pub, Δ_priv) = 0.000**;
+  conditioning on any public delta leaves P(lr6 wins private) at 0.66–0.69 vs 0.685
+  unconditional ⇒ the 07-11 LB read carried ~zero private information. BUT the honest
+  instruments alone already favor lr6 (P=0.685 vs metablend, 0.635 vs final3) ⇒ same
+  conclusion, better epistemics. **Protocol upgrade: public tiebreaks between near-clones
+  (<0.1% disagreement) are noise — never worth a submission.**
+- **Generator fingerprint (`probe_generator_fingerprint.py` NEW, LH-6a/b) — hypothesis
+  INVERTED**: value containment 0.96–0.999 (generator resamples the original's value
+  vocabulary) but the ORIGINAL's numerics are essentially independent (mean |corr| 0.003)
+  while synthetic train has ~0.10 — the generator ADDED spurious dependence (CTGAN/TVAE
+  class), it is NOT a conditional-marginal sampler. Purist-4 analytic per-cell posterior
+  is misspecified for the synthetic joint (priced down); DL-1 synthetic pretraining would
+  need a generator fit to train (Day-10 candidate, lower prior).
+- **Afternoon variance play**: realmlp seeds 2024 (0.9491) + 99 (0.9492) → 5-seed
+  `realmlp_r_breadth` (0.9493) → **`lrstack6b_r` = honest 0.9495/0.9512/0.9444, a wash
+  with lrstack6_r at every digit** — correct for a variance-reduction move; prefer the
+  6b FILE for final #2 on stability (same recipe, lower seed noise; 3-seed arrays
+  snapshotted as `*_realmlp_r_breadth3.npy`).
+
+### Day-9 PM (user LB reads + reaction): finals CONFIRMED again; combiner axis measured SATURATED
+
+**User shared public reads (scores unrecorded per protocol)**: the ENTIRE repaired
+lineage cleared champion_v1's public score (6 candidates incl. two vetoed solos), and
+`realmlp_rule_r_s42` read at the public top as a solo ("kinda cooked"). Sober framing
+applied: all candidates share ONE public split ⇒ "6 candidates > champion" ≈ ONE read of
+"repaired lineage > champion on this public split", not 6 confirmations; near-clone
+orderings within ±0.0005 are mush (PP-2 theorem, corr=0.000).
+
+- **Finals-pair E[max] MC (`probe_finals_pairs.py` NEW)** over 6 candidates × all pairs:
+  `final5r2_r` tops every pair at face value — **rejected as the documented m050
+  own-surface inflation** (MC uses own-surface OOF labels; Day-8 intersection read =
+  tie). Among comparable pairs: **champion_v1 + lrstack6_r stays E[max]-optimal
+  (0.94951)** — champion's lower mean (P(win)=0.34) is outweighed by its independence
+  (sd(Δ)=0.00026); repaired near-clone pairs lose their variance term to correlation.
+  **Finals recommendation unchanged: #1 champion_v1 · #2 lrstack6_r (prefer the 6b
+  file).**
+- **realmlp_rule seed-averaged** (s7 0.9491, s123 0.9493) → `realmlp_rule_r_breadth`
+  0.9493 weighted.
+- **Focused rule-seat tournament (`probe_combiner_rule.py` NEW)**: lr6r (add rule
+  breadth as 7th base) **+0.00000** (6/12); lr6s (swap for realmlp) −0.00006 ⇒ no seat,
+  cleanly. **Fifth consecutive LR-seat veto today ⇒ the combiner axis is measured
+  saturated for this base inventory** — new legs must differ by TRAINING DATA/SURFACE
+  mechanism, not architecture (⇒ DL-2 transductive distillation is the one untried
+  class).
+- **User-directed submissions (scores not read back)**: `lrstack6b_r.csv`,
+  `realmlp_rule_r_breadth.csv` — the day's two promising artifacts.
 
 ### ⚠️ PROTOCOL (user-set, 2026-07-02 pm): work LEADERBOARD-BLIND
 The user watches the LB themselves; **Claude must not query submission scores**
@@ -961,6 +1053,20 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-10 | _r2 lineage endgame | Full mult-0.5 rebuild priced at deployed level via intersection reads: ensemble_r2_gbdt 0.9505 vs core 0.9506 (wash); final5r2_r 0.9512 = tie with metablend_r. Own-surface +0.0005 = inflation. **m050 lineage dead; do not chase.** | final5r2_r 0.9499 own / 0.9512 inter. |
 | 2026-07-10 | tabm_r_s42 | Zoo Z3 (overnight retry, ~24 min/fold): argmax 0.8774, weighted **0.9411**. NOT an architecture verdict — pytabkit TabM has NO class-weight/loss hook (s6e6 lesson repeating): plain CE on 86/8/6 majority-walls the minorities and decision weights can't fully rescue a train-time miscalibration. A "fixed" TabM ≈ what realmlp already is (deep ensemble + balanced softmax), so not worth rehabilitating. **Zoo scoreboard complete: 6 families priced, one survivor (realmlp).** | 0.9411 (repaired surf.) |
 | 2026-07-10 | lgbm_rule | Exact-rule three-valued deduction features (`rule_features.py`, from discussion/717222's proven generation tree; 89.1% of rows logically determined incl. 63.5% of missing-driver rows): **flat for trees** (−0.0002 vs paired lgbm_r_s42 0.9478) — they had it statistically. Realmlp consumer stays live (tomorrow #2). | 0.9476 (repaired surf.) |
+
+| 2026-07-11 | probe_leaks_day9 | LH-2 test trigger-mode segments / LH-3 gender boundary step / LH-5 noise burstiness: **all NULL** (uniform test masks everywhere; within-run drift; homogeneous noise 0.78% on determined rows). | — |
+| 2026-07-11 | cascade_r_s42/7/123 | Chained binary cascade (at-risk-vs-minority ⊕ fit-vs-unhealthy): solo +0.0004 vs paired lgbm (best GBDT-family leg) but core-member signature (overlap 94.3%, mixtures flat) + negative LR-seat test → **Tier-C kill measured, closed**. | 0.9482/0.9480/0.9482 |
+| 2026-07-11 | realmlp_rule_r_s42 | Corrected rule-triple TE (_combo2) + rule-set one-hots: **flat** (+0.0001 paired); realmlp-clone signature (overlap 95.1%). Rule features closed for NN too. | 0.9493 |
+| 2026-07-11 | tabms_r_s42/7/123 | From-scratch TabM (BatchEnsemble k=8 + balanced softmax + TE recipe): **0.9489-0.9490 every seed** — architecture rehabilitated (+0.0078 vs pytabkit config verdict); no LR seat though. | 0.9489/0.9490/0.9490 |
+| 2026-07-11 | probe_combiner_day9 | 12-cell tournament, challengers lr6+{cascade,tabms,rule,all}: ALL −0.00002..−0.00009 vs lr6 → **no seat; final #2 stays lrstack6_r**. | lr6 0.94944 holdout |
+| 2026-07-11 | probe_emax_portfolio | E[max] indifference-band flips: mean cost dominates at every K, variance gain an order too small → **flipping dead**. P(lr6>champ private)=0.66; two-finals bonus +0.00005. | — |
+| 2026-07-11 | paired-delta calculus | corr(Δ_pub, Δ_priv)=0.000 between near-clone finals; public tiebreaks between <0.1%-disagreement candidates carry no private info. lr6 favored by honest instruments alone (P=0.685/0.635). | — |
+| 2026-07-11 | probe_generator_fingerprint | Original's numerics ~independent (|corr| 0.003); synthetic train ~0.10 ⇒ generator ADDED dependence (CTGAN-class), NOT conditional-marginal; containment 0.96-0.999. Analytic posterior priced down. | — |
+| 2026-07-11 | realmlp_r_s2024/s99 | Breadth extension seeds. | 0.9491 / 0.9492 |
+| 2026-07-11 | lrstack6b_r | lr6 stack on 5-seed realmlp_r_breadth: honest wash with lrstack6_r at every digit (variance reduction, as expected). Preferred final-#2 FILE. **Submitted (user-directed).** | 0.9495 (honest) |
+| 2026-07-11 | realmlp_rule_r_s7/s123 + breadth | Rule-recipe seed average. **Submitted (user-directed).** | 0.9491/0.9493; breadth 0.9493 |
+| 2026-07-11 | probe_finals_pairs | Pairwise E[max] MC over 6 candidates: champion_v1+lrstack6_r optimal (0.94951) among comparable surfaces; final5r2_r face-value dominance = known m050 inflation, rejected. | — |
+| 2026-07-11 | probe_combiner_rule | Focused seat test: lr6r +0.00000 (6/12), lr6s −0.00006 → no seat. 5th consecutive LR-seat veto ⇒ combiner axis saturated for this inventory. | lr6 0.94939 holdout |
 
 **LB**: lgbm 0.94886, xgboost 0.94894, **ensemble_v1b 0.94970 (best)**. The blend lifts once
 models are pre-corrected to their deployed surface. Next lever for a bigger jump is a non-GBDT base
