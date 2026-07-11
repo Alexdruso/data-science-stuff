@@ -815,6 +815,36 @@ reading his notebook:**
   same +0.0003 whisker as always; the v0.7 gain is the HGBC-config × TE pairing, not
   generic TE.
 
+### Day-9 FINAL BLOCK (2026-07-11, ~18:00–21:00): the v0.7 recipe generalizes to every consumer
+
+**The te13 block (all-13 string EB TE, `zoo_common.te13_block_for_fold`) + regularized
+configs pay on all three families — the whole base inventory is upgraded:**
+- **realmlp_te13_u_s42 = 0.9505** (S6E7_TE13=1 appends the 39-col block to the recipe;
+  paired +0.0004 over realmlp_u — best solo leg of the campaign; seeds 7/123 queued on
+  GPU overnight, ckpt-safe).
+- **lgbm_te3_u_s42 = 0.9503 weighted** (`train_lgbm_te3.py`: his HGBC config translated
+  — 33 leaves, mcs 298, ff 0.82, lr 0.0627, bins 237 — + the TE block): +0.0010 over
+  lgbm_bagw; third-library confirmation that the CONFIG × TE pairing is the mechanism.
+- Candidates built (`build_u_candidates.py`): hgbc_te3_u_breadth 0.9504 /
+  realmlp_u_breadth 0.9503 CSVs; **blend2_u 0.9507** (NM 49/51 hgbc_te3 × realmlp_u —
+  a real two-family split, Susol's v0.9 signature); ublend_nm 0.9501 (diluted by the
+  0.949x legs); **metablend_u 0.9506** (avg(lrstack_u, ublend_nm) + weights, the s6e6
+  shape). Blend numbers are full-fit-optimistic; the honest anchor stays lrstack_u
+  0.9506.
+- **Finals-pairs MC rerun with the u-family**: solo E[priv] lrstack_u 0.95064 /
+  metablend_u 0.95059 / hgbc_te3_breadth 0.95042 vs old family 0.9494x — mean dominance
+  ~+0.0012 on this instrument. Best pair at face value lrstack_u + metablend_u (0.95069)
+  but those are near-clones; the decision framing = u-family champion + lrstack6b_r as
+  the two-surface hedge (repaired candidates are underrated by construction on this MC).
+  User's public reads on the u-artifacts arbitrate the Day-2-style haircut risk.
+- **Submitted before the daily cap (10/10) hit**: blend2_u, metablend_u (+ the five
+  earlier today). **Bounced, first in tomorrow's queue**: realmlp_te13_u_s42,
+  hgbc_te3_u_breadth, lgbm_te3_u_s42.
+- **Day-10 queue**: read realmlp_te13 s7/s123 (overnight) → te13 breadth; lgbm_te3 +
+  hgbc_te3 more seeds if stack rebuild wants them; **rebuild `lrstack_u2`** over the
+  te13-upgraded legs (replace realmlp_u_breadth with realmlp_te13 breadth, add
+  lgbm_te3); finals per the two-surface framing once public reads land.
+
 ### ⚠️ PROTOCOL (user-set, 2026-07-02 pm): work LEADERBOARD-BLIND
 The user watches the LB themselves; **Claude must not query submission scores**
 (`kaggle competitions submissions`) or design LB-probing/attribution submission plans. Rationale:
@@ -1135,6 +1165,10 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-11 | **realmlp_u s42/7/123** | realmlp on the UNREPAIRED surface (new "u" TE cache): **0.9501/0.9503/0.9503**, breadth 0.9503, vs repaired 0.9492 — repaired-OOF handicap confirmed at NN level. **s42 submitted (user-directed).** | **0.9503 (breadth)** |
 | 2026-07-11 | lgbm_te_u_s42 | Our TE, lgbm consumer, unrepaired: +0.0003 as always — the v0.7 gain is HGBC-config-specific. | 0.9491 |
 | 2026-07-11 | **lrstack_u (file: lrstack_u_r)** | **Honest LR stack over unrepaired bases: 0.9506 / c4 0.9515 / miss4 0.9456 — best honest number of the campaign.** NEW final-#2 candidate. **Submitted (user-directed).** | **0.9506 (honest)** |
+| 2026-07-11 | **realmlp_te13_u_s42** | realmlp + te13 block (all-13 EB TE appended to the recipe): paired **+0.0004** over realmlp_u — best solo leg. Seeds 7/123 overnight. Submission bounced on the daily cap — tomorrow's #1. | **0.9505** |
+| 2026-07-11 | **lgbm_te3_u_s42** | LGBM + v0.7 recipe (translated config + TE block): +0.0010 over lgbm_bagw — third-library confirmation of the config×TE mechanism. | **0.9503** |
+| 2026-07-11 | blend2_u / ublend_nm / metablend_u | Candidate builds (full-fit NM, optimistic): blend2_u 0.9507 (49/51 two-family split = the v0.9 signature); ublend_nm 0.9501; metablend_u 0.9506. **blend2_u + metablend_u submitted (cap reached after).** | 0.9507 / 0.9501 / 0.9506 |
+| 2026-07-11 | finals-pairs MC v2 | u-family mean-dominant: solo E[priv] lrstack_u 0.95064 vs old family 0.9494x; best comparable framing = u-champion + lrstack6b_r two-surface hedge. | — |
 
 **LB**: lgbm 0.94886, xgboost 0.94894, **ensemble_v1b 0.94970 (best)**. The blend lifts once
 models are pre-corrected to their deployed surface. Next lever for a bigger jump is a non-GBDT base

@@ -28,7 +28,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).parent))
 from train_common import N_CLASSES, SEEDS, finalize, load_dataset
 from train_mlp import NNData
-from zoo_common import clear_ckpt, te_block_for_fold, zoo_cv
+from zoo_common import clear_ckpt, te13_block_for_fold, te_block_for_fold, zoo_cv
 
 from data_science_stuff.kaggle.models.realmlp import RealMLP_TD_Classifier
 
@@ -40,12 +40,16 @@ _MULT = float(os.environ.get("S6E7_REPAIR_MULT", "1.0"))
 # Z1 recipe. Distinct model name + TE cache tag; everything else identical so the
 # read vs realmlp_r_s<seed> is paired.
 RULE = os.environ.get("S6E7_RULE", "") not in ("", "0")
+# S6E7_TE13=1 (Day-9 final block): append the v0.7/te3 all-13 string EB TE block
+# (zoo_common.te13_block_for_fold, 39 cols) to the recipe inputs — the block that
+# took HGBC to 0.9504. Additive: everything else identical, read is paired.
+TE13 = os.environ.get("S6E7_TE13", "") not in ("", "0")
 # "u" = UNREPAIRED surface (Day-9 evening, discussion/719199): REPAIR=0 must not
 # reuse the "r" TE cache — those blocks were computed on the remasked matrix.
 _REPAIR = os.environ.get("S6E7_REPAIR", "") not in ("", "0")
 _BASE_TAG = ("r" if _MULT == 1.0 else "r2") if _REPAIR else "u"
 SURFACE_TAG = _BASE_TAG + ("_rule" if RULE else "")
-MODEL_NAME = "realmlp_rule" if RULE else "realmlp"
+MODEL_NAME = ("realmlp_rule" if RULE else "realmlp") + ("_te13" if TE13 else "")
 CFG = dict(
     train_bs=512,
     fused_optimizer=True,
@@ -83,6 +87,12 @@ def main() -> None:
         te_tr_full, te_te, _names = te_block_for_fold(
             ds, tr_idx, seed, fold, SURFACE_TAG, rule=RULE
         )
+        if TE13:
+            t13_tr, t13_te, _n13 = te13_block_for_fold(
+                ds, tr_idx, seed, fold, _BASE_TAG
+            )
+            te_tr_full = np.concatenate([te_tr_full, t13_tr], axis=1)
+            te_te = np.concatenate([te_te, t13_te], axis=1)
         # median-impute raw numerics + the ordinal tail of the TE block (train-fold stats)
         num_med = np.nanmedian(nd.Xnum_tr[tr_idx], axis=0)
         num_tr = np.where(np.isnan(nd.Xnum_tr), num_med, nd.Xnum_tr)

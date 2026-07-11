@@ -37,10 +37,10 @@ from train_common import load_dataset
 CANDIDATES = [
     "champion_v1",
     "lrstack6_r",
-    "realmlp_rule_r_s42",
     "metablend_r",
-    "final5r2_r",
-    "final3_realmlp",
+    "lrstack_u_r",
+    "hgbc_te3_u_breadth",
+    "metablend_u",
 ]
 
 

@@ -186,6 +186,50 @@ def te_block_for_fold(
     return train_out, test_out, names
 
 
+def te13_block_for_fold(
+    ds: Dataset,
+    tr_idx: NDArray[np.int64],
+    seed: int,
+    fold: int,
+    tag: str,
+) -> tuple[NDArray[np.float32], NDArray[np.float32], list[str]]:
+    """The v0.7/te3 TE block for NN consumers (Day-9 evening, discussion/719199).
+
+    sklearn TargetEncoder(cv=5, smooth='auto', multiclass) over ALL feature
+    columns CAST TO STRINGS — categoricals included, numeric NaN becomes its
+    own 'nan' level, water included. Fold-train rows are cross-fitted
+    (fit_transform's internal cv), val/test rows use the full-fold encodings
+    (transform). Cached per (tag, seed, fold); `tag` must identify the surface.
+    Output is dense (no NaN): unseen values map to the fold prior.
+    """
+    from sklearn.preprocessing import TargetEncoder
+
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    cache = CACHE_DIR / f"te13_{tag}_s{seed}_f{fold}.npz"
+    if cache.exists():
+        z = np.load(cache, allow_pickle=True)
+        return z["train"], z["test"], list(z["names"])
+
+    cols = list(ds.train.columns)
+    tr_view = ds.train[cols].astype(str)
+    te_view = ds.test[cols].astype(str)
+    names = [f"te13_{c}_{k}" for c in cols for k in range(N_CLASSES)]
+
+    enc = TargetEncoder(cv=5, smooth="auto", target_type="multiclass")
+    fit_block = enc.fit_transform(tr_view.iloc[tr_idx], ds.y[tr_idx])
+    train_block = np.zeros((len(ds.y), len(names)), dtype=np.float32)
+    train_block[tr_idx] = fit_block.astype(np.float32)
+    val_mask = np.ones(len(ds.y), dtype=bool)
+    val_mask[tr_idx] = False
+    train_block[val_mask] = enc.transform(tr_view[val_mask]).astype(np.float32)
+    test_block = enc.transform(te_view).astype(np.float32)
+
+    np.savez_compressed(
+        cache, train=train_block, test=test_block, names=np.array(names)
+    )
+    return train_block, test_block, names
+
+
 def _ordinal_block(df: pd.DataFrame) -> NDArray[np.float32]:
     out = np.full((len(df), len(ORDINAL)), np.nan, dtype=np.float32)
     for i, (col, m) in enumerate(ORDINAL.items()):
