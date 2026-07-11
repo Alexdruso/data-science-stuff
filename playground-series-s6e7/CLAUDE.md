@@ -845,6 +845,29 @@ configs pay on all three families — the whole base inventory is upgraded:**
   te13-upgraded legs (replace realmlp_u_breadth with realmlp_te13 breadth, add
   lgbm_te3); finals per the two-surface framing once public reads land.
 
+### Day-9 OVERTIME (2026-07-11, ~21:00–23:00): fourth library, lrstack_u2, combiner verdict on the u-surface
+
+- **lrstack_u2 = 0.9508 honest** (c4 0.9515 / miss4 0.9464): the te13-upgraded stack
+  (8 legs incl. realmlp_te13_u_breadth + lgbm_te3_u_s42) adds +0.0002 over lrstack_u.
+  **The assembled final-#2 candidate.**
+- **xgb_te3_u_s42 = 0.9498** (+0.0010 over xgboost_bagw): the recipe's lift is UNIFORM
+  ~+0.0010 across all four GBDT libraries (HGBC/LGBM/XGB) — mechanism table complete;
+  XGB just starts lowest, stays out of the stack (inventory).
+- **realmlp_te13 breadth = 0.9506** (0.9505 every seed, s2024/s99 variance seeds queued
+  overnight); hgbc_te3 + lgbm_te3 seed chains extending breadths overnight (ckpt-safe;
+  combine with `combine_seeds`, prefix `_u`, tomorrow).
+- **Combiner verdict on the UNREPAIRED surface (`probe_combiner_u.py`, 12 cells)**:
+  lr 0.95076 = lr2 0.95076 (top-2 legs carry the WHOLE stack — the 5 older legs add
+  zero); **mb (metablend shape) −0.00009 = now HURTS** (NM −0.00055 is too weak to
+  average in — the s6e6/Day-8 metablend move does NOT transfer to this surface);
+  ⇒ **final #2 artifact = lrstack_u2, metablend_u dominated.**
+- **Day-10 morning queue**: submit the 3 bounced CSVs (realmlp_te13_u_s42,
+  hgbc_te3_u_breadth, lgbm_te3_u_s42) + lrstack_u2_r.csv; combine overnight breadths;
+  optional lrstack_u3 with 5-seed breadths; finals call = lrstack_u2 (or blend2_u — lr2
+  says equivalent) + lrstack6b_r as the two-surface hedge, subject to the user's public
+  reads of the u-family (Day-2 haircut risk is the one open question; Susol's 3
+  no-haircut precedents + our champion's say it should hold).
+
 ### ⚠️ PROTOCOL (user-set, 2026-07-02 pm): work LEADERBOARD-BLIND
 The user watches the LB themselves; **Claude must not query submission scores**
 (`kaggle competitions submissions`) or design LB-probing/attribution submission plans. Rationale:
@@ -1169,6 +1192,10 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-11 | **lgbm_te3_u_s42** | LGBM + v0.7 recipe (translated config + TE block): +0.0010 over lgbm_bagw — third-library confirmation of the config×TE mechanism. | **0.9503** |
 | 2026-07-11 | blend2_u / ublend_nm / metablend_u | Candidate builds (full-fit NM, optimistic): blend2_u 0.9507 (49/51 two-family split = the v0.9 signature); ublend_nm 0.9501; metablend_u 0.9506. **blend2_u + metablend_u submitted (cap reached after).** | 0.9507 / 0.9501 / 0.9506 |
 | 2026-07-11 | finals-pairs MC v2 | u-family mean-dominant: solo E[priv] lrstack_u 0.95064 vs old family 0.9494x; best comparable framing = u-champion + lrstack6b_r two-surface hedge. | — |
+| 2026-07-11 | realmlp_te13_u s7/s123 + breadth | te13 leg seed-stable (0.9505/0.9505); breadth = best solo artifact. | 0.9505/0.9505; breadth **0.9506** |
+| 2026-07-11 | **lrstack_u2 (file: lrstack_u2_r)** | te13-upgraded 8-leg honest stack: **0.9508 / c4 0.9515 / miss4 0.9464 — new best honest number.** Tomorrow's assembled final #2. | **0.9508 (honest)** |
+| 2026-07-11 | xgb_te3_u_s42 | v0.7 recipe on XGB: +0.0010 (uniform mechanism across all 4 libraries); weakest absolute, inventory only. | 0.9498 |
+| 2026-07-11 | probe_combiner_u | u-surface combiner verdict: lr = lr2 0.95076 (top-2 legs carry everything); **metablend shape now HURTS** (−0.00009; NM −0.00055) → final #2 = lrstack_u2, metablend_u dominated. | lr 0.95076 (holdout) |
 
 **LB**: lgbm 0.94886, xgboost 0.94894, **ensemble_v1b 0.94970 (best)**. The blend lifts once
 models are pre-corrected to their deployed surface. Next lever for a bigger jump is a non-GBDT base
