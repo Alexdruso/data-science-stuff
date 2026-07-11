@@ -1196,6 +1196,7 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-11 | **lrstack_u2 (file: lrstack_u2_r)** | te13-upgraded 8-leg honest stack: **0.9508 / c4 0.9515 / miss4 0.9464 — new best honest number.** Tomorrow's assembled final #2. | **0.9508 (honest)** |
 | 2026-07-11 | xgb_te3_u_s42 | v0.7 recipe on XGB: +0.0010 (uniform mechanism across all 4 libraries); weakest absolute, inventory only. | 0.9498 |
 | 2026-07-11 | probe_combiner_u | u-surface combiner verdict: lr = lr2 0.95076 (top-2 legs carry everything); **metablend shape now HURTS** (−0.00009; NM −0.00055) → final #2 = lrstack_u2, metablend_u dominated. | lr 0.95076 (holdout) |
+| 2026-07-11 | overnight breadths | **All three te3-family breadths converge at 0.9506** (realmlp_te13 ×5, hgbc_te3 ×5, lgbm_te3 ×3 seeds) — one recipe, one solo ceiling. `lrstack_u3` (deepened-breadth stack) building overnight; read + compare vs lrstack_u2 0.9508 in the morning. | 0.9506 / 0.9506 / 0.9506 |
 
 **LB**: lgbm 0.94886, xgboost 0.94894, **ensemble_v1b 0.94970 (best)**. The blend lifts once
 models are pre-corrected to their deployed surface. Next lever for a bigger jump is a non-GBDT base
