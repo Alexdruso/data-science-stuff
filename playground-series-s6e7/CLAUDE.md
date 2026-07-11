@@ -753,6 +753,15 @@ orderings within ±0.0005 are mush (PP-2 theorem, corr=0.000).
   class).
 - **User-directed submissions (scores not read back)**: `lrstack6b_r.csv`,
   `realmlp_rule_r_breadth.csv` — the day's two promising artifacts.
+- **DL-2 transductive distillation (`train_distill.py` NEW) — VETO, mechanism class
+  CLOSED**: TabMScratch student distilled from `lrstack6b_r` test probs on the 295k real
+  test rows (the only inputs with the TRUE mask mechanism), fine-tuned on fold labels.
+  Solo 0.9489 = EXACTLY its no-distill twin (tabms_r_s42) even with the optimistic
+  full-CV-teacher bias (flagged in the script); signature identical to the decimal
+  (76.0% vs 77.6% miss-driver fixes, overlap 93.5% vs 93.9%). **Training on
+  true-mechanism inputs does not move error placement ⇒ the "different training
+  surface" class is measured dead at its cheap end; DL-1 synthetic pretraining
+  deprioritized (same channel, 10× cost).**
 
 ### ⚠️ PROTOCOL (user-set, 2026-07-02 pm): work LEADERBOARD-BLIND
 The user watches the LB themselves; **Claude must not query submission scores**
@@ -1067,6 +1076,7 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-11 | realmlp_rule_r_s7/s123 + breadth | Rule-recipe seed average. **Submitted (user-directed).** | 0.9491/0.9493; breadth 0.9493 |
 | 2026-07-11 | probe_finals_pairs | Pairwise E[max] MC over 6 candidates: champion_v1+lrstack6_r optimal (0.94951) among comparable surfaces; final5r2_r face-value dominance = known m050 inflation, rejected. | — |
 | 2026-07-11 | probe_combiner_rule | Focused seat test: lr6r +0.00000 (6/12), lr6s −0.00006 → no seat. 5th consecutive LR-seat veto ⇒ combiner axis saturated for this inventory. | lr6 0.94939 holdout |
+| 2026-07-11 | distill_r_s42 | DL-2 transductive distillation (teacher lrstack6b_r test probs, real test rows, TabMScratch student): solo = twin exactly, signature identical to the decimal → **VETO; "different training surface" class closed cheap; DL-1 deprioritized.** | 0.9489 |
 
 **LB**: lgbm 0.94886, xgboost 0.94894, **ensemble_v1b 0.94970 (best)**. The blend lifts once
 models are pre-corrected to their deployed surface. Next lever for a bigger jump is a non-GBDT base
