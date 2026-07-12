@@ -49,6 +49,12 @@ TE13 = os.environ.get("S6E7_TE13", "") not in ("", "0")
 # leakage numerics). Flat for the 33-leaf HGBC; the smooth consumer is the
 # remaining test of the channel. Additive: read is paired vs realmlp_te13.
 KNN = os.environ.get("S6E7_KNN", "") not in ("", "0")
+# S6E7_ESEL=bll (Day-10 eve): epoch selection by balanced LOGLOSS instead of
+# balanced accuracy — the field verified BA-as-selection is noise-prone; our
+# strongest leg has always epoch-selected on BA. S6E7_SNAP=k: average softmax
+# over the top-k epochs (window average of the steep trajectory). Paired arms.
+ESEL = os.environ.get("S6E7_ESEL", "bacc")
+SNAP = int(os.environ.get("S6E7_SNAP", "0"))
 # "u" = UNREPAIRED surface (Day-9 evening, discussion/719199): REPAIR=0 must not
 # reuse the "r" TE cache — those blocks were computed on the remasked matrix.
 _REPAIR = os.environ.get("S6E7_REPAIR", "") not in ("", "0")
@@ -58,12 +64,16 @@ MODEL_NAME = (
     ("realmlp_rule" if RULE else "realmlp")
     + ("_te13" if TE13 else "")
     + ("_knn" if KNN else "")
+    + ("_bll" if ESEL == "bll" else "")
+    + (f"_snap{SNAP}" if SNAP else "")
 )
 CFG = dict(
     train_bs=512,
     fused_optimizer=True,
     allow_amp=True,
     verbosity=1,
+    epoch_select=ESEL,
+    snapshot_k=SNAP,
 )
 
 
@@ -141,11 +151,12 @@ def main() -> None:
             torch.cuda.empty_cache()
         return val_proba, test_proba
 
-    oof, test, fold_scores = zoo_cv(
-        ds, fit_fold, ckpt_name=f"{MODEL_NAME}_s{SEEDS[0]}", seed=SEEDS[0]
-    )
+    # ckpt name carries the SURFACE tag (Day-10 audit: r/u runs of the same
+    # model+seed must never share checkpoint files after a crash)
+    ckpt = f"{MODEL_NAME}_{SURFACE_TAG}_s{SEEDS[0]}"
+    oof, test, fold_scores = zoo_cv(ds, fit_fold, ckpt_name=ckpt, seed=SEEDS[0])
     finalize(MODEL_NAME, ds, oof, test, fold_scores)
-    clear_ckpt(f"{MODEL_NAME}_s{SEEDS[0]}")
+    clear_ckpt(ckpt)
 
 
 if __name__ == "__main__":

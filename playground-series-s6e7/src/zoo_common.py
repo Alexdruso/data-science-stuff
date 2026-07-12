@@ -215,7 +215,14 @@ def te13_block_for_fold(
     te_view = ds.test[cols].astype(str)
     names = [f"te13_{c}_{k}" for c in cols for k in range(N_CLASSES)]
 
-    enc = TargetEncoder(cv=5, smooth="auto", target_type="multiclass")
+    # seeded inner CV (Day-10 audit: sklearn 1.9's default is an UNSEEDED
+    # shuffled StratifiedKFold — nondeterministic TE draws add noise to
+    # every paired read)
+    enc = TargetEncoder(
+        cv=StratifiedKFold(n_splits=5, shuffle=True, random_state=seed),
+        smooth="auto",
+        target_type="multiclass",
+    )
     fit_block = enc.fit_transform(tr_view.iloc[tr_idx], ds.y[tr_idx])
     train_block = np.zeros((len(ds.y), len(names)), dtype=np.float32)
     train_block[tr_idx] = fit_block.astype(np.float32)

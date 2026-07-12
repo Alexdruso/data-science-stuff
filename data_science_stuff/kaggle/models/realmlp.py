@@ -483,6 +483,10 @@ class RealMLP_TD_Classifier(BaseEstimator):
 
         best_score, best_epoch = -np.inf, 0
         best_val_probs: NDArray[Any] | None = None
+        epoch_select = str(p.get("epoch_select", "bacc"))
+        snapshot_k = int(p.get("snapshot_k", 0))
+        # (score, val_probs, cpu_state) per epoch when snapshot averaging is on
+        snaps: list[tuple[float, NDArray[Any], dict[str, torch.Tensor]]] = []
         self.ckpt_path_ = ckpt_path
         ema_state = None
         if ema_decay > 0:
@@ -571,8 +575,28 @@ class RealMLP_TD_Classifier(BaseEstimator):
             if live_state is not None:
                 self.model_.load_state_dict(live_state, strict=True)
 
-            epoch_score = balanced_accuracy_score(y_v, np.argmax(val_probs, axis=1))
+            if epoch_select == "bll":
+                # balanced logloss: mean over classes of the class's mean NLL —
+                # smoother selection signal than the argmax-thresholded bacc
+                # (field-verified: bacc as a selection metric is noise-prone)
+                nll = -np.log(np.clip(val_probs[np.arange(len(y_v)), y_v], 1e-9, 1.0))
+                epoch_score = -float(
+                    np.mean([nll[y_v == c].mean() for c in np.unique(y_v)])
+                )
+            else:
+                epoch_score = balanced_accuracy_score(y_v, np.argmax(val_probs, axis=1))
             improved = epoch_score > best_score
+            if snapshot_k > 0:
+                eval_state = (
+                    ema_state if ema_state is not None else (self.model_.state_dict())
+                )
+                snaps.append(
+                    (
+                        epoch_score,
+                        val_probs.copy(),
+                        {k: v.detach().cpu().clone() for k, v in eval_state.items()},
+                    )
+                )
             if improved:
                 best_score, best_epoch = epoch_score, epoch + 1
                 best_val_probs = val_probs.copy()
@@ -596,6 +620,11 @@ class RealMLP_TD_Classifier(BaseEstimator):
         self.model_.load_state_dict(torch.load(ckpt_path, weights_only=True))
         self.best_score_ = best_score
         self.best_val_probs_ = best_val_probs
+        self._snap_states: list[dict[str, torch.Tensor]] = []
+        if snapshot_k > 0 and snaps:
+            top = sorted(snaps, key=lambda s: s[0], reverse=True)[:snapshot_k]
+            self.best_val_probs_ = np.mean([s[1] for s in top], axis=0)
+            self._snap_states = [s[2] for s in top]
         self._dev = dev
         if verbose >= 1:
             print(f"  → best score: {best_score:.5f}  (epoch {best_epoch})")
@@ -611,19 +640,35 @@ class RealMLP_TD_Classifier(BaseEstimator):
             X_cat = np.clip(X_cat, 0, np.array(self.cat_dims_) - 1)
         Xn = torch.as_tensor(X_num, dtype=torch.float32, device=self._dev)
         Xc = torch.as_tensor(X_cat, dtype=torch.long, device=self._dev)
-        self.model_.eval()
-        with torch.no_grad():
-            proba: NDArray[Any] = np.concatenate(
-                [
-                    self.model_(Xn[s : s + eval_bs], Xc[s : s + eval_bs])
-                    .mean(dim=1)
-                    .cpu()
-                    .numpy()
-                    for s in range(0, len(X_num), eval_bs)
-                ],
-                axis=0,
+
+        def _proba_current() -> NDArray[Any]:
+            self.model_.eval()
+            with torch.no_grad():
+                out: NDArray[Any] = np.concatenate(
+                    [
+                        self.model_(Xn[s : s + eval_bs], Xc[s : s + eval_bs])
+                        .mean(dim=1)
+                        .cpu()
+                        .numpy()
+                        for s in range(0, len(X_num), eval_bs)
+                    ],
+                    axis=0,
+                )
+            return out
+
+        snap_states = getattr(self, "_snap_states", [])
+        if not snap_states:
+            return _proba_current()
+        # snapshot averaging: mean softmax over the stored top-k epoch states;
+        # restore the checkpointed best state afterwards.
+        probas = []
+        for state in snap_states:
+            self.model_.load_state_dict(
+                {k: v.to(self._dev) for k, v in state.items()}, strict=True
             )
-        return proba
+            probas.append(_proba_current())
+        self.model_.load_state_dict(torch.load(self.ckpt_path_, weights_only=True))
+        return np.asarray(np.mean(probas, axis=0))
 
     def predict(self, X: pd.DataFrame) -> NDArray[Any]:
         labels: NDArray[Any] = self.classes_[np.argmax(self.predict_proba(X), axis=1)]
@@ -631,6 +676,8 @@ class RealMLP_TD_Classifier(BaseEstimator):
 
 
 REALMLP_TD_CONFIG: dict[str, Any] = {
+    "epoch_select": "bacc",  # "bll" = balanced logloss (smoother selection signal)
+    "snapshot_k": 0,  # >0: average val/test softmax over the top-k epochs
     "n_ens": 8,
     "embed_dim": 7,
     "onehot_thresh": 10,
