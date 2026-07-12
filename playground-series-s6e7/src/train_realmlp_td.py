@@ -44,12 +44,21 @@ RULE = os.environ.get("S6E7_RULE", "") not in ("", "0")
 # (zoo_common.te13_block_for_fold, 39 cols) to the recipe inputs — the block that
 # took HGBC to 0.9504. Additive: everything else identical, read is paired.
 TE13 = os.environ.get("S6E7_TE13", "") not in ("", "0")
+# S6E7_KNN=1 (Day-10 PM): append the kNN label-distribution block
+# (knn_features.knn_block_for_fold, 9 cols — joint-density statistic in the 6
+# leakage numerics). Flat for the 33-leaf HGBC; the smooth consumer is the
+# remaining test of the channel. Additive: read is paired vs realmlp_te13.
+KNN = os.environ.get("S6E7_KNN", "") not in ("", "0")
 # "u" = UNREPAIRED surface (Day-9 evening, discussion/719199): REPAIR=0 must not
 # reuse the "r" TE cache — those blocks were computed on the remasked matrix.
 _REPAIR = os.environ.get("S6E7_REPAIR", "") not in ("", "0")
 _BASE_TAG = ("r" if _MULT == 1.0 else "r2") if _REPAIR else "u"
 SURFACE_TAG = _BASE_TAG + ("_rule" if RULE else "")
-MODEL_NAME = ("realmlp_rule" if RULE else "realmlp") + ("_te13" if TE13 else "")
+MODEL_NAME = (
+    ("realmlp_rule" if RULE else "realmlp")
+    + ("_te13" if TE13 else "")
+    + ("_knn" if KNN else "")
+)
 CFG = dict(
     train_bs=512,
     fused_optimizer=True,
@@ -93,6 +102,12 @@ def main() -> None:
             )
             te_tr_full = np.concatenate([te_tr_full, t13_tr], axis=1)
             te_te = np.concatenate([te_te, t13_te], axis=1)
+        if KNN:
+            from knn_features import knn_block_for_fold
+
+            k_tr, k_te, _nk = knn_block_for_fold(ds, tr_idx, seed, fold, _BASE_TAG)
+            te_tr_full = np.concatenate([te_tr_full, k_tr], axis=1)
+            te_te = np.concatenate([te_te, k_te], axis=1)
         # median-impute raw numerics + the ordinal tail of the TE block (train-fold stats)
         num_med = np.nanmedian(nd.Xnum_tr[tr_idx], axis=0)
         num_tr = np.where(np.isnan(nd.Xnum_tr), num_med, nd.Xnum_tr)

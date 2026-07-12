@@ -15,10 +15,17 @@ His anchor: OOF 0.95026 (his fold split), LB 0.95036 — no haircut.
 
 Run (unrepaired namespace):
   S6E7_SEEDS=42 S6E7_RUN_TAG=_u_s42 python src/train_hgbc_te3.py
+
+S6E7_NO_CW=1 (Day-10 PM): drop class_weight="balanced" and let the decision
+layer do ALL prior correction — the field warns balanced training + tuned
+decision weights double-correct inside the sigmoid boundary band (the
+15x-upweighted minority side of a 20-40%-flip cell distorts what the tree
+estimates there). Artifact name becomes hgbc_te3ncw.
 """
 
 from __future__ import annotations
 
+import os
 import sys
 import warnings
 from pathlib import Path
@@ -48,7 +55,16 @@ HGBC_CONFIG: dict[str, object] = {
 }
 
 
+NO_CW = os.environ.get("S6E7_NO_CW") == "1"
+
+
 def main() -> None:
+    config = dict(HGBC_CONFIG)
+    name = "hgbc_te3"
+    if NO_CW:
+        config["class_weight"] = None
+        name = "hgbc_te3ncw"
+        print("S6E7_NO_CW=1: unweighted training, decision layer corrects priors")
     ds = load_dataset()
     raw_cols = ds.feature_cols
     X, X_test = ds.train.copy(), ds.test.copy()
@@ -83,17 +99,18 @@ def main() -> None:
         X_tr = assemble(X.iloc[tr_idx], te_tr)
         X_va = assemble(X.iloc[val_idx], te_va)
         X_te = assemble(X_test, te_te)
-        model = HistGradientBoostingClassifier(**HGBC_CONFIG, random_state=seed)
+        model = HistGradientBoostingClassifier(**config, random_state=seed)
         model.fit(X_tr, ds.y[tr_idx])
         assert list(model.classes_) == list(range(N_CLASSES)), model.classes_
         print(f"    n_iter={model.n_iter_}")
         return model.predict_proba(X_va), model.predict_proba(X_te)
 
+    tag = os.environ.get("S6E7_RUN_TAG", f"_u_s{SEEDS[0]}")
     oof, test, fold_scores = zoo_cv(
-        ds, fit_fold, ckpt_name=f"hgbc_te3_u_s{SEEDS[0]}", seed=SEEDS[0]
+        ds, fit_fold, ckpt_name=f"{name}{tag}", seed=SEEDS[0]
     )
-    finalize("hgbc_te3", ds, oof, test, fold_scores)
-    clear_ckpt(f"hgbc_te3_u_s{SEEDS[0]}")
+    finalize(name, ds, oof, test, fold_scores)
+    clear_ckpt(f"{name}{tag}")
 
 
 if __name__ == "__main__":

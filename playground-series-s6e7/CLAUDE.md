@@ -934,6 +934,105 @@ seat; the 4 queued CSVs submitted in the morning (scores unread).**
   NOT yet run (small P, cheap): TabPFN-3 subsample probe, per-class specialist
   binaries as meta columns, RealMLP snapshot averaging, missingness TTA.
 
+### Day-10 PM (2026-07-12): ADVISOR-GUIDED ROUND — two Fable 5 agents; boundary-band channel measured; hedge de-confounded; EXPLORATION CONTINUES (user ruling: no finals rush)
+
+**User spun up two advisor agents; condensed reports + Day-11 backlog in
+`notes/advisors_day10.md`.** Strategist: saturation unproven for the JOINT
+boundary-band channel (field notebook same day: the generator learned a SIGMOID at
+the sleep 6/7 cuts — sleep 6.01-6.10 × stress=high is 20-40% unhealthy; our AM
+amplifier pricing conditioned at rule-triple resolution = too coarse; the te3p and
+combo2 kills were scoped too narrowly to cover the rule pairs at exact-value
+resolution). Decision theorist: the two-surface hedge pays only if repaired-OOF
+bias δ_r ≥ ~0.0012 (previously untested); seeds are spent (per-seed sd ~1e-4 vs
+6e-4 private-split sd); ops hardening (PROTOCOL ADDITIONS below); highest-EV
+recurring activity = short daily forum sweep (the campaign's largest gain came
+from a forum post).
+
+**⚠️ USER RULING (evening): plenty of time — NO finals decision now; stay in
+exploration phase. All δ_r/finals work below is BOOKKEEPING; the pair question
+stays open until the user calls endgame.**
+
+- **Rule-pair TE at exact-value resolution (`train_hgbc_te3_rp.py`) — FLAT**:
+  sleep-exact×stress + sleep-exact×activity pair TEs (~2,750 cells, ~250
+  rows/cell) = 0.9503 vs 0.9504 — the sigmoid band does not pay through pair TE.
+- **kNN label-distribution features (`knn_features.py` +
+  `train_hgbc_te3_knn.py`) — FLAT solo**: fold-safe drop-self GPU kNN
+  (k∈{10,30,100} over the 6 leakage numerics, ~110 s/fold, cache knn_u_s42_f*) as
+  9 extra columns = 0.9503-0.9504 vs 0.9504. The field's +0.0003 does not
+  replicate on our base — te13 already absorbed it. Remaining reads: LR seat +
+  realmlp consumer (S6E7_KNN=1 wired into train_realmlp_td).
+- **Unweighted leg (`S6E7_NO_CW=1` → `hgbc_te3ncw_u_s42`)**: argmax 0.8892
+  (majority-walled as designed) → decision layer FULLY rescues to **0.9503**.
+  Differently-biased posteriors at par = seat-shaped (mlp_la_r precedent);
+  12-cell seat test at day's end (`probe_combiner_pm.py`).
+- **δ-bracket finals MC (`probe_finals_bracket.py`, bookkeeping)**: pair
+  crossover vs the all-u alternative sits between δ_r +0.0008 and +0.0016 ⇒
+  knife-edge **δ_r* ≈ 0.0012** (matches the advisor's analytical estimate).
+- **User-directed paired public read (explicit one-off exemption)**:
+  pub(lrstack_u3_r) − pub(lrstack6b_r) = **+0.00052** ⇒ δ_r point estimate
+  ≈ 0.0009 (68% band ~[0.0004, 0.0013]) — below the knife-edge, leaning all-u
+  pair; band straddles, decision OPEN per user ruling. Bonus reads: u3 public
+  sits ~0.0003 under honest OOF ⇒ **u-family transfers with no meaningful
+  haircut** (Day-2-style risk retired); u2-vs-u3 public ordering = near-clone
+  noise. Absolute scores not recorded here per protocol.
+- **te13 × repaired lane (bookkeeping; de-confounds surface vs recipe in the
+  hedge)**: hgbc_te3_r_s42 **0.9493**; realmlp_te13_r s42/7/123
+  **0.9495/0.9495/0.9495** — the modern recipe carries the same ~0.0010
+  repaired-OOF gap as the old legs. Repaired-te13 stack rebuild + intersection
+  read = open bookkeeping (no rush).
+- **Ops done**: finals-lineage backup `~/s6e7_finals_backup_2026-07-12.tar.gz` +
+  `results/finals_backup_manifest.sha256` (user to copy off-box).
+- **END-OF-DAY VERDICTS — the boundary-band channel is CLOSED by measurement**:
+  realmlp_te13_knn_u_s42 **0.9505 = exact tie** with its paired te13 baseline (the
+  smooth consumer extracts nothing from the joint-density block either);
+  seat tests (`probe_combiner_pm.py`, 12 cells): knn +0.00000 (5/12), ncw
+  −0.00001 (3/12), both +0.00002 (6/12) — **no seats**. The strategist's hole in
+  the saturation thesis is now measured shut through five reads (pair-TE, kNN on
+  trees, kNN on NN, ncw solo, seats). Saturation stands EARNED, not asserted —
+  at this inventory and these information channels. Day-11 leads: forum sweep
+  (standing), repaired-te13 stack rebuild (bookkeeping), fresh brainstorm for
+  genuinely new channels.
+
+### ⚠️ PROTOCOL ADDITIONS (Day-10 PM, decision-theorist audit — endgame hardening)
+
+1. **EXPLICIT FINALS SELECTION IS MANDATORY, ≥48h BEFORE DEADLINE (~Jul 31).** With
+   no selection, Kaggle auto-selects best-PUBLIC — which, given the gamed public band
+   (0.9510-0.9517 via LB probing) and 40+ curiosity submissions (one solo read "at
+   the public top"), would pick precisely a public-overfit artifact. The user clicks
+   the selection in the Kaggle UI; record the two selected files here when done.
+2. **Freeze finals-lineage tags ~Jul 27**: after that date no run may write into the
+   tags backing the selected finals; new experiments use fresh tags only.
+3. **Off-box backup**: `~/s6e7_finals_backup_2026-07-12.tar.gz` (finals CSVs +
+   oof/test npy + weights JSONs + sha256 manifest `results/finals_backup_manifest.
+   sha256`) — results/ (11 GB) and submissions/ are gitignored and exist only on a
+   box that randomly hard-reboots; the user should copy the tarball off-box. Kaggle
+   holds the submitted CSVs, so finals SELECTION survives total box loss either way.
+4. **Informative-read rule** (scope-corrects the Day-9 tiebreak theorem, which
+   excludes epistemic mean uncertainty by construction): a public read is worth
+   requesting from the user only when the hypothesis gap ≥ 2× read noise — i.e.
+   ≥0.0009 for PAIRED deltas of already-submitted structurally-different files
+   (sd(Δpub)≈0.00045), ≥0.003 for absolute reads (pub sd 0.0015). Within-lineage
+   near-clone orderings stay worthless (corr(Δpub,Δpriv)=0.000). Currently ONE read
+   qualifies: sign + rough magnitude of pub(lrstack_u3_r) − pub(lrstack6b_r) — it
+   carries ~3σ on the δ_r hedge question (knife-edge δ_r*≈0.0012, see
+   `results/probe_finals_bracket.txt`).
+
+### 🎲 QUARANTINED SIDE-TRACK (user-sanctioned 2026-07-12): `lbprobe_*` public-LB probing
+A for-fun public-LB-only track, explicitly NOT for finals (public∩private=∅; finals stay
+CV-selected). All code/artifacts are prefixed `lbprobe_` (src/, results/, submissions/);
+**public scores live ONLY in `results/lbprobe_scores.csv` + the raw dump — never in this
+file or memory.** Pipeline: `lbprobe_ingest.py` (reconcile `kaggle competitions submissions`
+dump with disk CSVs via the mtime rule) → `lbprobe_fit.py` (Gaussian conditioning of a
+calibrated per-row class posterior on the exact public scores, profile-group level) →
+`lbprobe_design.py` (probe submissions = reference + one flip set each) →
+`lbprobe_compose.py` (keep sets with measured Δ>0, compose next reference).
+Key findings: (1) one-shot posterior-tilt candidates do NOT survive constraint-split
+cross-validation — model-free probing only; (2) balanced accuracy is LINEAR in per-row
+assignments, so disjoint flip-set deltas are exact and compose additively — keep/revert
+hill-climbing with exact feedback; (3) LOO score prediction from 48 anchors: MAE 1.7e-4
+vs 4.5e-4 prior-only. ⚠️ This track makes protocol item #1 (manual finals selection)
+LOAD-BEARING — probe artifacts may top the public LB and Kaggle auto-selects best-public.
+
 ### ⚠️ PROTOCOL (user-set, 2026-07-02 pm): work LEADERBOARD-BLIND
 The user watches the LB themselves; **Claude must not query submission scores**
 (`kaggle competitions submissions`) or design LB-probing/attribution submission plans. Rationale:
@@ -1274,6 +1373,13 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-12 | hgbc_te3nb_u_s42 | Original-world NB log-posterior columns: **FLAT**. GF#2 closed. | 0.9503 |
 | 2026-07-12 | hgbc_te3fd_u_s42 | Freq-distortion ratio features: **FLAT** (= baseline exactly) despite live fingerprint. GF#4 closed. | 0.9504 |
 | 2026-07-12 | probe_geo_breadth | Geometric vs arithmetic seed-averaging: wash (±0.00002, 3 families). | — |
+| 2026-07-12 | hgbc_te3rp_u_s42 | Rule-pair TE at EXACT-value resolution (sleep-exact×stress/activity, ~250 rows/cell): **FLAT** — the sigmoid boundary band does not pay through pair TE. | 0.9503 |
+| 2026-07-12 | hgbc_te3knn_u_s42 | kNN label-distribution features (fold-safe drop-self, 6 leakage numerics, k={10,30,100}): **FLAT solo** — field's +0.0003 absorbed by te13 on our base. | 0.9503 |
+| 2026-07-12 | hgbc_te3ncw_u_s42 | Unweighted training (S6E7_NO_CW=1): argmax 0.8892 → decision layer fully rescues; seat-shaped par. | 0.9503 |
+| 2026-07-12 | probe_finals_bracket | δ-bracket pair MC (bookkeeping): knife-edge δ_r*≈0.0012 vs the all-u pair; user-directed paired public read → δ_r ≈ 0.0009 [0.0004, 0.0013] — leaning all-u, **decision OPEN (user: exploration phase)**. | — |
+| 2026-07-12 | hgbc_te3_r_s42 / realmlp_te13_r ×3 | te13 recipe on the REPAIRED surface (hedge de-confounding, bookkeeping): same ~0.0010 repaired-OOF gap as the old legs. | 0.9493 / 0.9495×3 |
+| 2026-07-12 | realmlp_te13_knn_u_s42 | kNN block through the smooth consumer: **exact tie with paired te13 baseline** — channel closed at the NN level too. | 0.9505 |
+| 2026-07-12 | probe_combiner_pm | Seat tests knn/ncw/both: +0.00000 / −0.00001 / +0.00002 — **no seats**. Boundary-band channel closed end-to-end; saturation earned, not asserted. | lr8 0.95071 holdout |
 
 **LB**: lgbm 0.94886, xgboost 0.94894, **ensemble_v1b 0.94970 (best)**. The blend lifts once
 models are pre-corrected to their deployed surface. Next lever for a bigger jump is a non-GBDT base
