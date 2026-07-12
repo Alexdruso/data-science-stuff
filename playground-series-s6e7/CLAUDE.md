@@ -868,6 +868,72 @@ configs pay on all three families — the whole base inventory is upgraded:**
   reads of the u-family (Day-2 haircut risk is the one open question; Susol's 3
   no-haircut precedents + our champion's say it should hold).
 
+### Day-10 (2026-07-12): EXPLORATION DAY — 10 backlog avenues measured; ⚡ flips = LEARNABLE generator structure; FTT rehabilitated (no seat); finals UNCHANGED
+
+**The whole `notes/ideas_day10_personas.md` slate priced in one day (CPU/GPU lanes
+parallel throughout). Finals stay lrstack_u3 + lrstack6b_r; nothing earned a stack
+seat; the 4 queued CSVs submitted in the morning (scores unread).**
+
+- **⚡ THE DAY'S MECHANISTIC FIND — provable-noise curation is INVERTED**
+  (`train_lgbm_te3_noise.py`, 4 paired arms vs lgbm_te3_u_s42 0.9503): relabel-to-rule
+  0.9466, drop 0.9466, soft-0.992 0.9454 — all ~−0.004, and the damage decomposes
+  EXACTLY into the contradicted-row recoveries the baseline was already making.
+  **The baseline predicts the observed (rule-contradicting) label on 17.2% of the
+  4,867 contradicted rows; a relabeled model recovers 0% by construction.** The
+  generator's 0.78% label tail is CELL-CLUSTERED, not homogeneous (rule-triple flip
+  rates 0.4%–2.26%, homogeneity rejected p≈1e-254; exact sleep_duration values
+  deviance 4171/370df) — since test labels come from the same generator, flips are
+  real learnable signal. Explains the field kills (noise cleaning absent from winning
+  solutions; minority-count promotion LB-verified harmful): the flips ARE minority
+  rows (1,961 fit + 2,187 unh of 4,867). Amplifier lever priced LOW: predicting a
+  flip needs P(flip|x) ≳ 9% under balanced weighting; cell rates top out ~2.3%, so
+  the recoverable tail (fine joint-value cells) is largely harvested already.
+  ⚠️ ntex arm (exclude-from-TE-only) INVALID BY CONSTRUCTION, not a finding: mixing
+  cross-fitted TE (clean rows) with full-fold TE (dirty rows) in one training matrix
+  makes "full-fit-style TE" a 15×-weighted minority signature that fires on every
+  val row → 0.8657. Methodological trap for the record: never mix TE generations
+  within a training design.
+- **FTT + te13 = the recipe's FIFTH consumer** (`train_ftt_te13.py` NEW: TE triple
+  fused per-feature into its token — token count unchanged vs Day-8 FTT; pad mask
+  dropped, NaN info now carried by the 'nan'-level TE): **0.9504/0.9503/0.9501
+  (s42/7/123)** vs the Day-8 veto at 0.9478 = +0.0026 — the veto was pre-TE-era, as
+  suspected. BUT **no stack seat** (`probe_combiner_ftt.py`, 12 cells: lr9−lr8
+  −0.00001 at 6/12; 3-family core lr3 −0.00002) ⇒ architecture diversity ≠
+  information diversity; all te3 legs share one TE channel; "top-2 carry the stack"
+  reconfirmed. ftt_te13 = inventory; extra seeds killed mid-run (no consumer).
+- **Decision-weight LOFO audit (`probe_dw_lofo.py`) — the +0.010 layer GENERALIZES**:
+  optimism (full-fit in-sample − honest 5-fold cross-fit) = +0.00003 (lrstack_u3) /
+  +0.00022 (hgbc_te3_breadth) / +0.00010 (realmlp_te13_breadth), all far below the
+  0.0005 gate → no deployment change. lrstack_u3's weights ≈ [1,1,1] (the LR meta
+  already internalizes class balance).
+- **Regime-conditioned meta (`probe_regime_meta.py`) — VETO**: logits × 8
+  missingness-pattern one-hots, C ∈ {0.03, 0.3, 3}: −0.00016..−0.00022 vs plain lr
+  (≤1/12 positive) even at max shrinkage. Third independent no-regional-trust
+  confirmation (after region_blend Day-2 and tree/NN metas Day-8).
+- **Pairwise co-occurrence TE (`train_hgbc_te3_pairs.py`) — FLAT** (0.9503 vs
+  0.9504): top added-dependence pairs by |ΔCramérV| are exactly the expected
+  generator couplings (step×activity .39, exercise×activity .39, water×gender .12)
+  but pair-key TEs add nothing the regularized trees + univariate TE didn't have.
+- **Original-world NB prior (`train_hgbc_te3_nb.py`) — FLAT** (0.9503).
+- **Freq-distortion features (`train_hgbc_te3_fd.py`) — FLAT** (0.9504 = baseline
+  exactly), despite the pre-check (`probe_freq_distortion.py`) finding REAL
+  class-conditional distortion (water control: 23/118 FDR-sig values, median TV
+  0.036 — a genuine CTGAN conditional-vector fingerprint; bmi=16.0 TV 0.96 = a
+  clipping-boundary artifact). The fingerprint exists; it carries no incremental
+  label signal beyond the TE posteriors.
+- **Row-memorization hash-join (`probe_memorization.py`) — DEAD**: 0 exact all-13
+  string matches test→original and train→original (permuted null 0); closes GF#6
+  consistent with Day-4's numeric-key result.
+- **Geometric vs arithmetic seed-averaging — WASH** (±0.00002 on hgbc_te3/
+  realmlp_te13/lgbm_te3 breadths; `results/probe_geo_breadth.txt`). The field's
+  +0.00012 nugget does not replicate.
+- **Day-10 net**: 10 avenues measured, one family rehabilitated (inventory), one
+  mechanism insight (flips = learnable structure — do NOT curate labels, ever), zero
+  stack changes. The saturation picture sharpens: the binding constraint is the TE
+  information channel, not architecture or combiner shape. Remaining backlog items
+  NOT yet run (small P, cheap): TabPFN-3 subsample probe, per-class specialist
+  binaries as meta columns, RealMLP snapshot averaging, missingness TTA.
+
 ### ⚠️ PROTOCOL (user-set, 2026-07-02 pm): work LEADERBOARD-BLIND
 The user watches the LB themselves; **Claude must not query submission scores**
 (`kaggle competitions submissions`) or design LB-probing/attribution submission plans. Rationale:
@@ -1198,6 +1264,16 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-11 | probe_combiner_u | u-surface combiner verdict: lr = lr2 0.95076 (top-2 legs carry everything); **metablend shape now HURTS** (−0.00009; NM −0.00055) → final #2 = lrstack_u2, metablend_u dominated. | lr 0.95076 (holdout) |
 | 2026-07-11 | overnight breadths | **All three te3-family breadths converge at 0.9506** (realmlp_te13 ×5, hgbc_te3 ×5, lgbm_te3 ×3 seeds) — one recipe, one solo ceiling. | 0.9506 / 0.9506 / 0.9506 |
 | 2026-07-11 | **lrstack_u3 (file: lrstack_u3_r)** | Deepened-breadth stack: tie with u2 (c4 0.9516 a hair up, miss4 same) = variance reduction as expected → **preferred final-#2 FILE** (more seeds, same recipe). | **0.9508 / c4 0.9516 / miss4 0.9464** |
+| 2026-07-12 | probe_memorization | All-13 string hash-join test/train→original: 0 matches (null 0) → GF#6 dead. | — |
+| 2026-07-12 | probe_freq_distortion | Class-conditional freq distortion PRESENT (water control 23/118 FDR-sig, TV 0.036 = CTGAN conditional-vector fingerprint) → feature arm gated in. | — |
+| 2026-07-12 | probe_dw_lofo | Decision-layer optimism ≤ +0.00022 on all 3 audited candidates → the +0.010 layer generalizes; no LOFO deployment. | — |
+| 2026-07-12 | probe_regime_meta | Logits × missingness-pattern interactions, C swept: −0.0002 vs plain lr at every C (≤1/12) → **VETO** (3rd no-regional-trust confirmation). | — |
+| 2026-07-12 | lgbm_te3_{nrel,ndrop,nsoft}_u_s42 | Noise-curation arms: **all ~−0.004** — damage = the baseline's 17.2% contradicted-row recoveries deleted. **⚡ Flips are cell-clustered learnable generator structure (homogeneity p≈1e-254); never curate labels.** ntex arm invalid (mixed TE generations). | 0.9466 / 0.9466 / 0.9454 |
+| 2026-07-12 | **ftt_te13_u s42/7/123** | FTT + te13 fused-token recipe: **0.9504/0.9503/0.9501** vs Day-8 veto 0.9478 (+0.0026, pre-TE-era veto overturned) — the recipe's 5th consumer. **No LR seat** (lr9−lr8 −0.00001) → inventory. | **0.9504/0.9503/0.9501** |
+| 2026-07-12 | hgbc_te3p_u_s42 | Pairwise co-occurrence TE (top-15 |ΔV| pairs): **FLAT** (−0.0001 vs hgbc_te3). GF#1 closed. | 0.9503 |
+| 2026-07-12 | hgbc_te3nb_u_s42 | Original-world NB log-posterior columns: **FLAT**. GF#2 closed. | 0.9503 |
+| 2026-07-12 | hgbc_te3fd_u_s42 | Freq-distortion ratio features: **FLAT** (= baseline exactly) despite live fingerprint. GF#4 closed. | 0.9504 |
+| 2026-07-12 | probe_geo_breadth | Geometric vs arithmetic seed-averaging: wash (±0.00002, 3 families). | — |
 
 **LB**: lgbm 0.94886, xgboost 0.94894, **ensemble_v1b 0.94970 (best)**. The blend lifts once
 models are pre-corrected to their deployed surface. Next lever for a bigger jump is a non-GBDT base
