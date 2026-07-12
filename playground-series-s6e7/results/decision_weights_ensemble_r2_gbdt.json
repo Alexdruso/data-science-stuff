@@ -1,0 +1,13 @@
+{
+  "blend": {
+    "lgbm_r2_breadth": 0.24096256284391931,
+    "hgbc_r2_breadth": 0.2627436506662766,
+    "xgboost_r2_breadth": 0.25147198028297446,
+    "catboost_r2_breadth": 0.24482180620682978
+  },
+  "decision": {
+    "at-risk": 0.9325300284241966,
+    "fit": 1.0,
+    "unhealthy": 0.7779202959105848
+  }
+}
