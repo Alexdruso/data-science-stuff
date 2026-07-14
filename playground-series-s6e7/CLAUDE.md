@@ -1172,7 +1172,10 @@ Ops log: rounds 1 (07-13) and 2 (07-14) closed — keep/revert by exact deltas w
 designed (4/9 then 6/9 sets kept), and the round-2 anchor read of the composed reference
 matched the additive prediction within LB rounding (composition validated end-to-end).
 Round 3 (d3_p01–09) designed vs the round-2 composed ref, queued for the next quota day
-(9 probes + composed-ref anchor = the full 10/day). `lbprobe_autosubmit.py` is now
+(9 probes + a REFRESHED full-Bayes tilt `lbprobe_full_bayes2.csv` as the 10th slot — the
+anchor is retired now that additivity is validated; the tilt is the round's high-variance
+jump candidate, adopted as the new reference iff it beats the composed ref's known score;
+`lbprobe_submission.py` grew a --suffix arg so rebuilt tilts never overwrite scored ones). `lbprobe_autosubmit.py` is now
 parameterized (`--day N --extra <anchors>`), quota-aware (submits immediately when
 today's budget covers the round), and chains ingest → anchor-check (abort if the
 measured reference deviates >2e-5 from the manifest score) → compose → re-ingest.

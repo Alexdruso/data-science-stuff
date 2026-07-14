@@ -13,6 +13,8 @@ expected delta on the SAME public split, with two uncertainty terms:
             could not pin down), via Gaussian conditioning covariance.
 """
 
+import argparse
+
 import numpy as np
 import polars as pl
 
@@ -66,6 +68,15 @@ def delta_uncertainty(
 
 
 def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument(
+        "--suffix",
+        type=str,
+        default="",
+        help="output-name suffix, e.g. '2' -> lbprobe_full_bayes2.csv; never "
+        "overwrite an already-scored candidate (mtime rule would quarantine it)",
+    )
+    args = ap.parse_args()
     res = fit()
     qp, q, y_mat, ginv = res["qp"], res["q"], res["y_mat"], res["ginv"]
     files, b_obs, p = res["files"], res["b_obs"], res["p"]
@@ -129,7 +140,7 @@ def main() -> None:
 
     test_ids = load_test_ids()
     for name, (lab, e_post, d_post, z, nflip) in summary.items():
-        out = SUBS_DIR / f"lbprobe_{name}.csv"
+        out = SUBS_DIR / f"lbprobe_{name}{args.suffix}.csv"
         pl.DataFrame({"id": test_ids, TARGET: decode_labels(lab)}).write_csv(out)
         print(f"wrote {out.name}  (E_post {e_post:.5f}, Δ {d_post:+.5f}, z {z:.1f})")
 
