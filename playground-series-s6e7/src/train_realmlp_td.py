@@ -17,6 +17,7 @@ Run (zoo protocol, repaired surface):
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -75,6 +76,16 @@ CFG = dict(
     epoch_select=ESEL,
     snapshot_k=SNAP,
 )
+# S6E7_REALMLP_PARAMS (Day-12 tuning): JSON dict merged into CFG for
+# confirmation runs of tune_realmlp_td.py winners. MODEL_NAME does NOT change,
+# so an explicit fresh S6E7_RUN_TAG is required — never overwrite the
+# finals-lineage arrays.
+_PARAMS_ENV = os.environ.get("S6E7_REALMLP_PARAMS")
+if _PARAMS_ENV:
+    if not os.environ.get("S6E7_RUN_TAG"):
+        raise SystemExit("S6E7_REALMLP_PARAMS requires an explicit S6E7_RUN_TAG")
+    CFG.update(json.loads(_PARAMS_ENV))
+    print(f"S6E7_REALMLP_PARAMS override: {json.loads(_PARAMS_ENV)}")
 
 
 def main() -> None:

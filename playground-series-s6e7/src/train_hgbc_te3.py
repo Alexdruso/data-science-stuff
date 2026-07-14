@@ -25,6 +25,7 @@ estimates there). Artifact name becomes hgbc_te3ncw.
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 import warnings
@@ -65,6 +66,15 @@ def main() -> None:
         config["class_weight"] = None
         name = "hgbc_te3ncw"
         print("S6E7_NO_CW=1: unweighted training, decision layer corrects priors")
+    # S6E7_HGBC_PARAMS (Day-12 tuning): JSON dict merged over HGBC_CONFIG for
+    # confirmation runs. The model name does NOT change, so an explicit fresh
+    # S6E7_RUN_TAG is required — never overwrite the finals-lineage arrays.
+    params_env = os.environ.get("S6E7_HGBC_PARAMS")
+    if params_env:
+        if not os.environ.get("S6E7_RUN_TAG"):
+            raise SystemExit("S6E7_HGBC_PARAMS requires an explicit S6E7_RUN_TAG")
+        config.update(json.loads(params_env))
+        print(f"S6E7_HGBC_PARAMS override: {json.loads(params_env)}")
     ds = load_dataset()
     raw_cols = ds.feature_cols
     X, X_test = ds.train.copy(), ds.test.copy()

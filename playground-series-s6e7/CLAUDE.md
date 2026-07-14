@@ -1129,6 +1129,80 @@ Each attacked a specific crack in the saturation thesis; all held:
 discussion-board titles); finals UNCHANGED (exploration phase). In-house cupboard is
 thin at this inventory — measured, not asserted.
 
+### Day-12 (2026-07-14): HP-TUNING DAY — the two unmeasured config axes closed
+
+**User mandate: tune hyperparameters for the available models. The two genuinely
+unmeasured axes (Day-9 lesson "config × features × surface interact" left them
+open): (1) GBDT config × te13 — the Susol config was never tuned IN-HOUSE on our
+surface; (2) RealMLP — never tuned on this dataset at all (pytabkit meta-learned
+defaults; epochs=6 on 690k rows was the headline suspect).**
+
+- **RealMLP HP axis: FAIL, cleanly measured** (`src/tune_realmlp_td.py` NEW —
+  pre-registered 13-config single-axis ladder on seed-42 fold 1, te13 recipe,
+  u surface, dw-bacc objective; ~100 s/config with caches hit, whole ladder
+  28 min; resumable JSON ckpt `results/tune_realmlp_td.json`). Base fold-1
+  dw 0.95105. Every config within [−0.00031, +0.00016]: epochs 10/14/20
+  MONOTONE-NEGATIVE (the 6-epoch default is optimal, not underfitting — it
+  early-selects epoch 3-5 anyway), lr ±(0.006/0.02) both negative,
+  loss_prior_power 1.0 +0.00016 / 1.2 −0.00019 (1.075 near-optimal),
+  wd/dropout/hid768/ls_eps/numeric-noise all flat. No OOM (768³ fits).
+  Promotion bar +0.0007: nothing close. **The meta-learned TD defaults are a
+  measured local optimum on this dataset — consistent with the 3-dim channel
+  model (a better-fit vehicle still carries the same information).**
+- Env hooks added for confirmation runs (unused — no promotions):
+  `S6E7_HGBC_PARAMS` (train_hgbc_te3.py) / `S6E7_REALMLP_PARAMS`
+  (train_realmlp_td.py), JSON merged over the config; both HARD-REQUIRE an
+  explicit fresh `S6E7_RUN_TAG` so finals-lineage arrays can't be overwritten.
+- **train_tabm_scratch.py integrity fix**: TE cache tag was hardcoded `"r"` — a
+  u-surface run would have silently consumed repaired-surface TE blocks; now
+  surface-derived like the realmlp trainer (+ surface-tagged ckpt name;
+  `fit_fold_impl` hoisted to module level for the tuner).
+- **HGBC config × te13 axis: FAIL** (`src/tune_hgbc_te3.py` NEW — Optuna TPE,
+  2-fold(1,3) dw objective, cached te13 blocks → ~46 s/trial, 311 trials/4h,
+  study `results/optuna_hgbc_te3.db`, Susol incumbent pinned as trial 0):
+  incumbent 0.95027, best 0.95074 = **+0.00047**, under the +0.0007 screen bar
+  → no 5-fold rescore (even a confirmed +0.0005 fails the 0.001 gate = no
+  decision-relevant information). TPE's optimum is a DIFFERENT basin (77
+  leaves, lr 0.034, max_features 0.41, bins 192, depth None) — Susol's config
+  is not the unique optimum, but the surface is flat between basins. The Day-9
+  "config carries +0.0007" ablation is now explained: that was Susol-config vs
+  OUR DEFAULT (a bad config), not headroom above Susol.
+- **TabM-scratch config axis: FAIL** (`src/tune_tabm_scratch.py` NEW, same
+  2-fold objective, u surface, 55 trials/2h, `results/optuna_tabms.db`):
+  incumbent 0.94987, best 0.95021 = +0.00035. Hand-set constants near-optimal.
+- **⇒ HP tuning is now measured-closed on ALL THREE axes that were open**
+  (GBDT×te13, RealMLP, TabM) — the Day-11 SAME-3-DIM-VEHICLE prediction held
+  everywhere; largest delta of the day +0.00047. The tuners + env hooks remain
+  as permanent infra (resumable studies; rescore mode in tune_hgbc_te3.py).
+
+**Day-12 PM (user: "keep going, keep GPU and CPU busy") — four follow-on reads,
+all measured, all flat/no-change:**
+- **Config-basin diversity: CLOSED (8th consecutive seat veto).** The TPE
+  second basin run through the full trainer (`hgbc_te3_u_s42t`): 0.9505 vs
+  incumbent 0.9504 = +0.0001 solo (the 2-fold +0.00047 shrank at 5-fold
+  fidelity — flat between basins confirmed at deployment level). Seat test
+  (`probe_seat_basin.py`, 12 cells): +0.00003 (8/12) = noise; err-overlap
+  0.941 vs the incumbent breadth leg = core-member fingerprint. A
+  differently-regularized basin makes the SAME errors. Config-mix averaging
+  (breadth ⊕ basin 1:1) +0.00007 — flat too (`results/probe_basin_mix.txt`).
+- **CatBoost + te13 (`train_catboost_te3.py` NEW): the mechanism table's
+  missing 4th row, now complete.** 0.9501/0.9500/0.9500 (s42/7/123, GPU
+  ~1 min/fold), breadth 0.9502 = +0.0009 over catboost_bagw — the uniform
+  recipe lift holds in all four libraries (HGBC 0.9504 / LGBM 0.9503 /
+  CatBoost 0.9502 / XGB 0.9498). **Leg-swap probe (`probe_swap_cat.py`,
+  catboost_bagw→catboost_te3_u_breadth in lr8): +0.00000 (5/12) — exact wash,
+  as lr=lr2 predicted; NO stack rebuild.** Arrays = inventory.
+- **Missingness TTA: FLAT — the last un-run Day-10 backlog item closed**
+  (`probe_miss_tta.py`: K=8 re-masked copies per val row at test marginal
+  rates, raw cell AND its te13 nan-level triple flipped consistently; hgbc_te3
+  vehicle, 5-fold paired): full TTA dw 0.95019 vs plain 0.95025 (−0.00006;
+  miss4 +0.0002 but complete4 down); mixes +0.00007 = noise. Marginalizing the
+  NaN channel at predict time adds nothing — consistent with trees estimating
+  P(y|x_obs, pattern) directly.
+- Day-12 net: 3 tuning axes + 4 follow-on reads, seven clean measured
+  negatives, zero stack changes, mechanism table completed. Finals unchanged
+  (#1 lrstack_u3_r file + #2 lrstack6b_r hedge framing, exploration phase).
+
 ### ⚠️ PROTOCOL ADDITIONS (Day-10 PM, decision-theorist audit — endgame hardening)
 
 1. **EXPLICIT FINALS SELECTION IS MANDATORY, ≥48h BEFORE DEADLINE (~Jul 31).** With
@@ -1541,6 +1615,12 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-13 | original-dataset hunt | User challenge ("invent it ourselves"). Web-searched + pulled 3 candidate source datasets to `data/original/`. `evan65549/health-and-fitness-dataset` = **687,701 rows ≈ our 690,088 train** (strong generator-base tell) but disease-label {Hypertension/Diabetes/Asthma} ≠ our {at-risk/fit/unhealthy}; synthetic rows carry no key to source anyway → **no clean-merge ground truth**. Measured negative. | — |
 | 2026-07-13 | probe_nn_memorization | Row-level memorization — a channel the AGGREGATE 3-dim scan is blind to; raw kNN never in the zoo (`probe_nn_memorization.py`, NEW). test→train NN dist min 0.242, **frac<0.10=0.0000** → no near-duplicate emission. kNN OOF BA 0.734, overlap 0.139 but **blend-negative at every w** → decorrelation was noise, not truth. **Memorization channel closed by measurement.** | kNN 0.734 |
 | 2026-07-13 | probe_covariate_shift | The one measured-but-unused signal (AV AUC 0.654). Importance-weight te13-HGBC toward the test distribution (`probe_covariate_shift.py`, NEW); score plain + AV-weighted OOF BA. **weighted vs unweighted: plain 0.9503 vs 0.9502, AV-weighted Δ=−0.0000 → FLAT.** Shift is PURE COVARIATE (P(x) moves, P(y\|x) fixed) → Bayes predictor unchanged. Shift channel closed. | 0.9503 |
+| 2026-07-14 | tune_realmlp_td ladder | RealMLP HP tuning, first ever on this dataset (13 pre-registered single-axis configs, fold-1 dw screen, base 0.95105): all within [−0.00031, +0.00016]; epochs monotone-negative, lr both directions negative, lpp 1.075 near-optimal. **FAIL — RealMLP HP axis closed by measurement** (promotion bar +0.0007 untouched). | fold-1 dw 0.95105 (base) |
+| 2026-07-14 | tune_hgbc_te3 | Optuna re-tune of the Susol config ON te13 (the Day-5 kill was pre-te13; 311 trials, 2-fold dw objective, incumbent pinned): best **+0.00047** from a different basin (77 leaves / lr 0.034 / mf 0.41) — under the +0.0007 screen bar. **FAIL — config×te13 axis closed by measurement**; the Day-9 "+0.0007 config effect" was Susol-vs-our-default, not headroom above Susol. | 0.95074 best vs 0.95027 inc (2-fold dw) |
+| 2026-07-14 | tune_tabm_scratch | TabM-scratch constants swept (filler lane, 55 trials, u surface): best +0.00035. **FAIL.** First u-surface tabms read: incumbent 2-fold dw 0.94987. | 0.95021 best (2-fold dw) |
+| 2026-07-14 | hgbc_te3_u_s42t + probe_seat_basin | TPE second basin through the full trainer: +0.0001 solo (2-fold +0.00047 shrank); seat +0.00003 (8/12), err-overlap 0.941 = core-member; config-mix 1:1 +0.00007. **Config-basin diversity closed (8th seat veto).** | 0.9505 |
+| 2026-07-14 | catboost_te3_u s42/7/123 | te13 through the 4th library (`train_catboost_te3.py` NEW, GPU): +0.0009 over catboost_bagw — mechanism table complete (all 4 libraries uniform). Leg-swap probe +0.00000 (5/12) → no stack change; inventory. | 0.9501/0.9500/0.9500; breadth 0.9502 |
+| 2026-07-14 | probe_miss_tta | Missingness TTA (K=8 re-masks at test rates, te13-consistent): full −0.00006, mixes +0.00007. **FLAT — last Day-10 backlog item closed.** | 0.95019 vs 0.95025 (dw) |
 
 **LB**: lgbm 0.94886, xgboost 0.94894, **ensemble_v1b 0.94970 (best)**. The blend lifts once
 models are pre-corrected to their deployed surface. Next lever for a bigger jump is a non-GBDT base

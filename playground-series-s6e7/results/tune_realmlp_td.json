@@ -1,0 +1,123 @@
+{
+  "base": {
+    "argmax": 0.950976085634481,
+    "dw": 0.9510497211159527,
+    "overrides": {},
+    "train_bs": 512,
+    "seconds": 101.9
+  },
+  "ep10": {
+    "argmax": 0.9508360909670567,
+    "dw": 0.950947297516587,
+    "overrides": {
+      "epochs": 10
+    },
+    "train_bs": 512,
+    "seconds": 163.1
+  },
+  "ep14": {
+    "argmax": 0.9506933445512744,
+    "dw": 0.9507728001143186,
+    "overrides": {
+      "epochs": 14
+    },
+    "train_bs": 512,
+    "seconds": 220.3
+  },
+  "ep20": {
+    "argmax": 0.9507434211271536,
+    "dw": 0.9507434211271536,
+    "overrides": {
+      "epochs": 20
+    },
+    "train_bs": 512,
+    "seconds": 319.1
+  },
+  "lr0.006_ep6": {
+    "argmax": 0.9509790624022959,
+    "dw": 0.9509790624022959,
+    "overrides": {
+      "lr": 0.006,
+      "epochs": 6
+    },
+    "train_bs": 512,
+    "seconds": 99.3
+  },
+  "lr0.02_ep6": {
+    "argmax": 0.9507357853435604,
+    "dw": 0.9507357853435604,
+    "overrides": {
+      "lr": 0.02,
+      "epochs": 6
+    },
+    "train_bs": 512,
+    "seconds": 101.0
+  },
+  "lpp1.0": {
+    "argmax": 0.9512052947130635,
+    "dw": 0.9512052947130635,
+    "overrides": {
+      "loss_prior_power": 1.0
+    },
+    "train_bs": 512,
+    "seconds": 98.9
+  },
+  "lpp1.2": {
+    "argmax": 0.950855756046371,
+    "dw": 0.950855756046371,
+    "overrides": {
+      "loss_prior_power": 1.2
+    },
+    "train_bs": 512,
+    "seconds": 100.8
+  },
+  "wd0.04": {
+    "argmax": 0.9510712654434458,
+    "dw": 0.9510712654434458,
+    "overrides": {
+      "weight_decay": 0.04
+    },
+    "train_bs": 512,
+    "seconds": 101.2
+  },
+  "do0.10": {
+    "argmax": 0.9508982322043916,
+    "dw": 0.9510998845505586,
+    "overrides": {
+      "dropout": 0.1
+    },
+    "train_bs": 512,
+    "seconds": 103.3
+  },
+  "hid768": {
+    "argmax": 0.9509003622334271,
+    "dw": 0.9510289699673938,
+    "overrides": {
+      "hidden_dims": [
+        768,
+        768,
+        768
+      ]
+    },
+    "train_bs": 512,
+    "seconds": 129.5
+  },
+  "ls0": {
+    "argmax": 0.9511564615758291,
+    "dw": 0.9511564615758291,
+    "overrides": {
+      "ls_eps": 0.0
+    },
+    "train_bs": 512,
+    "seconds": 103.6
+  },
+  "noise0.02": {
+    "argmax": 0.9510694942997099,
+    "dw": 0.9510694942997099,
+    "overrides": {
+      "numeric_noise_std": 0.02
+    },
+    "train_bs": 512,
+    "seconds": 101.2
+  }
+}
