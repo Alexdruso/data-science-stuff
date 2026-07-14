@@ -993,6 +993,142 @@ stays open until the user calls endgame.**
   (standing), repaired-te13 stack rebuild (bookkeeping), fresh brainstorm for
   genuinely new channels.
 
+### Day-10 LATE EVE (2026-07-12): generator archaeologist — information EXHAUSTED BY CONSTRUCTION; bll NEGATIVE / snap3 wash; audit traps fixed; repaired-te13 stack read
+
+**⚡⚡ GENERATOR-ARCHAEOLOGIST AGENT — the label channel is provably 3-dimensional.**
+The generator is a CTGAN-class NN with the label trained as a 14th column (the original
+50k is exactly rule-consistent, 0 contradictions/50k; 701 vs 700 sleep_duration uniques
+= continuous modeling of a discrete field; numeric tails contracted; masks injected
+post-hoc split-inconsistently — the mechanism shift the repair targets). **Kill shot =
+a 15-statistic flip-residual scan on the 511k complete-driver rows**: conditional on
+(stress × physical_activity × EXACT sleep_duration), P(flip) is independent of
+EVERYTHING measured — including an AUC-0.908 original-vs-synthetic discriminator
+(p=0.40, flat). The label channel is exactly 3-dimensional and `te13` already saturates
+it (~1,900 rows per sleep value); the off-band flip ceiling is 0.96% vs the ~9%
+actionability bar under balanced weighting. **This mechanistically explains every Day-10
+flat**: the X-fingerprints (freq-distortion, pair couplings, kNN density) are all
+*mediated* by the rule triple, not incremental. ⇒ **screen every future lever against
+this 3-dim model** — a new architecture/feature/encoder fed the recipe is another
+vehicle for the same channel and will be flat.
+
+- **bll (epoch-selection knob) — NEGATIVE**: realmlp_te13_bll_u_s42 **0.9501** vs
+  paired 0.9505 (the field's balanced-accuracy-toxic early-stopping does not transfer
+  to our setup). **snap3 (3-snapshot averaging) — WASH**: **0.9505**. Both wired as
+  opt-in package knobs (`epoch_select` / `snapshot_k`, ruff-clean) but off by default.
+- **Implementation auditor — pipeline CLEAN except 2 integrity traps, BOTH FIXED**:
+  (1) zoo checkpoints are now surface-tagged in the realmlp trainer (a plain/repaired
+  cache could otherwise be served across surfaces); (2) the `te13_block` TargetEncoder
+  inner CV is now explicitly seeded (sklearn ≥1.9 defaults to an unseeded shuffle →
+  non-reproducible TE folds).
+- **lrstack_rte13_r (repaired te13 stack, recipe-controlled hedge)**: **0.9497 own** /
+  intersection **0.95156** vs u3 0.95172, u2 0.95162, 6b_r 0.95124 ⇒ most of 6b_r's
+  gap to the u-family was the *missing recipe*, not the surface; the repaired surface
+  itself costs only a whisker once the te13 recipe is controlled for. Bookkeeping; the
+  two-surface hedge decision stays OPEN (user: exploration phase). Re-read any time with
+  `python src/read_lineage.py lrstack_rte13_r lrstack_u3_r lrstack_u2_r lrstack6b_r`.
+- **Specialist binaries built** (`train_binaries_te3.py`): fit-vs-rest OOF AUC 0.98245,
+  unh-vs-rest 0.98882; arrays `results/{oof,test}_bins_te3_u_s42.npy` (n×2 =
+  [P(fit), P(unhealthy)]) for use as LR-stack meta columns. Seat test was lost to an
+  overnight shutdown (`probe_seat_bins.txt` held only joblib warnings) — reconstructed
+  and saved as `src/probe_seat_bins.py` (Day-11).
+
+### Day-11 (2026-07-13): external sweep flat; bins seat closed; ⚡ S1 error-placement penalty — the objective channel measured-closed at its most-motivated point
+
+**Lead lane = external-intelligence sweep (advisor reorder: it is the highest-EV
+recurring activity — the campaign's +0.0014 came from a forum post).** Pulled the
+newest + top-voted s6e7 kernels via the Kaggle CLI (`.venv/bin/kaggle kernels list/
+pull`; discussion board stays JS-walled → user-fetched). **Nothing methodologically
+new**: the field's honest notebooks are all families we hold (GBDT stacks, RealMLP,
+FT-Transformer, prior-correction ≡ our decision weights, categorical-TE ⊂ te13), and
+EVERY notebook above our 0.9508 honest frontier self-describes as "hill climbing /
+LB-guided / consensus / public ensemble" = the probing/public-blend contamination the
+strategic headline predicted. One untried family flagged: **TabPFN-3** (philippsinger
+GM starter — raw forward pass, no FE, balance_probabilities; license-gated checkpoint,
+~1 hr on dual-GPU, feasibility-marginal on the 6 GB card; capped by the measured
+TabPFN-v2 in-region 0.8827 + the 0.886 Bayes ceiling). Sweep is a decisive result, not
+a failed lane: the only live external EV is user-dependent (the discussion board).
+
+**Bins seat test (closed the Day-10 lost inline probe; saved permanently as
+`src/probe_seat_bins.py`)**: `lrb` −0.00004 vs lr8 (5/12) — **no seat**, as the 3-dim
+finding predicts. The specialist binaries are inventory.
+
+**Fresh-channel brainstorm (`notes/ideas_day11.md`, agent + advisor-screened)**: the
+full tabular playbook (18 directions) screened against the 3-dim label-channel model.
+The feature/information channel is measured-saturated ⇒ every "new model/feature/TE/
+imbalance trick" is a SAME-3-DIM-VEHICLE kill; the only live buckets are (A) new
+external signal and (B) an objective/target formulation not mediated by the triple.
+Survivor shortlist thin but non-empty; nominee **S1 = error-placement penalty**.
+
+**⚡ S1 — error-placement (anti-correlation) penalty (`src/train_s1.py`, new; the one
+genuinely-new experiment).** Objective-channel lever: penalize AGREEMENT with the
+frozen u-core (lrstack_u3) ONLY on complete-driver ∩ test-like rows (where information
+EXISTS), to forbid parking diversity in the info-deleted MCAR region where every prior
+NN dumped it. Minimal-diff from `train_dann.py` (SAME MLP backbone, only the objective
+changes ⇒ signature directly comparable to dann_r); unrepaired "u" surface; leak-free
+(cross-fitted core OOF + label-free subset mask). User-approved the ½-day build after a
+**decisive pre-check** (`src/probe_s1_oracle.py`): the perfect per-row selector over
+{core + all 24 diverse bases} gains **+0.00176** on complete∩test-like (borderline-
+positive, ≈+0.0004 overall upper bound), so S1 had a target — built it.
+- **λ-sweep {0.1, 0.3, 1.0}** (`probe_s1_signature.py` / `probe_seat_s1.py`):
+
+  | λ | wbacc | fix-share | %fix miss-drv | err-overlap | fixes/breaks | seat |
+  |---|---|---|---|---|---|---|
+  | 0.1 | 0.9486 | 5.9% | **82.0%** | 83.0% | 2414/5439 | −0.00000 (5/12) |
+  | 0.3 | 0.9398 | 11.8% | 91.4% | 63.4% | 4809/15922 | +0.00001 (3/12) |
+  | 1.0 | 0.9025 | 55.4% | 95.2% | **30.2%** | 22562/19406 | +0.00002 (7/12) |
+
+- **The objective WORKED mechanically** — error-overlap collapsed 92%→30% (the most
+  decorrelated leg of the campaign; λ=0.1 even bent the missing-driver invariant to
+  82% < the universal ~90% for the first time). **But it produced ZERO value**: every
+  λ is net-negative solo (breaks > fixes), NO test-like enrichment (%fix-testlike ≈
+  base 30% at every λ), and **no LR seat** (best +0.00002 = noise; **6th consecutive
+  seat veto**). Forcing decorrelation where the core is near-Bayes-right just
+  manufactures errors; the fixes it does produce can't escape the MCAR region.
+- **⇒ the objective/decision channel (brainstorm bucket B) is measured-closed at its
+  single most-motivated point.** Sharpest confirmation yet of the campaign
+  decomposition "no region has BOTH errors AND decorrelated-transferable structure":
+  even an objective explicitly built to create transferable decorrelation, which
+  achieved massive raw decorrelation, could not, because the transferable region is
+  near-Bayes and the MCAR region is info-deleted. S1 legs = inventory.
+
+**⚡ TabPFN-3 — the last untried model family, MEASURED (user-requested).** Foundation
+model, in-context learning, license-gated (tabpfn 8.1.0 in an isolated venv
+`/tmp/tabpfn_venv`; needs `TABPFN_TOKEN` + one-click license accept at
+ux.priorlabs.ai/accept-license?hf_repo_id=tabpfn_3; coexists with sklearn 1.9 — no
+downgrade, the Day-7 sklearn<1.7 pin was older tabpfn). `src/probe_tabpfn3.py`
+(feasibility) → `src/train_tabpfn3.py` (full 5-fold OOF, u-surface, context=50k
+stratified/fold, balance_probabilities). **Runs comfortably on the 6 GB card** (peak
+0.87 GiB, ~12 min/fold). Unlike TabPFN-v2 (Day-9, dominated in-region), v3 is
+IN-LEAGUE: probe solo 0.9494 UB, full-OOF decision-weighted **0.9482** (−0.0026 vs
+core), error-overlap **83.5%**, and its fixes are the LEAST MCAR-concentrated of any
+leg (**72.9%** vs the universal ~90%) — genuinely the best decorrelation profile of
+the campaign. **But no stack seat** (12-cell: +0.00000, 6/12 — **7th consecutive
+veto**); net-negative solo (2401 fixes / 5173 breaks), no test-like enrichment. ⇒ the
+combiner axis is saturated **even against a foundation-model prior**: decorrelation
+that isn't test-like-transferable can't seat, exactly as the 3-dim ceiling predicts.
+TabPFN-3 = inventory (oof array saved; test array not built — no consumer). **The last
+untried model family is measured out.**
+
+**Fresh-crack brainstorm (3 Haiku agents, user-requested "think of something").**
+Each attacked a specific crack in the saturation thesis; all held:
+- **Encoding** — the one genuinely-UNBUILT feature: exact 3-way cross-fitted
+  `P(y | stress × activity × EXACT sleep_duration)` (`train_hgbc_te3_tri.py`, 10,450
+  cells ~66 rows/cell, `smooth="auto"` EB shrinkage). Built + MEASURED: **0.9501 vs
+  hgbc_te3 0.9504 = −0.0003, flat**. The exact-triple (a superset of the flat exact-
+  pairs `rp`) adds nothing over univariate te13 — encoding channel closed by
+  measurement, not by the superset argument.
+- **Decision/metric** — closed by PROOF: balanced accuracy is linear in per-row
+  assignments ⇒ E[BA] separates per-row ⇒ the E[BA]-optimum IS `argmax(w·p)` with
+  w∝1/E[n_c]. No cross-row coupling beyond the fixed per-class denominators the weights
+  already absorb (weights ≈[1,1,1] confirm calibration). Prior-matching to test priors
+  is BA-invariant (already killed −0.2pp).
+- **Generating-process** — every angle collapses to a measured kill (curation inverted,
+  rule-features flat, amplifier below noise, linkage/augmentation dead).
+
+**Live lane remains the external sweep** (standing daily; pending the user's
+discussion-board titles); finals UNCHANGED (exploration phase). In-house cupboard is
+thin at this inventory — measured, not asserted.
+
 ### ⚠️ PROTOCOL ADDITIONS (Day-10 PM, decision-theorist audit — endgame hardening)
 
 1. **EXPLICIT FINALS SELECTION IS MANDATORY, ≥48h BEFORE DEADLINE (~Jul 31).** With
@@ -1032,6 +1168,20 @@ assignments, so disjoint flip-set deltas are exact and compose additively — ke
 hill-climbing with exact feedback; (3) LOO score prediction from 48 anchors: MAE 1.7e-4
 vs 4.5e-4 prior-only. ⚠️ This track makes protocol item #1 (manual finals selection)
 LOAD-BEARING — probe artifacts may top the public LB and Kaggle auto-selects best-public.
+Ops log: rounds 1 (07-13) and 2 (07-14) closed — keep/revert by exact deltas worked as
+designed (4/9 then 6/9 sets kept), and the round-2 anchor read of the composed reference
+matched the additive prediction within LB rounding (composition validated end-to-end).
+Round 3 (d3_p01–09) designed vs the round-2 composed ref, queued for the next quota day
+(9 probes + composed-ref anchor = the full 10/day). `lbprobe_autosubmit.py` is now
+parameterized (`--day N --extra <anchors>`), quota-aware (submits immediately when
+today's budget covers the round), and chains ingest → anchor-check (abort if the
+measured reference deviates >2e-5 from the manifest score) → compose → re-ingest.
+⚠️ STALE-ANCHOR TRAP (hit 07-14, now auto-fixed by the trailing re-ingest): compose
+OVERWRITES `lbprobe_composed_ref.csv`, so between compose and the next ingest the
+scores CSV still credits the old bytes' score to the new file — a fit/design run in
+that window conditions on a corrupted constraint AND `lbprobe_design.py` silently
+ignores `--reference-score` whenever the reference has a (stale) score on file. Always
+re-ingest after compose before any fit/design.
 
 ### ⚠️ PROTOCOL (user-set, 2026-07-02 pm): work LEADERBOARD-BLIND
 The user watches the LB themselves; **Claude must not query submission scores**
@@ -1380,6 +1530,14 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-12 | hgbc_te3_r_s42 / realmlp_te13_r ×3 | te13 recipe on the REPAIRED surface (hedge de-confounding, bookkeeping): same ~0.0010 repaired-OOF gap as the old legs. | 0.9493 / 0.9495×3 |
 | 2026-07-12 | realmlp_te13_knn_u_s42 | kNN block through the smooth consumer: **exact tie with paired te13 baseline** — channel closed at the NN level too. | 0.9505 |
 | 2026-07-12 | probe_combiner_pm | Seat tests knn/ncw/both: +0.00000 / −0.00001 / +0.00002 — **no seats**. Boundary-band channel closed end-to-end; saturation earned, not asserted. | lr8 0.95071 holdout |
+| 2026-07-13 | probe_seat_bins | Specialist-binary meta cols (rerun of the Day-10 lost inline probe; saved as `probe_seat_bins.py`): lrb −0.00004 (5/12) → **no seat**. | lr8 0.95071 holdout |
+| 2026-07-13 | probe_s1_oracle | S1 pre-check: perfect selector over {core + 24 diverse bases} on complete∩test-like gains **+0.00176** (≈+0.0004 overall UB) → borderline-positive, S1 has a target → build (user-approved). | +0.00176 (subset) |
+| 2026-07-13 | s1_l{010,030,100}_u_s42 | Error-placement penalty (`train_s1.py`, DANN backbone, penalize core-agreement on complete∩test-like). λ-sweep wbacc 0.9486/0.9398/0.9025; err-overlap collapsed 83%→63%→**30%** (most decorrelated leg ever) but net-negative solo, no test-like enrichment. **6th LR-seat veto** (best +0.00002 noise). **Objective channel (bucket B) measured-closed at its most-motivated point.** | 0.9486 / 0.9398 / 0.9025 |
+| 2026-07-13 | tabpfn3_u_s42 | TabPFN-3 (last untried family, user-requested; `probe_tabpfn3.py`/`train_tabpfn3.py`, isolated venv, license-gated). Runs on 6 GB (0.87 GiB peak). Full-OOF dec-weighted **0.9482** (−0.0026 vs core); err-overlap 83.5%, %fix-miss-drv **72.9%** (best decorrelation profile of the campaign) but net-negative solo → **NO seat (+0.00000, 6/12; 7th veto)**. Combiner saturated even vs a foundation-model prior. Inventory. | 0.9482 (dec-weighted OOF) |
+| 2026-07-13 | hgbc_te3tri_u_s42 | Exact 3-way cross-fitted TE `P(y\|stress×activity×EXACT-sleep)` (`train_hgbc_te3_tri.py`, Haiku-brainstorm encoding crack; 10,450 cells, EB smoothing): **0.9501 vs hgbc_te3 0.9504 = −0.0003, FLAT**. The one genuinely-unbuilt encoding of the proven 3-dim channel adds nothing over univariate te13 — encoding channel closed by measurement. | 0.9501 |
+| 2026-07-13 | original-dataset hunt | User challenge ("invent it ourselves"). Web-searched + pulled 3 candidate source datasets to `data/original/`. `evan65549/health-and-fitness-dataset` = **687,701 rows ≈ our 690,088 train** (strong generator-base tell) but disease-label {Hypertension/Diabetes/Asthma} ≠ our {at-risk/fit/unhealthy}; synthetic rows carry no key to source anyway → **no clean-merge ground truth**. Measured negative. | — |
+| 2026-07-13 | probe_nn_memorization | Row-level memorization — a channel the AGGREGATE 3-dim scan is blind to; raw kNN never in the zoo (`probe_nn_memorization.py`, NEW). test→train NN dist min 0.242, **frac<0.10=0.0000** → no near-duplicate emission. kNN OOF BA 0.734, overlap 0.139 but **blend-negative at every w** → decorrelation was noise, not truth. **Memorization channel closed by measurement.** | kNN 0.734 |
+| 2026-07-13 | probe_covariate_shift | The one measured-but-unused signal (AV AUC 0.654). Importance-weight te13-HGBC toward the test distribution (`probe_covariate_shift.py`, NEW); score plain + AV-weighted OOF BA. **weighted vs unweighted: plain 0.9503 vs 0.9502, AV-weighted Δ=−0.0000 → FLAT.** Shift is PURE COVARIATE (P(x) moves, P(y\|x) fixed) → Bayes predictor unchanged. Shift channel closed. | 0.9503 |
 
 **LB**: lgbm 0.94886, xgboost 0.94894, **ensemble_v1b 0.94970 (best)**. The blend lifts once
 models are pre-corrected to their deployed surface. Next lever for a bigger jump is a non-GBDT base
