@@ -1202,6 +1202,15 @@ all measured, all flat/no-change:**
 - Day-12 net: 3 tuning axes + 4 follow-on reads, seven clean measured
   negatives, zero stack changes, mechanism table completed. Finals unchanged
   (#1 lrstack_u3_r file + #2 lrstack6b_r hedge framing, exploration phase).
+- **Daily kernel sweep (standing lane)**: 20 newest scanned; nothing
+  methodologically new. Pulled the two non-obvious ones — N06 high-confidence
+  pseudo-labeling (dominated by the measured DL-2 distillation veto: soft
+  probs on ALL test rows moved nothing, so thresholded self-training can't)
+  and N10 TabNet+DAE-swap-noise (architecture vehicle = 7× seat-vetoed class;
+  DAE X-embeddings pre-screened by the archaeologist kill-shot — P(flip|triple)
+  independent of an AUC-0.908 orig-vs-synth discriminator ⊃ any DAE). Both
+  source-only, zero executed outputs. Per-segment router kernel = our 3×-vetoed
+  regime-meta. Day committed as d3882f3 (incl. Day-11 sources).
 
 ### ⚠️ PROTOCOL ADDITIONS (Day-10 PM, decision-theorist audit — endgame hardening)
 
