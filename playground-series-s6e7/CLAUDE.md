@@ -1259,12 +1259,27 @@ hedge monetizes. Answer: NO, three ways (`src/probe_cross_surface.py` →
   hgbc_te3 + realmlp trainers, plain-mode bit-clean — s2025 reproduced the 0.9505
   band) — kept for any future joint-stack rung; `results/cache/` (7.3 GB TE caches)
   now gitignored; lbprobe round 4 PARKED by user decision (slots kept free).
-- **Day-13 net**: exploration bucket "cross-surface combination" closed by measurement
-  at the mixture level (joint-LR rung bounded by the same evidence: 400-row deployment
-  disagreement + 8 seat vetoes with better decorrelation profiles); δ_r question moved
-  from "public-read-dependent" to "offline-bracketed"; finals framing sharpened to
-  **#1 lrstack_u4 (=u3 consolidated) · #2 = tail-insurance choice (champion_v1 most
-  decorrelated; 6b_r the mean-stronger middle)** — still user-decided, no rush.
+- **Day-13 PM (idle-compute falsifier): the Rung-2 joint stack run ANYWAY — seat veto
+  #9, and the δ_r decomposition nailed.** With the day's queue done and both lanes
+  idle, the `_rt` legs were built (zero opportunity cost; converts the morning's bound
+  into a measurement): **hgbc_te3_rt_u_s42 = 0.9503 / realmlp_te13_rt_u_s42 = 0.9506**
+  — i.e. repaired-TRAINED models scored on PLAIN val inputs sit AT u-level (plain
+  twins 0.9504/0.9505; repaired-val twins 0.9493/0.9495). ⇒ **the entire ~0.0010
+  repaired-OOF gap is the harder VAL SURFACE, not the training distribution** —
+  repaired-training is free-to-−0.0001 on plain inputs, pinning δ_r ≈ +0.0009-0.0010
+  (top of the offline bracket, = the public paired read; knife-edge 0.0012 still not
+  crossed). Seat test (`probe_seat_rt.py` → `results/probe_seat_rt.txt`, 12 cells):
+  lrrt1 +0.00005 (9/12), lrrt2 −0.00002, both +0.00001 — **6× under the adoption
+  gate; 9th consecutive veto**. Cross-surface combination is now measured-dead at
+  BOTH consumer levels (prob-mixture AM, per-class LR PM) with the mechanism
+  identified (rt legs are u-clones; the surface changes ~nothing the trees/NN learn).
+- **Day-13 net**: exploration bucket "cross-surface combination" closed by MEASUREMENT
+  at both consumer levels (mixture + LR seat, veto #9); δ_r moved from
+  "public-read-dependent" to "offline-pinned ≈ +0.0009-0.0010 < 0.0012 knife-edge";
+  finals framing sharpened to **#1 lrstack_u4 (=u3 consolidated) · #2 =
+  tail-insurance choice (champion_v1 most decorrelated at 2,320 rows; 6b_r the
+  mean-stronger middle; rte13_r OFF the menu as a 400-row clone)** — still
+  user-decided, no rush.
 
 ### ⚠️ PROTOCOL ADDITIONS (Day-10 PM, decision-theorist audit — endgame hardening)
 
