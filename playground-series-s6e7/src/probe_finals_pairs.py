@@ -43,9 +43,10 @@ from train_common import load_dataset
 CANDIDATES = [
     "champion_v1",
     "lrstack6b_r",
-    "lrstack_rte13_r",
-    "lrstack_u3_r",
+    "lrstack_u4_r",
     "hgbc_te3_u_breadth",
+    "realmlp_te13_u_breadth",
+    "lgbm_te3_u_breadth",
 ]
 
 

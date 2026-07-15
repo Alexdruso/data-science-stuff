@@ -1281,6 +1281,56 @@ hedge monetizes. Answer: NO, three ways (`src/probe_cross_surface.py` →
   mean-stronger middle; rte13_r OFF the menu as a 400-row clone)** — still
   user-decided, no rush.
 
+### Day-13 EVENING (2026-07-15, ~16:00–21:00, user: "do not surrender"): 3-agent brainstorm → every surviving scope-gap measured; combiner coverage matrix COMPLETE; rank-objective instruments built
+
+**Three Fable brainstorm agents (forensics / decision-theory / ensemble lenses) screened
+against the kill list; every runnable survivor was measured the same evening:**
+
+- **Combiner COVERAGE MATRIX — complete, all flat** (the ensemble agent's map: the 9
+  seat vetoes tested LEGS; the meta's own axes had unmeasured cells). 12-cell split-half
+  instrument, all vs the incumbent LR C=1.0 stack over the u 8-leg inventory:
+  hypothesis class gbdt-meta **−0.00009** (2/12) / nn-meta **−0.00015** (1/12) — the
+  stale Day-8 verdict replicates on the modern inventory (`probe_meta_u.py`);
+  regularization C∈{0.3,3} **±0.00001** (`probe_meta_u.txt`); fitting objective —
+  direct-bacc NM polish of the LR coefficients (9-param top-2-legs reparam)
+  **+0.00006** (8/12) (`probe_polish_u.py` — the log-loss surrogate is measured
+  near-optimal for the metric); calibration shape α_c per-class power **+0.00004**;
+  structure — pairwise-coupled binaries (Price) **−0.00002** (4/12), prediction-
+  geometry band two-regime meta **−0.00014** (2/12) (`probe_struct_u.py`). ⇒ **the LR
+  stack is a measured local optimum across every combiner axis, not just across legs.**
+- **Forensics scope-gaps (agent-verified holes in the proofs) — all closed by
+  measurement**: (1) ⚡ the 3-dim kill-shot covered complete-driver rows only —
+  `probe_error_auc_md.py` scans u4's errors ON the missing-driver region (178,413
+  rows, err 0.199) with a SUBSET-FIT predictor: conf-only AUC 0.9508, +features
+  **+0.0002** ⇒ **missing-driver saturation now PROVEN at the deployed frontier**
+  (was Day-2-era assertion); (2) ⚡ the evan65549 "generator-base tell" (687,701 ≈
+  690,088 rows) had NEVER been joined — `probe_evan_linkage.txt`: exact (bmi, steps,
+  sleep) 3-key hits = permuted null (934 vs 885; 50k: 53 vs 49) ⇒ **no joint
+  structure, the row-count tell is coincidence, last ceiling-breaking branch dead**;
+  (3) impossible-pattern test rows (2,958 = 1.0%): u4-vs-rte13 disagreements only
+  1.9× enriched — extrapolation pathology capped ≪ the bar.
+- **Rank-objective instruments (decision agent's real find: all prior finals MCs
+  optimize E[score]; standing is RANK vs a correlated field)**:
+  `results/lbprobe_ruler.txt` — the quarantined track doubles as a CONTAMINATION
+  RULER: **+0.00076 of public score was fakeable in 3 casual rounds** (measured lower
+  bound; delta-only, quarantine-safe) ⇒ rival public leads ≲0.0008 over our honest
+  public position carry no private evidence. `probe_rank_regime.py` — P(pair beats
+  rival) over d_lead × ρ grids for 4 #2-choices: **the #2 choice moves P(win) ≤3pp in
+  EVERY regime** (lead/tie/trail × any correlation) — the pair decision is
+  taste-level; mean dominance is the whole game. In the trailing regime (d≥+0.0005,
+  ρ=0.9) all pairs collapse to P≤0.08 ⇒ no pair choice rescues a true mean deficit.
+- **Ops**: `finals_audit.py` NEW (structure + array↔CSV faithfulness + sha256 for the
+  whole finals menu) — **caught a real staleness bug**: `hgbc_te3_u_breadth.csv` had
+  196 label mismatches vs the 8-seed arrays (5-seed-era bytes); it and
+  `realmlp_te13_u_breadth.csv` regenerated from current arrays; audit now ALL OK.
+  ⚠️ NOTE: `realmlp_te13_u_breadth` (the new mean-strong #2 per the extended MC,
+  E[priv] 0.95072, P(beats u4)=0.25) has NEVER been submitted — needs one slot
+  before it is finals-selectable. Extended pairs MC: `probe_finals_pairs_day13pm.txt`.
+- **Evening net**: 7 new probes, 7 measured flats/nulls + 2 instruments + 1 integrity
+  fix. The saturation thesis survived adversarial brainstorm × 3 lenses with every
+  proposed hole measured shut the same day. Finals framing unchanged from the PM
+  block; the #2 slot is now KNOWN to be low-stakes (rank table).
+
 ### ⚠️ PROTOCOL ADDITIONS (Day-10 PM, decision-theorist audit — endgame hardening)
 
 1. **EXPLICIT FINALS SELECTION IS MANDATORY, ≥48h BEFORE DEADLINE (~Jul 31).** With
