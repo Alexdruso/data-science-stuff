@@ -1326,10 +1326,31 @@ against the kill list; every runnable survivor was measured the same evening:**
   ⚠️ NOTE: `realmlp_te13_u_breadth` (the new mean-strong #2 per the extended MC,
   E[priv] 0.95072, P(beats u4)=0.25) has NEVER been submitted — needs one slot
   before it is finals-selectable. Extended pairs MC: `probe_finals_pairs_day13pm.txt`.
-- **Evening net**: 7 new probes, 7 measured flats/nulls + 2 instruments + 1 integrity
-  fix. The saturation thesis survived adversarial brainstorm × 3 lenses with every
-  proposed hole measured shut the same day. Finals framing unchanged from the PM
-  block; the #2 slot is now KNOWN to be low-stakes (rank table).
+- **⚡ Split-consistency audit (forensics #2, the last runnable survivor) — NULL**
+  (`lbprobe_split_audit.py` → `results/lbprobe_split_audit.txt`, quarantine-safe
+  deltas-only): 27 flip-set EXACT public deltas vs TRAIN-ONLY prior predictions —
+  overall z=+0.26, all 6 flip directions |z|≤1.2, rounds ±1.4. **The label channel is
+  split-CONSISTENT: the train posterior calibrates on real test labels**, so the
+  train-internal saturation proofs extend across the split (the one doubt the
+  mask-mechanism shift licensed). Caveat (auditor): the `ref_ok` sanity column is
+  unreliable for post-adoption rounds (composed-ref filename reuse) — the residual
+  z-tests are reference-independent and unaffected.
+- **Implementation audit (4th agent, today's diff)**: no criticals; 5 WARNs found and
+  ALL FIXED same evening (commit 34124c9): hgbc ckpt tag now surface-derived; unwired
+  trainers hard-assert against REPAIR_FIT; rt×mult combo forbidden; fit_df requires an
+  rt cache tag; `finals_audit --regen` now archives previous CSV bytes (⚠️ note: the
+  submitted `hgbc_te3_u_breadth` on Kaggle = the 5-seed-era bytes, preserved in the
+  07-12 tarball; current local bytes are the 8-seed regen, NEVER submitted);
+  build_lr_stack refuses silent overwrites + persists its outer seed list.
+- **Overnight tail**: realmlp_te13_u seeds 101/202/303/404 → `day13_overnight_u5.py`
+  (combines a DISTINCT `realmlp_te13_u_breadth12` key — u4's audited lineage
+  untouched — then builds `lrstack_u5`). Read `results/log_day13_u5_overnight.txt`
+  next session; adoption bar = wash-or-better vs u4, same as u4-vs-u3.
+- **Evening net**: 8 new probes/audits, all measured flats/nulls + 2 rank instruments
+  + 6 integrity hardenings. The saturation thesis survived adversarial brainstorm × 3
+  lenses PLUS a code audit, with every proposed hole measured shut or fixed the same
+  day. Finals framing unchanged from the PM block; the #2 slot is now KNOWN to be
+  low-stakes (rank table).
 
 ### ⚠️ PROTOCOL ADDITIONS (Day-10 PM, decision-theorist audit — endgame hardening)
 
