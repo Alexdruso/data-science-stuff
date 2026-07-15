@@ -1254,20 +1254,38 @@ LOAD-BEARING — probe artifacts may top the public LB and Kaggle auto-selects b
 Ops log: rounds 1 (07-13) and 2 (07-14) closed — keep/revert by exact deltas worked as
 designed (4/9 then 6/9 sets kept), and the round-2 anchor read of the composed reference
 matched the additive prediction within LB rounding (composition validated end-to-end).
-Round 3 (d3_p01–09) designed vs the round-2 composed ref, queued for the next quota day
-(9 probes + a REFRESHED full-Bayes tilt `lbprobe_full_bayes2.csv` as the 10th slot — the
-anchor is retired now that additivity is validated; the tilt is the round's high-variance
-jump candidate, adopted as the new reference iff it beats the composed ref's known score;
-`lbprobe_submission.py` grew a --suffix arg so rebuilt tilts never overwrite scored ones). `lbprobe_autosubmit.py` is now
-parameterized (`--day N --extra <anchors>`), quota-aware (submits immediately when
-today's budget covers the round), and chains ingest → anchor-check (abort if the
-measured reference deviates >2e-5 from the manifest score) → compose → re-ingest.
 ⚠️ STALE-ANCHOR TRAP (hit 07-14, now auto-fixed by the trailing re-ingest): compose
 OVERWRITES `lbprobe_composed_ref.csv`, so between compose and the next ingest the
 scores CSV still credits the old bytes' score to the new file — a fit/design run in
 that window conditions on a corrupted constraint AND `lbprobe_design.py` silently
 ignores `--reference-score` whenever the reference has a (stale) score on file. Always
 re-ingest after compose before any fit/design.
+
+**07-15 Round 3 submitted+closed, round 4 designed (session resumed after a 1-day
+gap — nothing else changed hands in the meantime).** Round 3 (9 probes vs the round-2
+composed ref + the refreshed full-Bayes tilt `lbprobe_full_bayes2.csv` as a 10th slot)
+all landed same-day. `lbprobe_autosubmit.py`'s anchor-check FAILED (`lbprobe_composed_ref.csv`
+had no reliable score on file — the round-3 design note's "anchor retired" decision means
+the reference's *current bytes* were never themselves resubmitted, so the generic
+anchor gate has nothing to check against; this is distinct from the stale-anchor trap,
+which is a mismatch, not an absence). Since `lbprobe_compose.py` only ever reads the
+manifest's `reference_score` (the additivity-validated assumed value, not a live re-read
+of `lbprobe_scores.csv`), the abort was safe but overly conservative — ran ingest →
+compose → re-ingest by hand instead of via autosubmit. Round 3 exact-feedback probes:
+**0/9 kept** (first all-revert round; rounds 1→2 went 4/9→6/9→0/9, i.e. NOT monotone
+decay — treat as one more measured point, not a saturation claim on 1 round). The
+full-Bayes tilt (`lbprobe_full_bayes2.csv`) DID beat the composed ref's known score
+(exactly, per the linear-bacc mechanism — not a noisy read) → adopted per the
+pre-registered rule as the new reference (copied over `lbprobe_composed_ref.csv`).
+Round 4 (9 probes) designed against the adopted tilt. **Two bookkeeping items for
+whoever runs round 4's autosubmit:** (1) include `--extra lbprobe_composed_ref.csv`
+in the round-4 call so the adopted-tilt bytes get their own scored anchor row (fixes
+the round-3 anchor-gate gap for round 5); (2) `lbprobe_compose.py` selects the round to
+process via `manifest["reference"][-1] == "lbprobe_composed_ref.csv"` by filename, which
+is reused every round — it re-reprocesses ALL prior rounds sharing that filename, not
+just the newest. Currently harmless (KEEP verdicts reassign the same already-applied
+labels, a no-op), but this is latent and worth a real fix (round-tagging in the manifest)
+if it ever stops being idempotent.
 
 ### ⚠️ PROTOCOL (user-set, 2026-07-02 pm): work LEADERBOARD-BLIND
 The user watches the LB themselves; **Claude must not query submission scores**
