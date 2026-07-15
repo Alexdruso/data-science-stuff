@@ -119,6 +119,7 @@ def te_block_for_fold(
     fold: int,
     tag: str,
     rule: bool = False,
+    fit_df: "pd.DataFrame | None" = None,
 ) -> tuple[NDArray[np.float32], NDArray[np.float32], list[str]]:
     """The NN input recipe for one fold, cached: (train_full, test, names).
 
@@ -135,6 +136,11 @@ def te_block_for_fold(
 
     `tag` must identify the surface (e.g. "r" for REPAIR=1 mult 1.0): TE maps
     depend on which rows are NaN, so surfaces must never share a cache entry.
+
+    fit_df (Day-13, S6E7_REPAIR_FIT): alternate TRAIN matrix used only as the
+    encoding SOURCE for the fold-train rows (remasked inputs — what the model
+    sees at fit time); val/test rows are always encoded from the plain
+    ds.train/ds.test. Callers must pass a distinct `tag` (e.g. "rt").
     """
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     cache = CACHE_DIR / f"te_{tag}_s{seed}_f{fold}.npz"
@@ -149,11 +155,17 @@ def te_block_for_fold(
     src_te[COMBO_COL] = combo_key(ds.test)
     cols = num_cols + [COMBO_COL]
     if rule:
+        assert fit_df is None, "rule recipe has no fit_df support"
         src_tr[COMBO2_COL] = combo2_key(ds.train)
         src_te[COMBO2_COL] = combo2_key(ds.test)
         cols.append(COMBO2_COL)
 
-    te_tr, full_maps, prior = encode_fold(src_tr, ds.y, tr_idx, cols, seed)
+    src_fit = src_tr
+    if fit_df is not None:
+        src_fit = fit_df[num_cols].copy()
+        src_fit[COMBO_COL] = combo_key(fit_df)
+
+    te_tr, full_maps, prior = encode_fold(src_fit, ds.y, tr_idx, cols, seed)
     te_names = [f"te_{c}_{k}" for c in cols for k in range(N_CLASSES)]
     train_block = np.full((len(ds.y), len(te_names)), np.nan, dtype=np.float32)
     train_block[tr_idx] = te_tr[te_names].to_numpy(dtype=np.float32)
@@ -171,6 +183,8 @@ def te_block_for_fold(
 
     ord_tr = _ordinal_block(ds.train)
     ord_te = _ordinal_block(ds.test)
+    if fit_df is not None:  # fold-train rows carry the remasked ordinals
+        ord_tr[tr_idx] = _ordinal_block(fit_df)[tr_idx]
     train_parts = [train_block, ord_tr]
     test_parts = [test_block, ord_te]
     names = te_names + [f"{c}_ord" for c in ORDINAL]
@@ -192,6 +206,7 @@ def te13_block_for_fold(
     seed: int,
     fold: int,
     tag: str,
+    fit_df: "pd.DataFrame | None" = None,
 ) -> tuple[NDArray[np.float32], NDArray[np.float32], list[str]]:
     """The v0.7/te3 TE block for NN consumers (Day-9 evening, discussion/719199).
 
@@ -213,6 +228,9 @@ def te13_block_for_fold(
     cols = list(ds.train.columns)
     tr_view = ds.train[cols].astype(str)
     te_view = ds.test[cols].astype(str)
+    # fit_df (Day-13, S6E7_REPAIR_FIT): encoder + fold-train encodings from the
+    # remasked matrix; val/test transforms stay on the plain views. Distinct tag.
+    fit_view = fit_df[cols].astype(str) if fit_df is not None else tr_view
     names = [f"te13_{c}_{k}" for c in cols for k in range(N_CLASSES)]
 
     # seeded inner CV (Day-10 audit: sklearn 1.9's default is an UNSEEDED
@@ -223,7 +241,7 @@ def te13_block_for_fold(
         smooth="auto",
         target_type="multiclass",
     )
-    fit_block = enc.fit_transform(tr_view.iloc[tr_idx], ds.y[tr_idx])
+    fit_block = enc.fit_transform(fit_view.iloc[tr_idx], ds.y[tr_idx])
     train_block = np.zeros((len(ds.y), len(names)), dtype=np.float32)
     train_block[tr_idx] = fit_block.astype(np.float32)
     val_mask = np.ones(len(ds.y), dtype=bool)

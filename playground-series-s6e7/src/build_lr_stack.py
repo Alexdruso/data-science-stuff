@@ -68,11 +68,21 @@ def main() -> None:
     all_variants = [("raw", oof_raw, test_raw), ("pc", oof_pc, test_pc)]
     for tag, oof_d, test_d in [v for v in all_variants if v[0] in variants]:
         name = f"{base_name}_r" if tag == "raw" else f"{base_name}_pc_r"
+        # S6E7_STACK_SEEDS (Day-13): outer cross-fit seed list override —
+        # deepening 5 -> 10 seeds is pure meta-variance reduction on the
+        # honest OOF (the lrstack6b precedent at the leg level).
+        seeds_env = os.environ.get("S6E7_STACK_SEEDS")
+        seeds = (
+            tuple(int(s) for s in seeds_env.split(","))
+            if seeds_env
+            else (2024, 7, 13, 42, 99)
+        )
         s_oof, s_test = stack_oof(
             [oof_d[k] for k in keys],
             [test_d[k] for k in keys],
             y,
             meta_factory,
+            seeds=seeds,
             use_logits=True,
         )
         dw = robust_decision_weights(y, s_oof)

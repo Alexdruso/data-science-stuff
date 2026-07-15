@@ -87,13 +87,25 @@ def main() -> None:
     # TE view: ALL columns as strings (numeric NaN -> 'nan' = its own level)
     te_tr_view = X[raw_cols].astype(str)
     te_te_view = X_test[raw_cols].astype(str)
+    # S6E7_REPAIR_FIT=1 (Day-13): fit encoder+model on the remasked matrix,
+    # predict val/test on the plain one (surface-consistent OOF for the joint
+    # u+r stack). Vocab note: remask only converts values to NaN, so the plain
+    # val rows' values are covered by the fit vocabulary (unseen -> prior).
+    X_fit, te_fit_view = X, te_tr_view
+    if ds.train_fit is not None:
+        X_fit = ds.train_fit.copy()
+        for col in ds.cat_cols:
+            X_fit[col] = X_fit[col].fillna("missing").astype(str)
+            X_fit[col] = pd.Categorical(X_fit[col], categories=X[col].cat.categories)
+        te_fit_view = X_fit[raw_cols].astype(str)
+        print("repair-at-fit-only: model/TE fit on remasked rows, val/test plain")
     te_names = [f"te_{c}_{k}" for c in raw_cols for k in range(N_CLASSES)]
     print(f"v0.7 replica: TE over {len(raw_cols)} string-cast cols "
           f"({len(te_names)} TE features), tuned HGBC config")
 
     def fit_fold(tr_idx, val_idx, seed, fold):  # noqa: ANN001, ANN202
         enc = TargetEncoder(cv=5, smooth="auto", target_type="multiclass")
-        te_tr = enc.fit_transform(te_tr_view.iloc[tr_idx], ds.y[tr_idx])
+        te_tr = enc.fit_transform(te_fit_view.iloc[tr_idx], ds.y[tr_idx])
         te_va = enc.transform(te_tr_view.iloc[val_idx])
         te_te = enc.transform(te_te_view)
 
@@ -106,7 +118,7 @@ def main() -> None:
                 axis=1,
             )
 
-        X_tr = assemble(X.iloc[tr_idx], te_tr)
+        X_tr = assemble(X_fit.iloc[tr_idx], te_tr)
         X_va = assemble(X.iloc[val_idx], te_va)
         X_te = assemble(X_test, te_te)
         model = HistGradientBoostingClassifier(**config, random_state=seed)

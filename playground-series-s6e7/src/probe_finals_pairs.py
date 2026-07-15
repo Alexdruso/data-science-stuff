@@ -34,13 +34,18 @@ from probe_emax_portfolio import (
 )
 from train_common import load_dataset
 
+# Day-13 refresh: the live finals menu — u-family champion + the three
+# structurally-distinct hedge candidates. Near-clones dropped (PP-2: pairing
+# them wastes the variance term; u3-vs-rte13 deployment disagreement is 400
+# rows). δ_r context for reading the output: offline bracket [0, +0.0010]
+# (probe_delta_r.txt), public paired read ≈ +0.0009, knife-edge ≈ +0.0012 —
+# repaired candidates are underrated here by roughly that much.
 CANDIDATES = [
     "champion_v1",
-    "lrstack6_r",
-    "metablend_r",
-    "lrstack_u_r",
+    "lrstack6b_r",
+    "lrstack_rte13_r",
+    "lrstack_u3_r",
     "hgbc_te3_u_breadth",
-    "metablend_u",
 ]
 
 

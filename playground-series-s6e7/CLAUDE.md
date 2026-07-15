@@ -1212,6 +1212,60 @@ all measured, all flat/no-change:**
   source-only, zero executed outputs. Per-segment router kernel = our 3×-vetoed
   regime-meta. Day committed as d3882f3 (incl. Day-11 sources).
 
+### Day-13 (2026-07-15): cross-surface combination measured-dead; δ_r pinned offline; u4 = the consolidated #1 file
+
+**Day shape (user: full day, private-LB focus, no external intel): one gated exploration
+swing + consolidation. The exploration budget went to the ONE unasked seat question —
+does SURFACE diversity (repaired-trained vs plain-trained) combine? All 8 prior seat
+vetoes were same-surface legs; the u-vs-r difference is the only decorrelation the
+hedge monetizes. Answer: NO, three ways (`src/probe_cross_surface.py` →
+`results/probe_cross_surface.txt`):**
+- **Mixture sweep on the 510,866 identical-input intersection rows** (weights refit per
+  arm, paired RNG): monotone-NEGATIVE — u3-pure 0.95174 → w_r=0.2 0.95171 → r-pure
+  0.95158. No mixture beats the better parent; pre-registered Rung-2 gate (≥+0.0002)
+  FAILED → the joint u+r stack build was skipped. (Sanity: saved-weights reads
+  reproduce Day-10's recorded 0.95172/0.95156 exactly.)
+- **Deployment near-clones**: u3 vs lrstack_rte13_r disagree on **400 test rows
+  (0.135%)** — once the te13 recipe is controlled, the surface flips almost nothing at
+  deployment. rte13_r is OFF the hedge menu (no variance to monetize). Full pairwise
+  disagreement table (deployed labels): champion_v1 2,320 (0.78%) > 6b_r 1,411 >
+  hgbc_breadth 753 > rte13_r 400.
+- **δ_r pinned offline** (`src/probe_delta_r.py` → `results/probe_delta_r.txt`): on the
+  86.7% of val rows the m100 remask never touched (identical inputs, superset of the
+  intersection — adds originally-NaN rows), rte13_r is at PAR with u3 (+0.00009); the
+  whole −0.00111 OOF gap concentrates in the 13.3% touched rows (+0.00777 there) ⇒
+  **δ_r ∈ [0, +0.0010]** — third independent estimate (bracket MC crossover ≥0.0008,
+  public paired read ≈0.0009), all at-or-below the knife-edge 0.0012. Lean: all-u pair;
+  champion_v1 is the real tail-insurance hedge if one is wanted.
+- **Finals-pairs MC refresh** (`results/probe_finals_pairs_day13.txt`, candidates
+  updated to the live menu): u3's mean dominance makes every u3-pair tie at E[max]
+  0.95083-84 (hedge bonus ≤+0.00001 at face; P(other beats u3)≈0.000 on the OOF-label
+  instrument). Even crediting repaired candidates the full δ_r bracket they stay below
+  u3's mean ⇒ **the pair choice is tail-insurance only**; decorrelation table above is
+  the tie-breaker. Bookkeeping — finals stay user-decided, exploration phase.
+- **Consolidation (Lane B): every u3 leg deepened to 8 seeds + the stack rebuilt.**
+  New seeds all in-band (realmlp_te13 s2025/31/7777 = 0.9505/0.9503/0.9504; lgbm_te3
+  s2024..s7777 0.9499-0.9501; hgbc_te3 + catboost_te3 completed to 8). Breadths:
+  realmlp_te13_u 0.9506→**0.9507**, lgbm_te3_u 0.9503→**0.9506**, hgbc_te3_u
+  0.9504→**0.9505**, catboost_te3_u 0.9502 (inventory; leg-swap still a wash by
+  Day-12's probe). **`lrstack_u4_r`** = the u3 recipe over 8-seed breadths + **10-seed
+  outer meta** (`S6E7_STACK_SEEDS` env new in build_lr_stack.py): honest **0.95081 vs
+  u3 0.95083** (Δ−0.00002 = noise), intersection 0.9517 = tie, test disagreement **95
+  rows (0.032%)** ⇒ exact wash with strictly more averaging under it — **prefer the
+  `lrstack_u4_r.csv` FILE for final #1** (lrstack6b precedent). Pre-rebuild breadths
+  snapshotted as `*_breadth3/_breadth5`; u3 arrays untouched.
+- **Infra (permanent, inert)**: `S6E7_REPAIR_FIT=1` repair-at-fit-only mode
+  (train_common `Dataset.train_fit`; fit_df params in zoo_common TE builders; wired in
+  hgbc_te3 + realmlp trainers, plain-mode bit-clean — s2025 reproduced the 0.9505
+  band) — kept for any future joint-stack rung; `results/cache/` (7.3 GB TE caches)
+  now gitignored; lbprobe round 4 PARKED by user decision (slots kept free).
+- **Day-13 net**: exploration bucket "cross-surface combination" closed by measurement
+  at the mixture level (joint-LR rung bounded by the same evidence: 400-row deployment
+  disagreement + 8 seat vetoes with better decorrelation profiles); δ_r question moved
+  from "public-read-dependent" to "offline-bracketed"; finals framing sharpened to
+  **#1 lrstack_u4 (=u3 consolidated) · #2 = tail-insurance choice (champion_v1 most
+  decorrelated; 6b_r the mean-stronger middle)** — still user-decided, no rush.
+
 ### ⚠️ PROTOCOL ADDITIONS (Day-10 PM, decision-theorist audit — endgame hardening)
 
 1. **EXPLICIT FINALS SELECTION IS MANDATORY, ≥48h BEFORE DEADLINE (~Jul 31).** With

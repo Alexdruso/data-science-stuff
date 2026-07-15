@@ -58,8 +58,12 @@ ESEL = os.environ.get("S6E7_ESEL", "bacc")
 SNAP = int(os.environ.get("S6E7_SNAP", "0"))
 # "u" = UNREPAIRED surface (Day-9 evening, discussion/719199): REPAIR=0 must not
 # reuse the "r" TE cache — those blocks were computed on the remasked matrix.
+# "rt" (Day-13, S6E7_REPAIR_FIT=1) = repair-at-fit-only: model/TE fit on the
+# remasked matrix, val/test inputs plain — surface-consistent OOF for the joint
+# u+r stack. Distinct cache tag: fold-train TE encodings differ from both u and r.
 _REPAIR = os.environ.get("S6E7_REPAIR", "") not in ("", "0")
-_BASE_TAG = ("r" if _MULT == 1.0 else "r2") if _REPAIR else "u"
+_REPAIR_FIT = os.environ.get("S6E7_REPAIR_FIT", "") not in ("", "0")
+_BASE_TAG = ("r" if _MULT == 1.0 else "r2") if _REPAIR else ("rt" if _REPAIR_FIT else "u")
 SURFACE_TAG = _BASE_TAG + ("_rule" if RULE else "")
 MODEL_NAME = (
     ("realmlp_rule" if RULE else "realmlp")
@@ -91,6 +95,14 @@ if _PARAMS_ENV:
 def main() -> None:
     ds = load_dataset()
     nd = NNData(ds)
+    nd_fit = None
+    if ds.train_fit is not None:
+        assert not (RULE or KNN), "S6E7_REPAIR_FIT not wired for rule/knn recipes"
+        from dataclasses import replace
+
+        nd_fit = NNData(replace(ds, train=ds.train_fit, train_fit=None))
+        assert nd_fit.cardinalities == nd.cardinalities, "fit/plain cat vocab drifted"
+        print("repair-at-fit-only: fold-train rows remasked, val/test plain")
     print(
         f"cats {dict(zip(nd.cat_cols, nd.cardinalities))}  device cuda={torch.cuda.is_available()}"
     )
@@ -115,11 +127,11 @@ def main() -> None:
         np.random.seed(fold_seed)  # noqa: NPY002 — library-internal RNG expects it
 
         te_tr_full, te_te, _names = te_block_for_fold(
-            ds, tr_idx, seed, fold, SURFACE_TAG, rule=RULE
+            ds, tr_idx, seed, fold, SURFACE_TAG, rule=RULE, fit_df=ds.train_fit
         )
         if TE13:
             t13_tr, t13_te, _n13 = te13_block_for_fold(
-                ds, tr_idx, seed, fold, _BASE_TAG
+                ds, tr_idx, seed, fold, _BASE_TAG, fit_df=ds.train_fit
             )
             te_tr_full = np.concatenate([te_tr_full, t13_tr], axis=1)
             te_te = np.concatenate([te_te, t13_te], axis=1)
@@ -129,15 +141,25 @@ def main() -> None:
             k_tr, k_te, _nk = knn_block_for_fold(ds, tr_idx, seed, fold, _BASE_TAG)
             te_tr_full = np.concatenate([te_tr_full, k_tr], axis=1)
             te_te = np.concatenate([te_te, k_te], axis=1)
+        # per-fold mixed matrices (repair-at-fit-only): fold-train rows from the
+        # remasked view, val rows plain — X_all.iloc[tr_idx] is then the fit surface
+        cat_all, num_all, miss_all = nd.Xcat_tr, nd.Xnum_tr, nd.miss_tr
+        if nd_fit is not None:
+            cat_all = nd.Xcat_tr.copy()
+            cat_all[tr_idx] = nd_fit.Xcat_tr[tr_idx]
+            num_all = nd.Xnum_tr.copy()
+            num_all[tr_idx] = nd_fit.Xnum_tr[tr_idx]
+            miss_all = nd.miss_tr.copy()
+            miss_all[tr_idx] = nd_fit.miss_tr[tr_idx]
         # median-impute raw numerics + the ordinal tail of the TE block (train-fold stats)
-        num_med = np.nanmedian(nd.Xnum_tr[tr_idx], axis=0)
-        num_tr = np.where(np.isnan(nd.Xnum_tr), num_med, nd.Xnum_tr)
+        num_med = np.nanmedian(num_all[tr_idx], axis=0)
+        num_tr = np.where(np.isnan(num_all), num_med, num_all)
         num_te = np.where(np.isnan(nd.Xnum_te), num_med, nd.Xnum_te)
         te_med = np.nanmedian(te_tr_full[tr_idx], axis=0)
         te_tr_f = np.where(np.isnan(te_tr_full), te_med, te_tr_full)
         te_te_f = np.where(np.isnan(te_te), te_med, te_te)
 
-        X_all = frame(nd.Xcat_tr, num_tr, nd.miss_tr, te_tr_f)
+        X_all = frame(cat_all, num_tr, miss_all, te_tr_f)
         X_test = frame(nd.Xcat_te, num_te, nd.miss_te, te_te_f)
         X_tr, X_val = X_all.iloc[tr_idx], X_all.iloc[val_idx]
 

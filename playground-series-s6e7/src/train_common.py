@@ -51,6 +51,15 @@ RUN_TAG: str = os.environ.get("S6E7_RUN_TAG", "")
 # S6E7_REPAIR=1 applies the R2a missingness-mechanism repair (see below); gated
 # PASS on the re-masked instrument 2026-07-07 (results/diag_repair_r2a.txt).
 REPAIR: bool = os.environ.get("S6E7_REPAIR", "") not in ("", "0")
+# S6E7_REPAIR_FIT=1 (Day-13): repair-at-FIT-only. The remasked matrix is exposed
+# as Dataset.train_fit for MODEL FITTING, while Dataset.train (and therefore the
+# OOF val inputs) stays PLAIN. Result: a repaired-TRAINED leg whose OOF sits on
+# the same surface as test — the surface-consistent artifact a joint u+r stack
+# needs for honest meta-fitting (plain-repair OOFs validate under remasked
+# inputs and must never be stacked with u-surface legs). Mutually exclusive
+# with S6E7_REPAIR.
+REPAIR_FIT: bool = os.environ.get("S6E7_REPAIR_FIT", "") not in ("", "0")
+assert not (REPAIR and REPAIR_FIT), "S6E7_REPAIR and S6E7_REPAIR_FIT are exclusive"
 
 # The 4 columns whose train masks are deterministic trigger rules but whose test
 # masks are uniform (results/eda_missingness.txt). Train-only NaN<->trigger
@@ -106,6 +115,9 @@ class Dataset:
     test_ids: NDArray[np.int64]
     feature_cols: list[str]
     cat_cols: list[str]
+    # S6E7_REPAIR_FIT=1 only: remasked copy of `train` for model fitting
+    # (predict/val/test stay on the plain matrices). None otherwise.
+    train_fit: "pd.DataFrame | None" = None
 
 
 def load_dataset() -> Dataset:
@@ -130,9 +142,13 @@ def load_dataset() -> Dataset:
     y = train_pd[TARGET].map({c: i for i, c in enumerate(CLASSES)}).to_numpy()
     train_X = train_pd[feature_cols].copy()
     test_X = test_pd[feature_cols].copy()
+    train_fit: pd.DataFrame | None = None
     if REPAIR:
         train_X = _uniform_remask(train_X, test_X)
         print("S6E7_REPAIR=1: R2a uniform re-mask applied to train")
+    elif REPAIR_FIT:
+        train_fit = _uniform_remask(train_X, test_X)
+        print("S6E7_REPAIR_FIT=1: remask on train_fit only (val/test surfaces plain)")
     return Dataset(
         train=train_X,
         test=test_X,
@@ -140,6 +156,7 @@ def load_dataset() -> Dataset:
         test_ids=test_pd["id"].to_numpy(),
         feature_cols=feature_cols,
         cat_cols=cat_cols,
+        train_fit=train_fit,
     )
 
 

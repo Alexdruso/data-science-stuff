@@ -186,3 +186,6 @@ catboost_info/
 *.zip
 *.fits
 *_ckpt/
+
+# competition working caches (TE blocks, fold checkpoints) — 7GB+, never commit
+playground-series-*/results/cache/
