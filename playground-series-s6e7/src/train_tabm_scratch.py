@@ -202,6 +202,7 @@ def fit_fold_impl(ds, nd, tr_idx, val_idx, seed, fold, want_test=True):  # noqa:
 
 def main() -> None:
     ds = load_dataset()
+    assert ds.train_fit is None, "S6E7_REPAIR_FIT not wired for this trainer"
     nd = NNData(ds)
     print(f"device {DEVICE}  k={K_MEMBERS} members, hidden {HIDDEN}x{N_LAYERS}")
 

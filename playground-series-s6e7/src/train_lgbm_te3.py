@@ -50,6 +50,7 @@ LGBM_TE3_PARAMS: dict[str, object] = {
 
 def main() -> None:
     ds = load_dataset()
+    assert ds.train_fit is None, "S6E7_REPAIR_FIT not wired for this trainer"
     raw_cols = ds.feature_cols
     X, X_test = ds.train.copy(), ds.test.copy()
     for col in ds.cat_cols:

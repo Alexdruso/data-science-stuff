@@ -77,6 +77,14 @@ def main() -> None:
             if seeds_env
             else (2024, 7, 13, 42, 99)
         )
+        # Day-13 audit: never silently overwrite an existing stack (finals
+        # lineage) with a different seed list; persist the seeds used.
+        if (RESULTS_DIR / f"oof_{name}.npy").exists() and not os.environ.get(
+            "S6E7_STACK_OVERWRITE"
+        ):
+            raise SystemExit(
+                f"oof_{name}.npy exists — set S6E7_STACK_OVERWRITE=1 or a new name"
+            )
         s_oof, s_test = stack_oof(
             [oof_d[k] for k in keys],
             [test_d[k] for k in keys],
@@ -98,7 +106,11 @@ def main() -> None:
         np.save(RESULTS_DIR / f"oof_{name}.npy", s_oof)
         np.save(RESULTS_DIR / f"test_{name}.npy", s_test)
         with (RESULTS_DIR / f"decision_weights_{name}.json").open("w") as f:
-            json.dump(dict(zip(CLASSES, dw.tolist())), f, indent=2)
+            json.dump(
+                {**dict(zip(CLASSES, dw.tolist())), "stack_seeds": list(seeds)},
+                f,
+                indent=2,
+            )
         labels = np.array(CLASSES)[weighted_predict(s_test, dw)]
         pd.DataFrame({"id": ds.test_ids, TARGET: labels}).to_csv(
             SUBMISSIONS_DIR / f"{name}.csv", index=False

@@ -127,7 +127,10 @@ def main() -> None:
         print(f"    n_iter={model.n_iter_}")
         return model.predict_proba(X_va), model.predict_proba(X_te)
 
-    tag = os.environ.get("S6E7_RUN_TAG", f"_u_s{SEEDS[0]}")
+    # ckpt tag must carry the surface (Day-13 audit): an rt run crashing without
+    # an explicit RUN_TAG must never leave fold ckpts under a u-named dir.
+    surface = "rt_u" if ds.train_fit is not None else "u"
+    tag = os.environ.get("S6E7_RUN_TAG", f"_{surface}_s{SEEDS[0]}")
     oof, test, fold_scores = zoo_cv(
         ds, fit_fold, ckpt_name=f"{name}{tag}", seed=SEEDS[0]
     )

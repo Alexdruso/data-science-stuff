@@ -67,6 +67,15 @@ def expected_labels(key: str | None, test_ids: np.ndarray) -> pd.Series:
 def regen(key: str, test_ids: np.ndarray) -> None:
     lab = expected_labels(key, test_ids)
     out = SUBMISSIONS_DIR / f"{key}.csv"
+    if out.exists():
+        # Day-13 audit: never destroy possibly-submitted bytes — Kaggle keeps
+        # the OLD bytes under this filename; archive before overwriting.
+        import datetime
+
+        stale = out.with_suffix(f".stale-{datetime.date.today():%Y%m%d}.csv")
+        out.rename(stale)
+        print(f"archived previous bytes -> {stale.name}; if that filename was "
+              "already submitted, Kaggle holds the ARCHIVED bytes, not the new ones")
     pd.DataFrame({"id": test_ids, TARGET: lab.to_numpy()}).to_csv(out, index=False)
     print(f"regenerated {out.name} from current arrays")
 

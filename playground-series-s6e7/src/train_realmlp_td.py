@@ -64,6 +64,9 @@ SNAP = int(os.environ.get("S6E7_SNAP", "0"))
 _REPAIR = os.environ.get("S6E7_REPAIR", "") not in ("", "0")
 _REPAIR_FIT = os.environ.get("S6E7_REPAIR_FIT", "") not in ("", "0")
 _BASE_TAG = ("r" if _MULT == 1.0 else "r2") if _REPAIR else ("rt" if _REPAIR_FIT else "u")
+# the "rt" cache tag does not encode the mult (Day-13 audit): forbid the combo
+# rather than silently serve mult-1.0 cache entries to a mult!=1 remask.
+assert not (_REPAIR_FIT and _MULT != 1.0), "REPAIR_FIT requires REPAIR_MULT=1.0"
 SURFACE_TAG = _BASE_TAG + ("_rule" if RULE else "")
 MODEL_NAME = (
     ("realmlp_rule" if RULE else "realmlp")

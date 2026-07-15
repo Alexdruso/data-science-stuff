@@ -142,6 +142,7 @@ def te_block_for_fold(
     sees at fit time); val/test rows are always encoded from the plain
     ds.train/ds.test. Callers must pass a distinct `tag` (e.g. "rt").
     """
+    assert fit_df is None or "rt" in tag, "fit_df requires a distinct rt-tag"
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     cache = CACHE_DIR / f"te_{tag}_s{seed}_f{fold}.npz"
     if cache.exists():
@@ -219,6 +220,7 @@ def te13_block_for_fold(
     """
     from sklearn.preprocessing import TargetEncoder
 
+    assert fit_df is None or "rt" in tag, "fit_df requires a distinct rt-tag"
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     cache = CACHE_DIR / f"te13_{tag}_s{seed}_f{fold}.npz"
     if cache.exists():

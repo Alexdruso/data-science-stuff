@@ -34,6 +34,7 @@ SURFACE_TAG = ("r" if _MULT == 1.0 else "r2") if _REPAIR else "u"
 
 def main() -> None:
     ds = load_dataset()
+    assert ds.train_fit is None, "S6E7_REPAIR_FIT not wired for this trainer"
     X, X_test = ds.train.copy(), ds.test.copy()
     for col in ds.cat_cols:
         X[col] = X[col].fillna(CAT_FILL).astype(str)

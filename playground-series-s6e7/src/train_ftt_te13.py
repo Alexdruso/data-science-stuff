@@ -91,6 +91,7 @@ class FTTTE(nn.Module):
 
 def main() -> None:
     ds = load_dataset()
+    assert ds.train_fit is None, "S6E7_REPAIR_FIT not wired for this trainer"
     nd = NNData(ds)
     n_num = len(nd.num_cols)
     tok_cols = nd.num_cols + nd.cat_cols  # token order
