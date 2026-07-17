@@ -1429,6 +1429,36 @@ red-team-the-instruments) with every runnable survivor measured the same day.**
   mean-strong #2 candidate, E[priv] 0.95072 — needs one anchor slot to be
   finals-selectable).
 
+### ▶▶ QUEUED for Day-15 (user-approved 07-17 night): ORIGINAL-50K REFEREE — pre-registered design
+
+**Question**: is any finals candidate differentially overfit to generator flip-noise?
+`data/external/student_health_dataset_50k.csv` (the generator's source: exact 13-feature
+schema, zero missing values, labels exactly rule-consistent 0/50k) has never been used
+as a VALIDATION instrument — only as augmentation (vetoed Day-3) and linkage (dead
+Day-4). It is the one labeled set whose noise is INDEPENDENT of our 690k CV rows.
+
+**Design** (`src/probe_original_referee.py`, NEW):
+1. Schema/level alignment check original ↔ `features.py` (column names, category levels,
+   numeric ranges; original has 700 vs our 701 sleep uniques — assert mapping, don't
+   assume).
+2. Leg predictions on the original, treating it as a SECOND TEST frame through the exact
+   test-side pipeline (full-train TE transform, same encoders): reuse per-fold ckpts if
+   still on disk, else retrain seed-42 legs — hgbc_te3 (~5 min CPU), lgbm_te3,
+   the 3 champion GBDTs (bagw recipe), realmlp_te13 (~35 min GPU). ⚠️ Trainers persist
+   arrays not models — this regeneration is the real cost (~1-2h total, not the "30
+   min" first quoted).
+3. Referee-compose the candidates from those leg predictions using the DEPLOYED recipes
+   read from disk: champion_v1 (precorrected 3-GBDT blend + saved weights), the u-stack
+   (LR meta + decision weights refit on the existing OOF arrays = deployed procedure,
+   then applied to original leg preds), realmlp_te13 solo.
+4. Score balanced accuracy on original labels. **Pre-registered read: RANKING + gap
+   pattern only, never absolutes** (distribution shift: no missingness, no flips,
+   contracted tails). All candidates within a common rule-recovery band = NULL (the
+   expected outcome, itself worth recording). A candidate materially below its peers =
+   flip-noise-overfit flag → demote it on the finals menu. Explicit blind spot: the
+   original has no NaNs, so this instrument says NOTHING about missing-driver behavior
+   (26% of competition rows) — it referees the complete-driver regime only.
+
 ### ⚠️ PROTOCOL ADDITIONS (Day-10 PM, decision-theorist audit — endgame hardening)
 
 1. **EXPLICIT FINALS SELECTION IS MANDATORY, ≥48h BEFORE DEADLINE (~Jul 31).** With
