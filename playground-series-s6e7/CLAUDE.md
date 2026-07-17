@@ -1459,6 +1459,24 @@ Day-4). It is the one labeled set whose noise is INDEPENDENT of our 690k CV rows
    original has no NaNs, so this instrument says NOTHING about missing-driver behavior
    (26% of competition rows) — it referees the complete-driver regime only.
 
+**ALSO QUEUED (user-pitched 07-17 night): FOLD-COUNT SWEEP — K=10/15 champion-leg
+reruns.** N_FOLDS=5 has never been swept; K=10 trains each fold model on 90% vs 80%
+(the MEASURABLE sibling of the full-train-refit idea — keeps an OOF surface), and the
+test side gains fold-axis averaging on top. Pre-registered design:
+- Wire `S6E7_N_FOLDS` env override in `train_common` + fold-count-tagged run tags
+  (`_f10`/`_f15`) so K≠5 arrays NEVER mix with the 5-fold lineage (surface-tag guard
+  pattern); TE caches are keyed per (surface, seed, fold) and rebuild cleanly.
+- Order: hgbc_te3 s42 at K=10 AND K=15 (CPU canary, ~seconds/fold) → realmlp_te13 s42
+  at K=10 (GPU, ~75 min). **Read = PAIRED same-seed vs the recorded 5-fold twins**
+  (hgbc_te3_u_s42 0.9503 / realmlp_te13_u_s42 0.9505); note the instrument-shift
+  caveat — K=10 OOF is less pessimistically biased by construction, so only the
+  paired delta with the escalation gate counts, not the raw number.
+- Escalation gate ≥ +0.0004 paired solo → more seeds + leg-swap into the stack with
+  the standard 12-cell split-half read; K=15 realmlp only if the K=10 canary moves.
+- Either outcome is informative: a null ALSO measures the learning-curve slope at
+  552k→621k rows flat, which closes the full-train-refit pitch by measurement
+  (80→90% flat ⇒ 100% flat) instead of leaving it a faith move.
+
 ### ⚠️ PROTOCOL ADDITIONS (Day-10 PM, decision-theorist audit — endgame hardening)
 
 1. **EXPLICIT FINALS SELECTION IS MANDATORY, ≥48h BEFORE DEADLINE (~Jul 31).** With
