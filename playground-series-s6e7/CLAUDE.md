@@ -1346,6 +1346,12 @@ against the kill list; every runnable survivor was measured the same evening:**
   (combines a DISTINCT `realmlp_te13_u_breadth12` key — u4's audited lineage
   untouched — then builds `lrstack_u5`). Read `results/log_day13_u5_overnight.txt`
   next session; adoption bar = wash-or-better vs u4, same as u4-vs-u3.
+  **RESOLVED 07-17**: `lrstack_u5_r` = weighted 0.9508 / complete4 0.9515 / miss4
+  0.9464 — a WASH with u4 (0.95081/0.9516/0.9464) at the adoption bar, third
+  consecutive stack-depth wash (u2→u3→u4→u5). Unlike the u3→u4 adoption, u5 does
+  NOT auto-become the preferred file: it has never been submitted and
+  `finals_audit.py` hasn't covered its lineage — **#1 stays `lrstack_u4_r.csv`**
+  unless the user spends a slot + audit on u5 (marginal: c4 reads a hair lower).
 - **Evening net**: 8 new probes/audits, all measured flats/nulls + 2 rank instruments
   + 6 integrity hardenings. The saturation thesis survived adversarial brainstorm × 3
   lenses PLUS a code audit, with every proposed hole measured shut or fixed the same
@@ -1426,6 +1432,48 @@ is reused every round — it re-reprocesses ALL prior rounds sharing that filena
 just the newest. Currently harmless (KEEP verdicts reassign the same already-applied
 labels, a no-op), but this is latent and worth a real fix (round-tagging in the manifest)
 if it ever stops being idempotent.
+
+**07-16 Round 4 submitted+closed, round 5 armed (autosubmit ran clean, anchor gate PASS).**
+Round 4 (9 exact-feedback probes + the `--extra lbprobe_composed_ref.csv` anchor = full
+10/10 quota) all scored near-instantly; anchor re-read matched the assumed reference exactly
+→ compose ran. **1/9 kept** (rounds 1→5: 4/9 → 6/9 → 0/9 → 1/9 — non-monotone, one more
+measured point, not a saturation claim per [[feedback_premature_ceiling]]). The one winning
+flip-set is the round's mechanically-correct composition (reference tilt + the single positive
+set = exactly `lbprobe_d4_p03.csv`), and its measured Δ additivity checked out. ⚠️ **The
+latent compose quirk finally bit — do NOT use the auto-composed `lbprobe_composed_ref.csv`.**
+Round 3 *replaced* the accumulation lineage (full_bayes2 overwrote composed_ref rather than
+extending it), so the round-1/2 kept sets stopped being "already applied"; compose then
+re-overlaid those old sets (measured vs the retired 0.95109 ref) onto the tilt, AND
+`lbprobe_compose.py:34` reads `ref_score` from the *first* filtered manifest row (the stale
+0.95109) while `ref_labels` come from the current tilt bytes — so its printed composed score
+is on the wrong base and the written bytes are an unverified Frankenstein overlay (cross-round
+sets aren't guaranteed disjoint; design.py's `used[]` mask is per-round). **Fix applied:
+adopted the winning probe as round-5's reference directly** (`lbprobe_design.py --day 5
+--reference lbprobe_d4_p03.csv`), which is the pre-registered "beats the reference → adopt"
+rule AND sidesteps both bugs going forward: unique reference filename → compose stops
+re-filtering prior rounds; `ref_score` comes correctly from the fit's reliable score (elif
+branch, no `--reference-score` needed); no `--extra` anchor needed for round 5 since
+`lbprobe_d4_p03.csv` already has a reliable score on file. `submissions/lbprobe_composed_ref.csv`
+was overwritten with the good `d4_p03` bytes to neutralize the polluted file. **Round 5 is
+ARMED** (9 probe CSVs `lbprobe_d5_p*.csv` + manifest rows written; all E[Δ]<0 near-saturation
+lottery tickets, keep/revert loses nothing) — next quota day (reset 00:02 UTC) just run
+`lbprobe_autosubmit.py --day 5` (no `--extra`). ⚠️ Do NOT re-run `lbprobe_design.py --day 5`
+(design *appends* to the manifest → would duplicate the d5 rows). Deeper compose fix still
+worth doing (pull `ref_score` from the actual reference row + round-tag the manifest); the
+unique-filename adoption pattern masks it as long as every round adopts its winning probe.
+
+**07-17 Round 5 submitted+closed (autosubmit clean, anchor PASS Δ=0), round 6 armed.**
+**1/9 kept** (rounds 1→5: 4/9 → 6/9 → 0/9 → 1/9 → 1/9): the 285-flip 0→2 set
+`lbprobe_d5_p01` measured Δ +0.00005; all 8 others reverted (measured Δ −0.00005..−0.00029,
+consistent with their E[Δ]<0 design). The unique-reference fix worked end-to-end: compose
+filtered to round-5 rows only and its composed bytes came out IDENTICAL to `lbprobe_d5_p01.csv`
+(verified by cmp — single kept set on its own reference, as expected). Round 6 designed per the
+adopt-the-winner rule (`lbprobe_design.py --day 6 --reference lbprobe_d5_p01.csv` — reliable
+score on file, no `--reference-score`/`--extra` needed): 9 probes `lbprobe_d6_p*.csv`, all
+E[Δ]<0 lottery tickets again (total E[kept gain] +0.00028; refreshed-fit LOO MAE 9.5e-5).
+Next quota day: `lbprobe_autosubmit.py --day 6` (no `--extra`). Two rounds at ~1/9 keeps with
+shrinking measured deltas = the climb is near its measurable resolution (LB rounding 1e-5),
+though per [[feedback_premature_ceiling]] that's a trend read, not a saturation proof.
 
 ### ⚠️ PROTOCOL (user-set, 2026-07-02 pm): work LEADERBOARD-BLIND
 The user watches the LB themselves; **Claude must not query submission scores**
