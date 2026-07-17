@@ -169,6 +169,7 @@ def main() -> None:
                 "delta_sd": sd,
                 "ev_keep": ev,
                 "decision_rule": "keep set iff public(probe) > public(reference)",
+                "round": args.day,
             }
         )
         print(f"{name:22s} {direction:6s} {len(ch):5d} {mu:+9.5f} {sd:8.5f} {ev:11.6f}")

@@ -83,6 +83,16 @@ STAGE_C: list[tuple[str, dict[str, object]]] = [
     ("noise0.02", {"numeric_noise_std": 0.02}),
 ]
 
+# Day-14 training-dynamics stage: manifold mixup (vicinal risk — the one
+# augmentation mechanism with zero campaign coverage) and SAM (the Day-8
+# asserted-kill the Day-9 persona notes re-armed; fp32 by construction).
+STAGE_D: list[tuple[str, dict[str, object]]] = [
+    ("mix0.2", {"mixup_alpha": 0.2}),
+    ("mix1.0", {"mixup_alpha": 1.0}),
+    ("sam0.05", {"sam_rho": 0.05, "allow_amp": False}),
+    ("sam0.10", {"sam_rho": 0.10, "allow_amp": False}),
+]
+
 
 def load_ckpt() -> dict[str, dict[str, object]]:
     if CKPT.exists():
@@ -193,6 +203,7 @@ def main() -> None:
     ]
     run_stage(stage_b)
     run_stage(STAGE_C)
+    run_stage(STAGE_D)
 
     base_dw = results["base"]["dw"]
     base_am = results["base"]["argmax"]

@@ -1358,6 +1358,77 @@ against the kill list; every runnable survivor was measured the same evening:**
   day. Finals framing unchanged from the PM block; the #2 slot is now KNOWN to be
   low-stakes (rank table).
 
+### Day-14 (2026-07-17, 14:00–23:00): INSTRUMENT RED-TEAM DAY — the saturation thesis survives its own audit; 8 measured closures, zero adoptable levers
+
+**Day shape (no external intel by user ruling): one zero-compute instrument on existing
+data + a 3-lens brainstorm (training-dynamics / decision-theory-under-uncertainty /
+red-team-the-instruments) with every runnable survivor measured the same day.**
+
+- **Pooled power analysis of the veto record** (`probe_veto_power.py` →
+  `results/probe_veto_power.txt`, zero compute): parsed all 53 recorded split-half
+  challenger rows. (1) One 12-cell probe has **MDE ≈ 0.000065** (80% power; power ≈ 1.0
+  at a true +0.0002) — the vetoes were NEVER under-powered; direction-pair correlation is
+  ~0 (n_eff ≈ 12). (2) The 39-row veto pool pools **NEGATIVE** (fixed −0.000032, RE CI
+  [−0.000060, −0.000020] — upper bound below zero); the positive controls (LR-over-NM
+  adoptions) pool at +0.000249, z ≈ +17 → the instrument family demonstrably detects real
+  +0.0003 effects on the same splits. Saturation upgraded from "9 vetoes" to one pooled
+  bound. Caveat (in report): all probes share the same 12 split-index pairs → CI width is
+  anti-conservative; direction unaffected.
+- **⚡ Decision-layer-under-private-uncertainty axis closed by PROOF + certificate.**
+  Private BA is exactly row-separable (denominators are TRUE class counts, never
+  predicted → every joint-assignment idea is dead on arrival); the exact E[private-BA]
+  Bayes rule is argmax p_c·λ_c with λ_c = q_c·E[1/(1+m_c)] — INSIDE the deployed
+  argmax(w·p) family; the finite-sample correction prices at ~1e-11 BA. This explains
+  why every decision-layer read of the campaign landed ≤+0.0001.
+  `probe_bayes_certificate.py`: the exact correction applied on top of the deployed u4
+  weights flips **0 rows at q=0.8** (OOF and test), ≤5 of ~1M worst-case at q=0.2.
+- **Training-dynamics survivors measured** (`tune_realmlp_td.py` STAGE_D, fold-1 paired
+  vs base 0.95105): **manifold mixup** (the one augmentation mechanism with zero campaign
+  coverage) mix0.2 **+0.00004** / mix1.0 **−0.00014**; **SAM** (the Day-8 asserted-kill
+  re-armed by the Day-9 personas) sam0.05 **−0.00010** / sam0.10 **−0.00014**. Both axes
+  closed by measurement; mix0.2-flat/mix1.0-negative corroborates the step-like-boundary
+  read. Infra: `mixup_alpha` (post-embedding manifold mixup) + `sam_rho` (fp32 two-step
+  SAM) knobs added to `data_science_stuff/kaggle/models/realmlp.py` — default-off, typed,
+  tested, **stock path verified bit-identical** (hash test), gate-clean. Rejected by
+  code-verified premise: SWA (EMA 0.99775 already on), fold-checkpoint soups (OOF leak —
+  fold-k weights saw fold-k val rows).
+- **Red-team of the 12-cell instrument family — 3 real soft spots found, all 3 measured
+  SHUT the same day:**
+  - **F1 in-sample-dw confound** (`fit_gbdtmeta`/`fit_nnmeta` return in-sample fit-half
+    probs; band's 2nd LR scored on its own rows — a handicap the 24-param LR doesn't
+    suffer, on exactly the hypothesis-class coverage cells): `probe_meta_honest.py`
+    reruns with 3-fold cross-fitted dw for EVERY arm — **gbdt_h −0.00005 (4/12) vs
+    confounded −0.00009; nn_h −0.00022 (1/12); band_h −0.00012 (2/12); lr in-sample vs
+    lr_h +0.00001** → the confound was real but worth ~+0.00004; **the "LR is a local
+    optimum across hypothesis classes" plank STANDS, now de-confounded.**
+  - **F2 test-side dilution + never-stacked micro-positives** (`probe_seat_day14.py`,
+    plain + adv-odds-weighted per-class-recall reads): lrrt1 replicates **+0.00005
+    (9/12)** but advw **+0.00003 (6/12)** — a test-like-concentrated effect would GROW
+    ~3.3× under adv weighting; it shrank → MCAR-parked noise. Stacked micro-arm
+    (rt1 + basin + alpha_c) **+0.00006 (9/12)** — micro-positives do NOT compound; 5×
+    under the gate.
+  - **F3 single-seed challenger handicap**: breadth-matched ftt (mean of 4 on-disk
+    seeds) **−0.00002 (4/12)** vs the single-seed −0.00001 → hypothesis refuted; the
+    Day-10 ftt veto is now breadth-fair. (tabms/cascade seeds are r-surface — cannot
+    honestly join the u incumbent; skipped, not measured.)
+  - Report-hygiene fix adopted: new probes print per-cell deltas (the audit found
+    `probe_seat_s1.txt` was overwritten by the tabpfn3 rerun — S1's cells survive only
+    in this file's summaries).
+- **lbprobe compose hardened for real** (the 07-16 latent bug): manifest now
+  **round-tagged** (migrated on disk from probe names; `lbprobe_design.py` writes
+  `round`), `lbprobe_compose.py` filters by round (not reference filename), asserts
+  unique reference+score within the round, takes `--round`/`--out`. Regression:
+  round-5 recompose is **byte-identical** to `lbprobe_d5_p01.csv`. The
+  adopt-the-winner pattern is no longer load-bearing.
+- **Day-14 net**: 8 measured closures/upgrades (pooled bound + MDE, decision-layer
+  proof + 0-flip certificate, mixup, SAM, honest-meta ×3 arms, breadth-fair ftt,
+  micro-stack, adv-weighted seat diagnostic) — **every red-team hole measured shut;
+  zero adoptable levers**. Finals framing unchanged: **#1 `lrstack_u4_r.csv`; #2 =
+  tail-insurance choice (user-decided)**. Next-quota-day recommendation: lbprobe round
+  6 takes 9 slots → the 10th fits `realmlp_te13_u_breadth.csv` (the never-submitted
+  mean-strong #2 candidate, E[priv] 0.95072 — needs one anchor slot to be
+  finals-selectable).
+
 ### ⚠️ PROTOCOL ADDITIONS (Day-10 PM, decision-theorist audit — endgame hardening)
 
 1. **EXPLICIT FINALS SELECTION IS MANDATORY, ≥48h BEFORE DEADLINE (~Jul 31).** With
@@ -1836,6 +1907,11 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-14 | hgbc_te3_u_s42t + probe_seat_basin | TPE second basin through the full trainer: +0.0001 solo (2-fold +0.00047 shrank); seat +0.00003 (8/12), err-overlap 0.941 = core-member; config-mix 1:1 +0.00007. **Config-basin diversity closed (8th seat veto).** | 0.9505 |
 | 2026-07-14 | catboost_te3_u s42/7/123 | te13 through the 4th library (`train_catboost_te3.py` NEW, GPU): +0.0009 over catboost_bagw — mechanism table complete (all 4 libraries uniform). Leg-swap probe +0.00000 (5/12) → no stack change; inventory. | 0.9501/0.9500/0.9500; breadth 0.9502 |
 | 2026-07-14 | probe_miss_tta | Missingness TTA (K=8 re-masks at test rates, te13-consistent): full −0.00006, mixes +0.00007. **FLAT — last Day-10 backlog item closed.** | 0.95019 vs 0.95025 (dw) |
+| 2026-07-17 | probe_veto_power | Pooled power analysis of all 53 recorded split-half rows (zero compute): single-probe MDE 0.000065 (power ~1.0 at +0.0002); 39-row veto pool mean **−0.00003** (RE CI upper <0); positive controls +0.00025 z≈+17. **Saturation statistically earned, not asserted.** | — |
+| 2026-07-17 | probe_bayes_certificate | Exact E[private-BA] correction (λ_c closed form, MC-verified) on deployed u4 weights: **0 flips at q=0.8** (OOF+test), ≤5/~1M at q=0.2. Decision-layer-under-uncertainty axis closed by proof + measurement. | — |
+| 2026-07-17 | tune_realmlp_td mix/sam | STAGE_D fold-1 paired: mix0.2 +0.00004 / mix1.0 −0.00014 / sam0.05 −0.00010 / sam0.10 −0.00014. **Vicinal-augmentation axis (zero prior coverage) + SAM asserted-kill both closed by measurement.** Knobs live in realmlp.py (default-off, stock path bit-identical). | fold-1 dw 0.95105 (base) |
+| 2026-07-17 | probe_meta_honest | Red-team F1: gbdt/nn/band coverage cells rerun with cross-fitted dw (in-sample confound removed): gbdt_h −0.00005 (4/12), nn_h −0.00022, band_h −0.00012, lr-vs-lr_h +0.00001. **Hypothesis-class plank stands, de-confounded.** | lr_h 0.95070 (holdout) |
+| 2026-07-17 | probe_seat_day14 | Red-team F2+F3: breadth-matched ftt4 **−0.00002** (single-seed-handicap refuted); lrrt1 replicates +0.00005 (9/12) but advw +0.00003 (6/12) → NOT test-like; stacked micro-arm (rt1+basin+alpha_c) +0.00006 (9/12) → **micro-positives don't compound**. Seat axis survives its own audit. | lr8 0.95071 (holdout) |
 
 **LB**: lgbm 0.94886, xgboost 0.94894, **ensemble_v1b 0.94970 (best)**. The blend lifts once
 models are pre-corrected to their deployed surface. Next lever for a bigger jump is a non-GBDT base

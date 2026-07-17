@@ -7,6 +7,9 @@ reference by linearity; the composed CSV is the next round's reference with a
 KNOWN score (sum of kept deltas, exact up to rounding accumulation).
 """
 
+import argparse
+from pathlib import Path
+
 import numpy as np
 import polars as pl
 
@@ -22,20 +25,43 @@ from features import CLASSES
 
 
 def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--round", type=int, default=None, help="round to compose (default: latest)")
+    ap.add_argument("--out", type=str, default=None, help="output CSV (default: composed_ref)")
+    args = ap.parse_args()
+
     manifest = pl.read_csv(RESULTS_DIR / "lbprobe_probe_manifest.csv")
-    # only the latest round's probes share a composable reference
-    ref_name = manifest["reference"][-1]
-    manifest = manifest.filter(pl.col("reference") == ref_name)
+    # round-tagged selection (NOT reference-filename matching: filenames were
+    # reused across rounds, which is how the 07-16 Frankenstein compose happened).
+    # Pre-round-column rows get their round from the probe name.
+    if "round" not in manifest.columns or manifest["round"].null_count() > 0:
+        derived = (
+            manifest["probe"].str.extract(r"lbprobe_d(\d+)_p", 1).cast(pl.Int64)
+        )
+        manifest = manifest.with_columns(
+            pl.col("round").fill_null(derived) if "round" in manifest.columns
+            else derived.alias("round")
+        )
+    rnd = args.round if args.round is not None else int(manifest["round"].max())
+    manifest = manifest.filter(pl.col("round") == rnd)
+    if manifest.is_empty():
+        raise SystemExit(f"no manifest rows for round {rnd}")
+    refs = manifest["reference"].unique().to_list()
+    ref_scores = manifest["reference_score"].unique().to_list()
+    assert len(refs) == 1 and len(ref_scores) == 1, (
+        f"round {rnd} has mixed references {refs} / scores {ref_scores} — manifest corrupt"
+    )
+    ref_name = refs[0]
     scores = load_scores()
     score_of = dict(zip(scores["file_name"], scores["public_score"]))
 
     test_ids = load_test_ids()
     ref_labels = load_submission_matrix([ref_name], test_ids)[:, 0].copy()
-    ref_score = float(manifest["reference_score"][0])
+    ref_score = float(ref_scores[0])
 
     total = 0.0
     kept = 0
-    print(f"reference {ref_name} @ {ref_score:.5f}\n")
+    print(f"round {rnd}: reference {ref_name} @ {ref_score:.5f}\n")
     print(f"{'probe':22s} {'n':>5s} {'E[Δ]':>9s} {'measured Δ':>11s}  verdict")
     for row in manifest.iter_rows(named=True):
         fname = row["probe"] + ".csv"
@@ -55,7 +81,7 @@ def main() -> None:
             f"{delta:+11.5f}  {'KEEP' if keep else 'revert'}"
         )
 
-    out = SUBS_DIR / "lbprobe_composed_ref.csv"
+    out = Path(args.out) if args.out else SUBS_DIR / "lbprobe_composed_ref.csv"
     pl.DataFrame(
         {"id": test_ids, TARGET: np.array(CLASSES)[ref_labels]}
     ).write_csv(out)

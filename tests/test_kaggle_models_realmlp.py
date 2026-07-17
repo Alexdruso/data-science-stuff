@@ -167,3 +167,42 @@ def test_realmlp_config_defaults_preserved() -> None:
     assert REALMLP_TD_CONFIG["n_ens"] == 8
     assert REALMLP_TD_CONFIG["lr_sched"] == "flat_cos"
     assert REALMLP_TD_CONFIG["ema_decay"] == 0.99775
+    # New training-dynamics knobs default OFF (stock path unchanged).
+    assert REALMLP_TD_CONFIG["mixup_alpha"] == 0.0
+    assert REALMLP_TD_CONFIG["sam_rho"] == 0.0
+
+
+def test_realmlp_mixup_and_sam_paths(tmp_path: Path) -> None:
+    torch.manual_seed(0)
+    x_tr, y_tr = _frame(120, seed=0)
+    x_va, y_va = _frame(45, seed=1)
+    cats = ["cat_small", "cat_large"]
+
+    mix = RealMLP_TD_Classifier(**_TINY, mixup_alpha=0.4)
+    mix.fit(x_tr, y_tr, x_va, y_va, cat_col_names=cats, ckpt_path=tmp_path / "m.pth")
+    proba = mix.predict_proba(x_va)
+    assert proba.shape == (45, 3)
+    np.testing.assert_allclose(proba.sum(axis=1), 1.0, atol=1e-5)
+
+    sam = RealMLP_TD_Classifier(**_TINY, sam_rho=0.05)
+    sam.fit(x_tr, y_tr, x_va, y_va, cat_col_names=cats, ckpt_path=tmp_path / "s.pth")
+    assert sam.predict_proba(x_va).shape == (45, 3)
+
+
+def test_realmlp_mixup_and_sam_guards(tmp_path: Path) -> None:
+    x_tr, y_tr = _frame(120, seed=0)
+    x_va, y_va = _frame(45, seed=1)
+
+    with pytest.raises(ValueError, match="allow_amp=False"):
+        RealMLP_TD_Classifier(**_TINY, sam_rho=0.05, allow_amp=True).fit(
+            x_tr, y_tr, x_va, y_va, ckpt_path=tmp_path / "g.pth"
+        )
+    with pytest.raises(ValueError, match="per_sample_weight"):
+        RealMLP_TD_Classifier(**_TINY, mixup_alpha=0.2).fit(
+            x_tr,
+            y_tr,
+            x_va,
+            y_va,
+            ckpt_path=tmp_path / "g.pth",
+            per_sample_weight=np.ones(len(y_tr)),
+        )

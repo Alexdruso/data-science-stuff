@@ -250,15 +250,20 @@ class RealMLP(nn.Module):
             n_ens=n_ens, in_features=in_dim, out_features=output_dim
         )
 
-    def forward(self, x_num: torch.Tensor, x_cat: torch.Tensor) -> torch.Tensor:
+    def embed(self, x_num: torch.Tensor, x_cat: torch.Tensor) -> torch.Tensor:
+        """Post-embedding representation (batch, n_ens, dim) — the manifold
+        mixup interpolation point (input-space mixup is invalid on cat codes)."""
         x_num = x_num.unsqueeze(1).expand(-1, self.n_ens, -1)
         x_cat = x_cat.unsqueeze(1).expand(-1, self.n_ens, -1)
-        x_num = self.num_embed(x_num)
-        x_cat = self.cate(x_cat)
-        combined = torch.cat([x_num, x_cat], dim=2)
+        return torch.cat([self.num_embed(x_num), self.cate(x_cat)], dim=2)
+
+    def head(self, combined: torch.Tensor) -> torch.Tensor:
         x = self.hidden(combined)
         x = self.output_layer(x)
         return F.softmax(x, dim=2)
+
+    def forward(self, x_num: torch.Tensor, x_cat: torch.Tensor) -> torch.Tensor:
+        return self.head(self.embed(x_num, x_cat))
 
 
 def apply_schedule(
@@ -469,6 +474,66 @@ class RealMLP_TD_Classifier(BaseEstimator):
         lr_sched, flat_ratio = p["lr_sched"], p["flat_ratio"]
         numeric_noise_std = float(p.get("numeric_noise_std", 0.0))
         ema_decay = float(p.get("ema_decay", 0.0))
+        mixup_alpha = float(p.get("mixup_alpha", 0.0))
+        sam_rho = float(p.get("sam_rho", 0.0))
+        if sam_rho > 0 and bool(p.get("allow_amp", False)):
+            msg = "sam_rho requires allow_amp=False (two-step SAM + GradScaler unsupported)"
+            raise ValueError(msg)
+        if mixup_alpha > 0 and per_sample_w_t is not None:
+            msg = "mixup_alpha does not compose with per_sample_weight"
+            raise ValueError(msg)
+        mix_rng = (
+            np.random.default_rng(int(p.get("random_state", 0)) + 4051)
+            if mixup_alpha > 0
+            else None
+        )
+
+        def compute_batch_loss(
+            x_num_batch: torch.Tensor,
+            x_cat_batch: torch.Tensor,
+            y_batch: torch.Tensor,
+            ls_val: float,
+            psw_batch: torch.Tensor | None,
+            mix_lam: float | None,
+            mix_perm: torch.Tensor | None,
+        ) -> torch.Tensor:
+            with torch.autocast(amp_device, dtype=torch.float16, enabled=use_amp):
+                if mix_lam is None or mix_perm is None:
+                    y_pred = forward_model(x_num_batch, x_cat_batch)
+                    return smooth_ce_loss(
+                        y_batch.repeat_interleave(n_ens),
+                        y_pred.reshape(-1, n_classes),
+                        ls=ls_val,
+                        class_weights=class_weights,
+                        focal_gamma=float(p.get("focal_gamma", 0.0)),
+                        loss_prob_multipliers=loss_prob_multipliers,
+                        per_sample_weight=psw_batch,
+                    )
+                # manifold mixup: interpolate post-embedding representations and
+                # mix the two losses (vicinal risk over the boundary band)
+                emb = base_model.embed(x_num_batch, x_cat_batch)
+                emb = mix_lam * emb + (1.0 - mix_lam) * emb[mix_perm]
+                y_pred = base_model.head(emb).reshape(-1, n_classes)
+                loss_a = smooth_ce_loss(
+                    y_batch.repeat_interleave(n_ens),
+                    y_pred,
+                    ls=ls_val,
+                    class_weights=class_weights,
+                    focal_gamma=float(p.get("focal_gamma", 0.0)),
+                    loss_prob_multipliers=loss_prob_multipliers,
+                    per_sample_weight=None,
+                )
+                loss_b = smooth_ce_loss(
+                    y_batch[mix_perm].repeat_interleave(n_ens),
+                    y_pred,
+                    ls=ls_val,
+                    class_weights=class_weights,
+                    focal_gamma=float(p.get("focal_gamma", 0.0)),
+                    loss_prob_multipliers=loss_prob_multipliers,
+                    per_sample_weight=None,
+                )
+                return mix_lam * loss_a + (1.0 - mix_lam) * loss_b
+
         total_steps = epochs * len(y_tr)
         train_order = np.arange(len(y_tr))
         sample_weight_power = float(p.get("sample_weight_power", 0.0))
@@ -526,22 +591,72 @@ class RealMLP_TD_Classifier(BaseEstimator):
                 psw_batch = None
                 if per_sample_w_t is not None:
                     psw_batch = per_sample_w_t[idx_batch].repeat_interleave(n_ens)
-                with torch.autocast(amp_device, dtype=torch.float16, enabled=use_amp):
-                    y_pred = forward_model(x_num_batch, Xtc[idx_batch])
-                    loss = smooth_ce_loss(
-                        ytt[idx_batch].repeat_interleave(n_ens),
-                        y_pred.reshape(-1, n_classes),
-                        ls=ls_val,
-                        class_weights=class_weights,
-                        focal_gamma=float(p.get("focal_gamma", 0.0)),
-                        loss_prob_multipliers=loss_prob_multipliers,
-                        per_sample_weight=psw_batch,
+                mix_lam: float | None = None
+                mix_perm: torch.Tensor | None = None
+                if mix_rng is not None:
+                    mix_lam = float(mix_rng.beta(mixup_alpha, mixup_alpha))
+                    mix_perm = torch.as_tensor(
+                        mix_rng.permutation(len(idx_batch)),
+                        dtype=torch.long,
+                        device=dev,
                     )
-                scaler.scale(loss).backward()  # type: ignore[no-untyped-call]
-                scaler.unscale_(optimizer)
-                torch.nn.utils.clip_grad_norm_(base_model.parameters(), p["grad_clip"])
-                scaler.step(optimizer)
-                scaler.update()
+                loss = compute_batch_loss(
+                    x_num_batch,
+                    Xtc[idx_batch],
+                    ytt[idx_batch],
+                    ls_val,
+                    psw_batch,
+                    mix_lam,
+                    mix_perm,
+                )
+                if sam_rho > 0:
+                    # SAM ascent step: perturb weights toward the local sharp
+                    # direction, then descend from the perturbed point (fp32)
+                    loss.backward()  # type: ignore[no-untyped-call]
+                    sam_eps: list[tuple[nn.Parameter, torch.Tensor]] = []
+                    with torch.no_grad():
+                        gnorm = torch.norm(
+                            torch.stack(
+                                [
+                                    prm.grad.norm()
+                                    for prm in base_model.parameters()
+                                    if prm.grad is not None
+                                ]
+                            )
+                        )
+                        sam_scale = sam_rho / (gnorm + 1e-12)
+                        for prm in base_model.parameters():
+                            if prm.grad is None:
+                                continue
+                            e_w = prm.grad * sam_scale
+                            prm.add_(e_w)
+                            sam_eps.append((prm, e_w))
+                    optimizer.zero_grad()
+                    loss = compute_batch_loss(
+                        x_num_batch,
+                        Xtc[idx_batch],
+                        ytt[idx_batch],
+                        ls_val,
+                        psw_batch,
+                        mix_lam,
+                        mix_perm,
+                    )
+                    loss.backward()  # type: ignore[no-untyped-call]
+                    with torch.no_grad():
+                        for prm, e_w in sam_eps:
+                            prm.sub_(e_w)
+                    torch.nn.utils.clip_grad_norm_(
+                        base_model.parameters(), p["grad_clip"]
+                    )
+                    optimizer.step()
+                else:
+                    scaler.scale(loss).backward()  # type: ignore[no-untyped-call]
+                    scaler.unscale_(optimizer)
+                    torch.nn.utils.clip_grad_norm_(
+                        base_model.parameters(), p["grad_clip"]
+                    )
+                    scaler.step(optimizer)
+                    scaler.update()
                 if ema_state is not None:
                     with torch.no_grad():
                         for key, value in self.model_.state_dict().items():
@@ -717,6 +832,8 @@ REALMLP_TD_CONFIG: dict[str, Any] = {
     "train_bs": 256,
     "eval_bs": 10240,
     "numeric_noise_std": 0.0,
+    "mixup_alpha": 0.0,  # >0: manifold mixup (Beta(a,a) post-embedding interpolation)
+    "sam_rho": 0.0,  # >0: sharpness-aware minimization (needs allow_amp=False)
     "ema_decay": 0.99775,
     "verbosity": 1,
     "use_early_stopping": False,

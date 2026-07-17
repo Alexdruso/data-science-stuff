@@ -119,5 +119,43 @@
     },
     "train_bs": 512,
     "seconds": 101.2
+  },
+  "mix0.2": {
+    "argmax": 0.951075685128759,
+    "dw": 0.9510925610569348,
+    "overrides": {
+      "mixup_alpha": 0.2
+    },
+    "train_bs": 512,
+    "seconds": 115.7
+  },
+  "mix1.0": {
+    "argmax": 0.9508329194270612,
+    "dw": 0.9509120488009133,
+    "overrides": {
+      "mixup_alpha": 1.0
+    },
+    "train_bs": 512,
+    "seconds": 113.3
+  },
+  "sam0.05": {
+    "argmax": 0.9509210054685321,
+    "dw": 0.9509509477175127,
+    "overrides": {
+      "sam_rho": 0.05,
+      "allow_amp": false
+    },
+    "train_bs": 512,
+    "seconds": 167.7
+  },
+  "sam0.10": {
+    "argmax": 0.9509133063297699,
+    "dw": 0.9509133063297699,
+    "overrides": {
+      "sam_rho": 0.1,
+      "allow_amp": false
+    },
+    "train_bs": 512,
+    "seconds": 167.0
   }
 }
