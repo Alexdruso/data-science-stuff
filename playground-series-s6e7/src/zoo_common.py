@@ -38,6 +38,17 @@ from train_te_num import encode_fold, with_te
 
 CACHE_DIR = RESULTS_DIR / "cache"
 
+# the historical fold count baked into every pre-Day-15 cache filename
+_LEGACY_N_FOLDS = 5
+
+
+def _kseg() -> str:
+    """Fold-count cache-key segment (Day-15 sweep): the te/te13 cache names key on
+    (tag, seed, fold) but not the fold COUNT — at K!=5 folds f1..f5 would collide
+    by filename with the 5-fold entries while holding different splits. K=5 keeps
+    the historical names so existing caches stay valid."""
+    return f"_k{N_FOLDS}" if N_FOLDS != _LEGACY_N_FOLDS else ""
+
 FitFold = Callable[
     [NDArray[np.int64], NDArray[np.int64], int, int],
     "tuple[NDArray[np.float64], NDArray[np.float64]]",
@@ -144,7 +155,7 @@ def te_block_for_fold(
     """
     assert fit_df is None or "rt" in tag, "fit_df requires a distinct rt-tag"
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    cache = CACHE_DIR / f"te_{tag}_s{seed}_f{fold}.npz"
+    cache = CACHE_DIR / f"te_{tag}{_kseg()}_s{seed}_f{fold}.npz"
     if cache.exists():
         z = np.load(cache, allow_pickle=True)
         return z["train"], z["test"], list(z["names"])
@@ -222,7 +233,7 @@ def te13_block_for_fold(
 
     assert fit_df is None or "rt" in tag, "fit_df requires a distinct rt-tag"
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    cache = CACHE_DIR / f"te13_{tag}_s{seed}_f{fold}.npz"
+    cache = CACHE_DIR / f"te13_{tag}{_kseg()}_s{seed}_f{fold}.npz"
     if cache.exists():
         z = np.load(cache, allow_pickle=True)
         return z["train"], z["test"], list(z["names"])

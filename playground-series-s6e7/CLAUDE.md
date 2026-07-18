@@ -1429,6 +1429,41 @@ red-team-the-instruments) with every runnable survivor measured the same day.**
   mean-strong #2 candidate, E[priv] 0.95072 — needs one anchor slot to be
   finals-selectable).
 
+### Day-15 (2026-07-18): FOLD-COUNT SWEEP K=10/15 — NULL; full-train-refit closed by measurement
+
+**The pre-registered sweep (block below) executed verbatim. Verdict: the escalation gate
+(≥+0.0004 paired solo) was not met by any leg — no extra seeds, no leg-swap, no K=15
+realmlp. Learning-curve bonus banked: the 552k→621k/644k-row slope is measured flat,
+which closes the full-train-refit pitch (80→90/93% flat ⇒ 100% flat) by measurement.**
+
+- **Wiring (permanent, inert at default)**: `S6E7_N_FOLDS` env override in
+  `train_common.py` (default 5, existing recipes bit-identical); TE cache filenames in
+  `zoo_common.py` gain a `_k{K}` segment when K≠5 (`_kseg()`) — the (tag, seed, fold)
+  key never encoded the fold COUNT, so K=10 folds f1..f5 would have silently served
+  stale 5-fold TE blocks (the pre-reg's "caches rebuild cleanly" claim required this
+  fix); realmlp ckpt dir name carries the same segment. Inner TE cross-fit stays 5
+  everywhere (encoder property, part of the fixed recipe — isolates the outer-K
+  variable). Verified: 10 fresh `te13_u_k10_s42_f*.npz` built; 5-fold cache mtimes
+  untouched (07-11).
+- **Paired reads (weighted OOF vs recorded same-seed 5-fold twins)**:
+  hgbc_te3 K=10 **0.950219** / K=15 **0.950253** vs twin 0.950255 → Δ **−0.000036 /
+  −0.000002** — the CPU canary is exactly flat, and since K≠5 OOF is *less*
+  pessimistically biased by construction, a real learning-curve gain would have read
+  positive. realmlp_te13 K=10 **0.950675** vs twin 0.950449 → Δ **+0.000226** —
+  positive but ~half the gate and confounded by the same instrument shift (the tree
+  canary pins the pure data-fraction effect at ~0); at per-seed sd ~1e-4 this is a
+  ≤2σ read. **No leg cleared the gate.**
+- Artifacts: `{oof,test}_hgbc_te3_u_s42_f10/_f15.npy`, `{oof,test}_realmlp_te13_u_s42_f10.npy`
+  + weights JSONs (inventory; fold-count-tagged, never mixes with the 5-fold lineage);
+  logs `results/log_{hgbc_te3,realmlp_te13}_u_s42_f1*.txt`. Per-model sanity CSVs exist
+  on disk but are NOT queued (LB-blind; sub-gate by construction).
+- **Consequence**: the fold-count axis joins the measured-closed list (config, HP,
+  combiner, decision layer, surface, objective, encoding, …) — and the one remaining
+  "more training data" idea (full-train refit, no OOF) is now closed by measurement
+  instead of vetoed on faith. Finals framing unchanged: #1 `lrstack_u4_r.csv`, #2 =
+  tail-insurance choice. Still queued for a Day-15+ session: the ORIGINAL-50K REFEREE
+  probe (block below).
+
 ### ▶▶ QUEUED for Day-15 (user-approved 07-17 night): ORIGINAL-50K REFEREE — pre-registered design
 
 **Question**: is any finals candidate differentially overfit to generator flip-noise?
@@ -1460,7 +1495,8 @@ Day-4). It is the one labeled set whose noise is INDEPENDENT of our 690k CV rows
    (26% of competition rows) — it referees the complete-driver regime only.
 
 **ALSO QUEUED (user-pitched 07-17 night): FOLD-COUNT SWEEP — K=10/15 champion-leg
-reruns.** N_FOLDS=5 has never been swept; K=10 trains each fold model on 90% vs 80%
+reruns. ▶ RESOLVED 07-18 (Day-15): NULL, no escalation — see the Day-15 section.**
+N_FOLDS=5 has never been swept; K=10 trains each fold model on 90% vs 80%
 (the MEASURABLE sibling of the full-train-refit idea — keeps an OOF surface), and the
 test side gains fold-axis averaging on top. Pre-registered design:
 - Wire `S6E7_N_FOLDS` env override in `train_common` + fold-count-tagged run tags
@@ -1960,6 +1996,8 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-17 | tune_realmlp_td mix/sam | STAGE_D fold-1 paired: mix0.2 +0.00004 / mix1.0 −0.00014 / sam0.05 −0.00010 / sam0.10 −0.00014. **Vicinal-augmentation axis (zero prior coverage) + SAM asserted-kill both closed by measurement.** Knobs live in realmlp.py (default-off, stock path bit-identical). | fold-1 dw 0.95105 (base) |
 | 2026-07-17 | probe_meta_honest | Red-team F1: gbdt/nn/band coverage cells rerun with cross-fitted dw (in-sample confound removed): gbdt_h −0.00005 (4/12), nn_h −0.00022, band_h −0.00012, lr-vs-lr_h +0.00001. **Hypothesis-class plank stands, de-confounded.** | lr_h 0.95070 (holdout) |
 | 2026-07-17 | probe_seat_day14 | Red-team F2+F3: breadth-matched ftt4 **−0.00002** (single-seed-handicap refuted); lrrt1 replicates +0.00005 (9/12) but advw +0.00003 (6/12) → NOT test-like; stacked micro-arm (rt1+basin+alpha_c) +0.00006 (9/12) → **micro-positives don't compound**. Seat axis survives its own audit. | lr8 0.95071 (holdout) |
+| 2026-07-18 | hgbc_te3_u_s42_f10/_f15 | Fold-count sweep CPU canary (pre-registered; `S6E7_N_FOLDS` + `_k{K}` cache keys new): paired Δ vs 5-fold twin **−0.000036 / −0.000002** — exactly flat despite the less-pessimistic K≠5 instrument. Gate (≥+0.0004) not met. | 0.950219 / 0.950253 |
+| 2026-07-18 | realmlp_te13_u_s42_f10 | Fold-count sweep GPU leg: paired Δ **+0.000226** vs twin 0.950449 — sub-gate (~½ the bar), instrument-shift-confounded (tree canary pins data-fraction effect at ~0). **NULL — no escalation; learning-curve slope 552k→621k flat ⇒ full-train-refit closed by measurement.** | 0.950675 |
 
 **LB**: lgbm 0.94886, xgboost 0.94894, **ensemble_v1b 0.94970 (best)**. The blend lifts once
 models are pre-corrected to their deployed surface. Next lever for a bigger jump is a non-GBDT base

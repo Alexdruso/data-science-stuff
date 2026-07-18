@@ -33,7 +33,10 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 SUBMISSIONS_DIR = Path(__file__).parent.parent / "submissions"
 RESULTS_DIR = Path(__file__).parent.parent / "results"
 
-N_FOLDS = 5
+# S6E7_N_FOLDS (Day-15 fold-count sweep): outer CV fold count, default 5. K!=5
+# runs MUST use a fold-count-tagged S6E7_RUN_TAG (_f10/_f15) so their arrays
+# never mix with the 5-fold lineage; TE caches gain a _k{K} segment (zoo_common).
+N_FOLDS = int(os.environ.get("S6E7_N_FOLDS", "5"))
 N_CLASSES = len(CLASSES)
 # Multi-seed bagging: each seed is a full 5-fold split; OOF is averaged over seeds
 # (every row is out-of-fold once per seed), test over all seed*fold fits. Fold-to-fold

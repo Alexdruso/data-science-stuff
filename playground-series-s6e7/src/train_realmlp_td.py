@@ -29,7 +29,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).parent))
 from train_common import N_CLASSES, SEEDS, finalize, load_dataset
 from train_mlp import NNData
-from zoo_common import clear_ckpt, te13_block_for_fold, te_block_for_fold, zoo_cv
+from zoo_common import _kseg, clear_ckpt, te13_block_for_fold, te_block_for_fold, zoo_cv
 
 from data_science_stuff.kaggle.models.realmlp import RealMLP_TD_Classifier
 
@@ -188,8 +188,9 @@ def main() -> None:
         return val_proba, test_proba
 
     # ckpt name carries the SURFACE tag (Day-10 audit: r/u runs of the same
-    # model+seed must never share checkpoint files after a crash)
-    ckpt = f"{MODEL_NAME}_{SURFACE_TAG}_s{SEEDS[0]}"
+    # model+seed must never share checkpoint files after a crash) and the
+    # fold-count segment (Day-15: K!=5 folds must never resume 5-fold ckpts)
+    ckpt = f"{MODEL_NAME}_{SURFACE_TAG}{_kseg()}_s{SEEDS[0]}"
     oof, test, fold_scores = zoo_cv(ds, fit_fold, ckpt_name=ckpt, seed=SEEDS[0])
     finalize(MODEL_NAME, ds, oof, test, fold_scores)
     clear_ckpt(ckpt)
