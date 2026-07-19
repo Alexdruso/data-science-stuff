@@ -1462,9 +1462,72 @@ which closes the full-train-refit pitch (80→90/93% flat ⇒ 100% flat) by meas
   "more training data" idea (full-train refit, no OOF) is now closed by measurement
   instead of vetoed on faith. Finals framing unchanged: #1 `lrstack_u4_r.csv`, #2 =
   tail-insurance choice. Still queued for a Day-15+ session: the ORIGINAL-50K REFEREE
-  probe (block below).
+  probe (block below; ▶ RESOLVED Day-16 — instrument-failure finding, no demotion).
 
-### ▶▶ QUEUED for Day-15 (user-approved 07-17 night): ORIGINAL-50K REFEREE — pre-registered design
+### Day-16 (2026-07-19): quota day (anchor + lbprobe r6 dried); ORIGINAL-50K REFEREE run — non-null board diagnosed as JOINT-SHIFT, not flip-noise; 3-lens brainstorm → 4 survivors measured, all NULL
+
+**Day shape (user-planned): quota lane + the pre-registered referee as lead experiment +
+PM fresh-lever brainstorm (user-selected); external sweep OFF by ruling.**
+
+**1. Quota (10/10).** `realmlp_te13_u_breadth.csv` submitted as its own plain anchor
+(score unread) → **now finals-selectable** for the #2 slot. lbprobe round 6 via
+autosubmit: clean run, anchor check PASS (Δ +0.00000), **0/9 kept** (all sets measured
+−0.00001..−0.00013); composed reference unchanged (= the round-5 winner). Keep trend
+4/9 → 6/9 → 0/9 → 1/9 → 1/9 → 0/9 ⇒ **the probe track has dried**; round 7 NOT armed —
+user's call whether to keep spending quota days on it.
+
+**2. ORIGINAL-50K REFEREE (pre-registered block below) — RESOLVED, instrument-failure
+finding.** `src/probe_original_referee.py` NEW (schema gate → 6 seed-42 legs with the
+50k as a second test frame through the exact per-fold TE pipeline, ckpt-resumable →
+deployed-recipe composition). Schema gate clean: cat vocab subset, 700-vs-701 sleep
+uniques as registered, referee numeric ranges WIDER than train (the generator
+contracted tails — as predicted), priors shifted (at-risk 87.4% vs 85.9%). Leg
+regeneration faithful: hgbc_te3 OOF argmax 0.95026 = recorded twin to 4dp; the 6-leg
+u-stack subset refit reads OOF 0.95075 vs deployed 8-leg 0.95081 (subset costs ~nothing).
+- **BOARD (BA on original labels): realmlp_te13 solo 0.90782 > champion_v1 0.89696 >
+  lrstack(6-leg) 0.89339** — NON-NULL; ranking inverts OOF order.
+- **Diagnosis (3 follow-ups, all in `results/probe_original_referee*.txt`):**
+  (a) decision-layer deconfound — argmax-only AND per-candidate oracle weights refit on
+  referee labels keep the ranking (oracle gaps −0.0045/−0.0090) ⇒ not a dw×prior
+  artifact; (b) in-range restriction (135 rows outside train numeric ranges) changes
+  nothing ⇒ not tails; (c) mechanism = **generator-ADDED dependence** (07-11
+  fingerprint: original numerics ~independent |corr| 0.003 vs synthetic ~0.10) ⇒ every
+  model is scored off its training joint, families degrade differentially (leg scramble
+  0.877–0.927 argmax, uncorrelated with OOF strength), combinations land near the bulk
+  of their members. Magnitude bound: the stack's entire OOF edge over solo realmlp is
+  +0.0004 — a 100%-fake edge would cost ~0.0004 here, not 0.009.
+- **VERDICT: the instrument cannot referee cross-family flip-noise overfit as
+  pre-registered — its cross-family gaps are joint-shift-dominated. NO finals demotion
+  on this evidence; finals unchanged.** Blind-spot ledger grows: not just missingness —
+  the 50k's joint distribution itself is off-manifold for models fit on the synthetic.
+
+**3. PM brainstorm (Day-13-eve pattern, 3 lenses: representation / model-training /
+log red-team) → 4 survivors measured same-day, ALL NULL:**
+- **TE-generation design sweep** (`probe_te_design.py`): the load-bearing encoder's own
+  HPs (frozen `smooth="auto", cv=5` since Day-9; only consumers were ever tuned).
+  Arms smooth {5,100,500} + inner-cv 10, hgbc_te3 canary, paired: **all within ±0.0001**
+  (best smooth5 +0.00008 wt vs +0.0007 bar) ⇒ encoder-HP axis measured-closed. The
+  test-transform-bagging sub-lever is OOF-invisible — recorded UNREADABLE offline, not flat.
+- **Cumulative-link ordinal target** (`probe_ord_hgbc.py`): the unmeasured
+  target-reparametrization cell (cascade killed a *different* factorization). Two
+  cumulative HGBC binaries on identical te3 inputs: **wt −0.00026, error-overlap
+  0.947** ⇒ nested-thresholds sibling of the cascade kill, measured-closed; no CORN
+  escalation (gate +0.0004).
+- **Cross-seed dispersion seat** (`probe_seat_disp.py`): 9 z-scored per-class seed-std
+  cols (channel destroyed by breadth-averaging before every measured combiner).
+  12-cell: **−0.00004 (4/12 positive)** ⇒ **seat veto #11**; dispersion channel closed.
+- **realmlp K=10 seed-7 replication** (red-team of Day-15's NN dismissal-by-tree-canary):
+  paired Δ **+0.000097** vs 5-fold twin 0.950421 (s42 read +0.000226) — sign persists,
+  size halves, both ≪ +0.0004 gate ⇒ fold-count closure now NN-measured at 2 seeds,
+  no longer assumption-transferred.
+
+**Still armed (not run, idle-compute candidates for a future day):** cascade×te13×u +
+tabms-u honest closure (the FTT-precedent pitch); realmlp JOINT HP search (red-team of
+the single-axis-ladder closure, ~3-4.5h GPU, overnight-sized); S2 soft-BA surrogate
+fold-1 screen (~200s, touches the shared package). Rejected without compute: nan-level
+TE correction (bounded by the 400-row rt-clone read); external sweep (user ruling).
+
+### ▶▶ QUEUED for Day-15 (user-approved 07-17 night, ▶ RESOLVED Day-16 — see above): ORIGINAL-50K REFEREE — pre-registered design
 
 **Question**: is any finals candidate differentially overfit to generator flip-noise?
 `data/external/student_health_dataset_50k.csv` (the generator's source: exact 13-feature
@@ -1998,6 +2061,11 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-17 | probe_seat_day14 | Red-team F2+F3: breadth-matched ftt4 **−0.00002** (single-seed-handicap refuted); lrrt1 replicates +0.00005 (9/12) but advw +0.00003 (6/12) → NOT test-like; stacked micro-arm (rt1+basin+alpha_c) +0.00006 (9/12) → **micro-positives don't compound**. Seat axis survives its own audit. | lr8 0.95071 (holdout) |
 | 2026-07-18 | hgbc_te3_u_s42_f10/_f15 | Fold-count sweep CPU canary (pre-registered; `S6E7_N_FOLDS` + `_k{K}` cache keys new): paired Δ vs 5-fold twin **−0.000036 / −0.000002** — exactly flat despite the less-pessimistic K≠5 instrument. Gate (≥+0.0004) not met. | 0.950219 / 0.950253 |
 | 2026-07-18 | realmlp_te13_u_s42_f10 | Fold-count sweep GPU leg: paired Δ **+0.000226** vs twin 0.950449 — sub-gate (~½ the bar), instrument-shift-confounded (tree canary pins data-fraction effect at ~0). **NULL — no escalation; learning-curve slope 552k→621k flat ⇒ full-train-refit closed by measurement.** | 0.950675 |
+| 2026-07-19 | probe_original_referee | Pre-registered 50k referee run (6 seed-42 legs, deployed-recipe composition). Board NON-NULL (solo 0.90782 > champion 0.89696 > stack 0.89339) but diagnosed **joint-shift, not flip-noise** (dw-deconfound + in-range null + generator-added-dependence fingerprint; deficit 0.009 ≈ 20× the stack's whole OOF edge). **Instrument cannot referee cross-family flip-noise; NO finals demotion.** | ref BA 0.893–0.908 (pattern-only) |
+| 2026-07-19 | probe_te_design | Encoder-HP sweep of the load-bearing TE block (smooth {5,100,500}, inner-cv 10; hgbc_te3 canary, paired): all arms ±0.0001 (best smooth5 +0.00008 wt). **Encoder-HP axis measured-closed**; test-transform bagging = OOF-invisible, recorded unreadable. | 0.95026–0.95034 (wt) |
+| 2026-07-19 | probe_ord_hgbc | Cumulative-link ordinal head (nested severity thresholds fit<at-risk<unhealthy) on identical te3 inputs: wt **−0.00026**, err-overlap 0.947. **Target-formulation cell measured-closed** (cascade kill's sibling); no CORN escalation. | 0.94999 (wt) |
+| 2026-07-19 | probe_seat_disp | Cross-seed dispersion (9 per-class seed-std cols, the channel breadth-averaging destroys) into lr8: 12-cell **−0.00004** (4/12). **Seat veto #11.** | lr8 0.95071 (holdout) |
+| 2026-07-19 | realmlp_te13_u_s7_f10 | K=10 seed-7 replication (red-team of the tree-canary transfer assumption): paired Δ **+0.000097** vs twin 0.950421 (s42 was +0.000226) — sign persists, size halves, ≪ gate. **Fold-count closure now NN-measured at 2 seeds.** | 0.950518 (wt) |
 
 **LB**: lgbm 0.94886, xgboost 0.94894, **ensemble_v1b 0.94970 (best)**. The blend lifts once
 models are pre-corrected to their deployed surface. Next lever for a bigger jump is a non-GBDT base
