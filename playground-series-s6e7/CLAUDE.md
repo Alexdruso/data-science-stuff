@@ -1582,6 +1582,44 @@ Full 5-fold confirmation run (`_u_s42j`, Day-12 basin-leg protocol) → below.
   decision layer converts). Sub-bar but at gate level → full 5-fold
   confirmation (`_u_s42f`) chained after the joint-basin run → below.
 
+**5. Evening — both 5-fold confirmations SHRINK (the Day-12 pattern replays),
+seats veto:** paired on one instrument vs the recorded twin
+realmlp_te13_u_s42 0.95045 wt: **joint-basin `_u_s42j` 0.95067 = +0.00022**
+(fold-1 +0.00050 halves; sub-gate — flat between basins at deployment scale,
+config axis closed at the NN too, now by 5-fold measurement) and **focal
+`_u_s42f` 0.95049 = +0.00004** (the OOS fold-1 +0.00037 vanishes; focal is
+not a lever, closed). 12-cell seats (`probe_seat_basin_realmlp.txt`): lrj
+**+0.00001 (6/12) = veto #15**, lrf **−0.00000 (6/12) = veto #16** — the
+realmlp basin-diversity cell is now measured (mirror of HGBC veto #8).
+Arrays `*_u_s42j/_u_s42f` = inventory.
+
+**6. P1 escalation (idle-GPU falsifier): the reconstruction channel through
+the SMOOTH consumer — same verdict, P1 closed at BOTH consumer levels.** New
+`imp_features.imp_block_for_fold` (cached per (tag,seed,fold) like te blocks)
++ inert `S6E7_IMP` env in train_realmlp_td (model realmlp_te13_imp).
+Rationale: seat veto #14 came from a tree canary; sleep_completed is the
+rule's own coordinate, the form a smooth net consumes directly. Result:
+**realmlp_te13_imp_u_s42 wt 0.95058 = +0.00013 paired** (argmax exactly
+equal to twin), **seat +0.00002 (8/12) = veto #17**. The reconstruction
+channel is real (+0.0001-2 at every consumer) and combiner-absorbed at every
+consumer — the Day-13 cross-surface structure exactly. Channel measured shut.
+
+**Day-17 tally: 17 measured reads, 6 new seat vetoes (#12-#17), 0 adoptable
+levers; finals unchanged (#1 lrstack_u4_r, #2 user's tail-insurance pick).
+NOT a ceiling claim — Day-18 candidate levers, in EV order:**
+1. **Referee v2 (instrument fix, zero quota, CPU):** importance-weight the
+   original-50k referee rows toward the synthetic joint (AV-style weights from
+   the Day-11 covariate-shift probe) — deconfounds the joint-shift failure and
+   could make the one independent-noise validation instrument usable for the
+   finals #2 choice.
+2. **Test-transform TE bagging read (needs ONE quota submission, user's
+   call):** the only lever recorded UNREADABLE offline; a single probe pair
+   (bagged vs stock composition of a known-score file) converts it to an exact
+   public delta — the retired lbprobe machinery already automates composition.
+3. **tabms_te13 breadth as a #2-menu diversifier** — NOT for the stack (veto
+   #12) but as a plain-submission hedge candidate: its deployment
+   disagreement profile vs the u-family is unmeasured.
+
 **4. PM brainstorm (3 fresh lenses: information-pathway / loss-geometry /
 evaluation-asymmetry — `notes/ideas_day17.md`; 4 entries screened out without
 compute, recorded there):**

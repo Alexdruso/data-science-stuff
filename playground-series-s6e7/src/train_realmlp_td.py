@@ -50,6 +50,12 @@ TE13 = os.environ.get("S6E7_TE13", "") not in ("", "0")
 # leakage numerics). Flat for the 33-leaf HGBC; the smooth consumer is the
 # remaining test of the channel. Additive: read is paired vs realmlp_te13.
 KNN = os.environ.get("S6E7_KNN", "") not in ("", "0")
+# S6E7_IMP=1 (Day-17 P1 escalation): append the driver-reconstruction block
+# (imp_features.imp_block_for_fold, 2 cols — fold-safe HGBR sleep imputation).
+# Replicated +0.00015 solo on the tree canary but seat veto #14 there; the
+# smooth consumer is the remaining test (completed driver = the rule's own
+# coordinate). Additive: read is paired vs realmlp_te13.
+IMP = os.environ.get("S6E7_IMP", "") not in ("", "0")
 # S6E7_ESEL=bll (Day-10 eve): epoch selection by balanced LOGLOSS instead of
 # balanced accuracy — the field verified BA-as-selection is noise-prone; our
 # strongest leg has always epoch-selected on BA. S6E7_SNAP=k: average softmax
@@ -72,6 +78,7 @@ MODEL_NAME = (
     ("realmlp_rule" if RULE else "realmlp")
     + ("_te13" if TE13 else "")
     + ("_knn" if KNN else "")
+    + ("_imp" if IMP else "")
     + ("_bll" if ESEL == "bll" else "")
     + (f"_snap{SNAP}" if SNAP else "")
 )
@@ -144,6 +151,12 @@ def main() -> None:
             k_tr, k_te, _nk = knn_block_for_fold(ds, tr_idx, seed, fold, _BASE_TAG)
             te_tr_full = np.concatenate([te_tr_full, k_tr], axis=1)
             te_te = np.concatenate([te_te, k_te], axis=1)
+        if IMP:
+            from imp_features import imp_block_for_fold
+
+            i_tr, i_te, _ni = imp_block_for_fold(ds, tr_idx, seed, fold, _BASE_TAG)
+            te_tr_full = np.concatenate([te_tr_full, i_tr], axis=1)
+            te_te = np.concatenate([te_te, i_te], axis=1)
         # per-fold mixed matrices (repair-at-fit-only): fold-train rows from the
         # remasked view, val rows plain — X_all.iloc[tr_idx] is then the fit surface
         cat_all, num_all, miss_all = nd.Xcat_tr, nd.Xnum_tr, nd.miss_tr
