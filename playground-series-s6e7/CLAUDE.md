@@ -1560,9 +1560,27 @@ rebuilt on the deployed recipe (te13 block, u surface), both VETO:**
   ON THE CURRENT RECIPE, not by assumption transfer.
 
 **3. realmlp JOINT TPE (`tune_realmlp_joint.py` NEW — red-team of the Day-12
-single-axis ladder): 8 axes jointly (lr, epochs, wd, dropout, width, lpp, ls_eps,
-noise), TPE multivariate+group, incumbent enqueued trial 0 (reproduced dw 0.95105
-exactly), optuna sqlite resumable, 3.5h budget.** → resolution logged below.
+single-axis ladder): NULL at the screen bar, basin candidate sent to full-run
+closure.** 8 axes jointly (lr, epochs, wd, dropout, width, lpp, ls_eps, noise),
+TPE multivariate+group, incumbent enqueued trial 0 (reproduced dw 0.95105
+exactly), optuna sqlite resumable (`results/tune_realmlp_joint.db`), 85 trials
+in 3.5h. Best trial 59 dw **0.95155 = +0.00050** (argmax=dw, clean surface) —
+under the +0.0007 bar ⇒ pre-registered NULL, the single-axis closure survives.
+The joint search consistently prefers a DIFFERENT basin (dropout ~0.22-0.24,
+lpp ~0.9-1.0, input noise ~0.02; several trials +0.0004-5) — the exact Day-12
+HGBC pattern (TPE found a different basin at +0.00047, flat between basins).
+Full 5-fold confirmation run (`_u_s42j`, Day-12 basin-leg protocol) → below.
+
+**3b. Loss-geometry ladder arms (ideas_day17 L1/L2) + dw-instrument red-team:**
+- **swp0.3/0.6 (resampling): −0.00112/−0.00150** — loses to loss-adjustment,
+  the s6e6 verdict now measured HERE. Closed.
+- **focal0.5: COLLAPSED** (0.3333 degenerate, epoch-1 selection) — unstable.
+- **focal1.0: dw +0.00060 / argmax −0.00873** — distorted-surface signature ⇒
+  ran `probe_focal_deconf.py` (split-half OOS weight fitting, 6 half-cells):
+  **OOS +0.00037 (5/6)** — the effect SURVIVES deconfounding (not instrument
+  inflation; the focal surface genuinely reshapes the boundary in a way the
+  decision layer converts). Sub-bar but at gate level → full 5-fold
+  confirmation (`_u_s42f`) chained after the joint-basin run → below.
 
 **4. PM brainstorm (3 fresh lenses: information-pathway / loss-geometry /
 evaluation-asymmetry — `notes/ideas_day17.md`; 4 entries screened out without

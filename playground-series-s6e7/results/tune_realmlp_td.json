@@ -177,5 +177,41 @@
     },
     "train_bs": 512,
     "seconds": 116.3
+  },
+  "focal0.5": {
+    "argmax": 0.3333333333333333,
+    "dw": 0.3333333333333333,
+    "overrides": {
+      "focal_gamma": 0.5
+    },
+    "train_bs": 512,
+    "seconds": 99.7
+  },
+  "focal1.0": {
+    "argmax": 0.9422411300146849,
+    "dw": 0.9516493892115566,
+    "overrides": {
+      "focal_gamma": 1.0
+    },
+    "train_bs": 512,
+    "seconds": 108.6
+  },
+  "swp0.3": {
+    "argmax": 0.9499338807762366,
+    "dw": 0.9499338807762366,
+    "overrides": {
+      "sample_weight_power": 0.3
+    },
+    "train_bs": 512,
+    "seconds": 101.4
+  },
+  "swp0.6": {
+    "argmax": 0.9491501491057718,
+    "dw": 0.949551650561037,
+    "overrides": {
+      "sample_weight_power": 0.6
+    },
+    "train_bs": 512,
+    "seconds": 103.9
   }
 }
