@@ -1604,21 +1604,32 @@ equal to twin), **seat +0.00002 (8/12) = veto #17**. The reconstruction
 channel is real (+0.0001-2 at every consumer) and combiner-absorbed at every
 consumer — the Day-13 cross-surface structure exactly. Channel measured shut.
 
-**Day-17 tally: 17 measured reads, 6 new seat vetoes (#12-#17), 0 adoptable
+**7. Referee v2 (`probe_original_referee_v2.py` NEW, ran same evening) —
+joint-shift CONFIRMED BY INTERVENTION.** Cross-fitted HGBC discriminator
+(orig vs complete-driver synth, AUC 0.9046), referee rows importance-weighted
+toward the synthetic joint (w clipped q0.995, **ESS 10,920/50,000** — well
+powered). Every candidate jumps ~+0.065 (0.962-0.968 weighted — models
+recover the rule far better on the on-manifold region) and the
+solo-minus-stack gap **halves: +0.01444 → +0.00704**. Direction and size
+confirm the Day-16 diagnosis; the residual gap is UN-BRIDGED shift (an
+AUC-0.90 discriminator with clipped IW cannot fully match the joints) and the
+magnitude bound still holds (stack's true OOF edge +0.0004 ≪ 0.007). **No
+finals action; the 50k stays retired as a fine-grained referee.**
+
+**Day-17 tally: 18 measured reads, 6 new seat vetoes (#12-#17), 0 adoptable
 levers; finals unchanged (#1 lrstack_u4_r, #2 user's tail-insurance pick).
-NOT a ceiling claim — Day-18 candidate levers, in EV order:**
-1. **Referee v2 (instrument fix, zero quota, CPU):** importance-weight the
-   original-50k referee rows toward the synthetic joint (AV-style weights from
-   the Day-11 covariate-shift probe) — deconfounds the joint-shift failure and
-   could make the one independent-noise validation instrument usable for the
-   finals #2 choice.
-2. **Test-transform TE bagging read (needs ONE quota submission, user's
+NOT a ceiling claim — Day-18 candidate levers:**
+1. **Test-transform TE bagging read (needs ONE quota submission, user's
    call):** the only lever recorded UNREADABLE offline; a single probe pair
    (bagged vs stock composition of a known-score file) converts it to an exact
    public delta — the retired lbprobe machinery already automates composition.
-3. **tabms_te13 breadth as a #2-menu diversifier** — NOT for the stack (veto
+2. **tabms_te13 breadth as a #2-menu diversifier** — NOT for the stack (veto
    #12) but as a plain-submission hedge candidate: its deployment
    disagreement profile vs the u-family is unmeasured.
+3. **Finals bookkeeping when user calls it:** freeze tags ~Jul 27; the #2
+   menu (champion_v1 / 6b_r / realmlp_te13_u_breadth) is fully selectable and
+   every pair ties at E[max] within noise — taste-level per the rank-regime
+   table.
 
 **4. PM brainstorm (3 fresh lenses: information-pathway / loss-geometry /
 evaluation-asymmetry — `notes/ideas_day17.md`; 4 entries screened out without
