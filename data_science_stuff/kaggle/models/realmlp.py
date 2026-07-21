@@ -35,7 +35,7 @@ from sklearn.metrics import balanced_accuracy_score
 from sklearn.utils.class_weight import compute_class_weight
 from torch import nn
 
-from data_science_stuff.kaggle.models.losses import smooth_ce_loss
+from data_science_stuff.kaggle.models.losses import smooth_ce_loss, soft_ba_loss
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -476,11 +476,15 @@ class RealMLP_TD_Classifier(BaseEstimator):
         ema_decay = float(p.get("ema_decay", 0.0))
         mixup_alpha = float(p.get("mixup_alpha", 0.0))
         sam_rho = float(p.get("sam_rho", 0.0))
+        soft_ba_weight = float(p.get("soft_ba_weight", 0.0))
         if sam_rho > 0 and bool(p.get("allow_amp", False)):
             msg = "sam_rho requires allow_amp=False (two-step SAM + GradScaler unsupported)"
             raise ValueError(msg)
         if mixup_alpha > 0 and per_sample_w_t is not None:
             msg = "mixup_alpha does not compose with per_sample_weight"
+            raise ValueError(msg)
+        if soft_ba_weight > 0 and mixup_alpha > 0:
+            msg = "soft_ba_weight does not compose with mixup_alpha"
             raise ValueError(msg)
         mix_rng = (
             np.random.default_rng(int(p.get("random_state", 0)) + 4051)
@@ -500,15 +504,23 @@ class RealMLP_TD_Classifier(BaseEstimator):
             with torch.autocast(amp_device, dtype=torch.float16, enabled=use_amp):
                 if mix_lam is None or mix_perm is None:
                     y_pred = forward_model(x_num_batch, x_cat_batch)
-                    return smooth_ce_loss(
-                        y_batch.repeat_interleave(n_ens),
-                        y_pred.reshape(-1, n_classes),
+                    probs = y_pred.reshape(-1, n_classes)
+                    y_rep = y_batch.repeat_interleave(n_ens)
+                    if soft_ba_weight >= 1.0:
+                        return soft_ba_loss(y_rep, probs)
+                    ce = smooth_ce_loss(
+                        y_rep,
+                        probs,
                         ls=ls_val,
                         class_weights=class_weights,
                         focal_gamma=float(p.get("focal_gamma", 0.0)),
                         loss_prob_multipliers=loss_prob_multipliers,
                         per_sample_weight=psw_batch,
                     )
+                    if soft_ba_weight > 0:
+                        sba = soft_ba_loss(y_rep, probs)
+                        return (1.0 - soft_ba_weight) * ce + soft_ba_weight * sba
+                    return ce
                 # manifold mixup: interpolate post-embedding representations and
                 # mix the two losses (vicinal risk over the boundary band)
                 emb = base_model.embed(x_num_batch, x_cat_batch)
@@ -834,6 +846,7 @@ REALMLP_TD_CONFIG: dict[str, Any] = {
     "numeric_noise_std": 0.0,
     "mixup_alpha": 0.0,  # >0: manifold mixup (Beta(a,a) post-embedding interpolation)
     "sam_rho": 0.0,  # >0: sharpness-aware minimization (needs allow_amp=False)
+    "soft_ba_weight": 0.0,  # >0: blend in soft-balanced-accuracy loss; 1.0 = pure
     "ema_decay": 0.99775,
     "verbosity": 1,
     "use_early_stopping": False,

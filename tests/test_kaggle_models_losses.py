@@ -5,7 +5,11 @@ import pytest
 import torch
 import torch.nn.functional as F  # noqa: N812
 
-from data_science_stuff.kaggle.models.losses import logit_adjustment, smooth_ce_loss
+from data_science_stuff.kaggle.models.losses import (
+    logit_adjustment,
+    smooth_ce_loss,
+    soft_ba_loss,
+)
 
 
 def _fixture() -> "tuple[torch.Tensor, torch.Tensor]":
@@ -52,6 +56,34 @@ def test_smooth_ce_loss_per_sample_weight_composes_with_class_weights() -> None:
 
     assert torch.isfinite(combined)
     assert combined.item() != pytest.approx(solo.item())
+
+
+def test_soft_ba_loss_closed_form_on_known_input() -> None:
+    # class 0 samples get p0 = 0.8/0.6, class 1 sample gets p1 = 0.5:
+    # soft recalls = (0.7, 0.5) -> loss = 1 - 0.6
+    proba = torch.tensor([[0.8, 0.2], [0.6, 0.4], [0.5, 0.5]])
+    y = torch.tensor([0, 0, 1])
+    assert soft_ba_loss(y, proba).item() == pytest.approx(0.4, abs=1e-6)
+
+
+def test_soft_ba_loss_skips_absent_classes_and_backprops() -> None:
+    torch.manual_seed(0)
+    logits = torch.randn(32, 3, requires_grad=True)
+    proba = torch.softmax(logits, dim=1)
+    y = torch.randint(0, 2, (32,))  # class 2 absent from the batch
+
+    loss = soft_ba_loss(y, proba)
+    loss.backward()  # type: ignore[no-untyped-call]
+
+    assert 0.0 < loss.item() < 1.0
+    assert logits.grad is not None
+    assert torch.isfinite(logits.grad).all()
+
+
+def test_soft_ba_loss_perfect_prediction_is_zero() -> None:
+    y = torch.tensor([0, 1, 2])
+    proba = torch.eye(3)
+    assert soft_ba_loss(y, proba).item() == pytest.approx(0.0, abs=1e-6)
 
 
 def test_logit_adjustment_closed_form_and_mean_zero() -> None:

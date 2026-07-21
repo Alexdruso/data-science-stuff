@@ -170,6 +170,7 @@ def test_realmlp_config_defaults_preserved() -> None:
     # New training-dynamics knobs default OFF (stock path unchanged).
     assert REALMLP_TD_CONFIG["mixup_alpha"] == 0.0
     assert REALMLP_TD_CONFIG["sam_rho"] == 0.0
+    assert REALMLP_TD_CONFIG["soft_ba_weight"] == 0.0
 
 
 def test_realmlp_mixup_and_sam_paths(tmp_path: Path) -> None:
@@ -189,10 +190,31 @@ def test_realmlp_mixup_and_sam_paths(tmp_path: Path) -> None:
     assert sam.predict_proba(x_va).shape == (45, 3)
 
 
+def test_realmlp_soft_ba_paths(tmp_path: Path) -> None:
+    torch.manual_seed(0)
+    x_tr, y_tr = _frame(120, seed=0)
+    x_va, y_va = _frame(45, seed=1)
+    cats = ["cat_small", "cat_large"]
+
+    # pure surrogate (replaces balanced softmax) and the 50/50 CE blend
+    for w in (1.0, 0.5):
+        clf = RealMLP_TD_Classifier(**_TINY, soft_ba_weight=w, loss_prior_power=0.0)
+        clf.fit(
+            x_tr, y_tr, x_va, y_va, cat_col_names=cats, ckpt_path=tmp_path / "b.pth"
+        )
+        proba = clf.predict_proba(x_va)
+        assert proba.shape == (45, 3)
+        np.testing.assert_allclose(proba.sum(axis=1), 1.0, atol=1e-5)
+
+
 def test_realmlp_mixup_and_sam_guards(tmp_path: Path) -> None:
     x_tr, y_tr = _frame(120, seed=0)
     x_va, y_va = _frame(45, seed=1)
 
+    with pytest.raises(ValueError, match="soft_ba_weight"):
+        RealMLP_TD_Classifier(**_TINY, soft_ba_weight=0.5, mixup_alpha=0.2).fit(
+            x_tr, y_tr, x_va, y_va, ckpt_path=tmp_path / "g.pth"
+        )
     with pytest.raises(ValueError, match="allow_amp=False"):
         RealMLP_TD_Classifier(**_TINY, sam_rho=0.05, allow_amp=True).fit(
             x_tr, y_tr, x_va, y_va, ckpt_path=tmp_path / "g.pth"

@@ -32,7 +32,7 @@ from torch import nn
 sys.path.insert(0, str(Path(__file__).parent))
 from train_common import N_CLASSES, SEEDS, finalize, load_dataset
 from train_mlp import NNData
-from zoo_common import clear_ckpt, te_block_for_fold, zoo_cv
+from zoo_common import clear_ckpt, te13_block_for_fold, te_block_for_fold, zoo_cv
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 K_MEMBERS = 8
@@ -48,6 +48,12 @@ TAU = 1.075  # balanced-softmax strength (realmlp's loss_prior_power)
 _MULT = float(os.environ.get("S6E7_REPAIR_MULT", "1.0"))
 _REPAIR = os.environ.get("S6E7_REPAIR", "") not in ("", "0")
 SURFACE_TAG = ("r" if _MULT == 1.0 else "r2") if _REPAIR else "u"
+# S6E7_TE13=1 (Day-17 honest closure): append the v0.7/te3 all-13 string EB TE
+# block (zoo_common.te13_block_for_fold, 39 cols) exactly like train_realmlp_td —
+# the Day-9 tabms veto predates the recipe; this rerun makes it honest. Additive:
+# everything else identical, so the read vs realmlp_te13_u is family-paired.
+TE13 = os.environ.get("S6E7_TE13", "") not in ("", "0")
+MODEL_NAME = "tabms" + ("_te13" if TE13 else "")
 
 
 class BELinear(nn.Module):
@@ -97,6 +103,10 @@ def fit_fold_impl(ds, nd, tr_idx, val_idx, seed, fold, want_test=True):  # noqa:
     np.random.seed(fold_seed)  # noqa: NPY002
 
     te_tr_full, te_te, _names = te_block_for_fold(ds, tr_idx, seed, fold, SURFACE_TAG)
+    if TE13:
+        t13_tr, t13_te, _n13 = te13_block_for_fold(ds, tr_idx, seed, fold, SURFACE_TAG)
+        te_tr_full = np.concatenate([te_tr_full, t13_tr], axis=1)
+        te_te = np.concatenate([te_te, t13_te], axis=1)
     num_med = np.nanmedian(nd.Xnum_tr[tr_idx], axis=0)
     te_med = np.nanmedian(te_tr_full[tr_idx], axis=0)
     cont_tr = np.concatenate(
@@ -209,11 +219,10 @@ def main() -> None:
     def fit_fold(tr_idx, val_idx, seed, fold):  # noqa: ANN001, ANN202
         return fit_fold_impl(ds, nd, tr_idx, val_idx, seed, fold)
 
-    oof, test, fold_scores = zoo_cv(
-        ds, fit_fold, ckpt_name=f"tabms_{SURFACE_TAG}_s{SEEDS[0]}", seed=SEEDS[0]
-    )
-    finalize("tabms", ds, oof, test, fold_scores)
-    clear_ckpt(f"tabms_{SURFACE_TAG}_s{SEEDS[0]}")
+    ckpt = f"{MODEL_NAME}_{SURFACE_TAG}_s{SEEDS[0]}"
+    oof, test, fold_scores = zoo_cv(ds, fit_fold, ckpt_name=ckpt, seed=SEEDS[0])
+    finalize(MODEL_NAME, ds, oof, test, fold_scores)
+    clear_ckpt(ckpt)
 
 
 if __name__ == "__main__":

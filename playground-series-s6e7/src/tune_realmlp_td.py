@@ -93,6 +93,14 @@ STAGE_D: list[tuple[str, dict[str, object]]] = [
     ("sam0.10", {"sam_rho": 0.10, "allow_amp": False}),
 ]
 
+# Day-17 S2 stage: soft-confusion-matrix balanced-accuracy surrogate (ideas_day11
+# S2, armed Day-16) — the last unmeasured objective slot. The surrogate REPLACES
+# the balanced-softmax mechanism (loss_prior_power -> 0), pure and 50/50-CE arms.
+STAGE_S2: list[tuple[str, dict[str, object]]] = [
+    ("softba1.0", {"soft_ba_weight": 1.0, "loss_prior_power": 0.0}),
+    ("softba0.5", {"soft_ba_weight": 0.5, "loss_prior_power": 0.0}),
+]
+
 
 def load_ckpt() -> dict[str, dict[str, object]]:
     if CKPT.exists():
@@ -204,6 +212,7 @@ def main() -> None:
     run_stage(stage_b)
     run_stage(STAGE_C)
     run_stage(STAGE_D)
+    run_stage(STAGE_S2)
 
     base_dw = results["base"]["dw"]
     base_am = results["base"]["argmax"]

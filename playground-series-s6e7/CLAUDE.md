@@ -1526,6 +1526,43 @@ tabms-u honest closure (the FTT-precedent pitch); realmlp JOINT HP search (red-t
 the single-axis-ladder closure, ~3-4.5h GPU, overnight-sized); S2 soft-BA surrogate
 fold-1 screen (~200s, touches the shared package). Rejected without compute: nan-level
 TE correction (bounded by the 400-row rt-clone read); external sweep (user ruling).
+**▶ All three RESOLVED Day-17 — see below.**
+
+### Day-17 (2026-07-21): armed queue drained — S2 soft-BA NULL, cascade×te13×u + tabms_te13×u honest closures (vetoes #12/#13), realmlp joint TPE
+
+**Day shape (user-approved plan, full day to 21:00): drain the three armed experiments
+in CPU∥GPU lanes, PM fresh-lens brainstorm, survivors measured same day. User rulings
+am: lbprobe track RETIRED (quota idle today, nothing to anchor), external sweep stays
+OFF. LB-blind throughout.**
+
+**1. S2 soft-BA surrogate — NULL, objective slot closed by measurement.** New
+`soft_ba_loss` in the shared package (`kaggle/models/losses.py`; `soft_ba_weight` knob
+in `RealMLP_TD_Classifier`, default-off, stock path bit-identical; full quality gate +
+5 new tests). Fold-1 ladder arms (paired vs cached base dw 0.95105): **softba1.0
+(pure, lpp=0) dw −0.00239** — the surrogate is strictly worse than balanced-softmax;
+**softba0.5 (50/50 CE) argmax −0.01209, dw −0.00014** — the argmax surface collapses
+and the decision layer only rescues to par−ε. The last unmeasured objective slot
+(ideas_day11 S2) closes with the same signature as S1/cascade/cumlink: objective
+reshuffles don't move this frontier.
+
+**2. Honest closures of the two pre-TE-era Tier-C kills (FTT precedent) — both
+rebuilt on the deployed recipe (te13 block, u surface), both VETO:**
+- **tabms_te13_u_s42** (`train_tabm_scratch.py` gains inert S6E7_TE13 env, mirrors
+  realmlp wiring): OOF argmax **0.9504** (dw 0.9504) — te13 lifts TabM-scratch from
+  0.9489 to te3-family level, the FTT-precedent replay at exact scale. 12-cell seat
+  (`probe_seat_day17.py`): **+0.00004 (10/12) = veto #12** — sub-MDE, the lrrt1
+  profile (architecture diversity ≠ information diversity, 4th confirmation).
+- **cascade_te3_u_s42** (`train_cascade_te3.py` NEW: both binary stages on raw cols +
+  cached te13 block, translated Susol config, CPU lane): argmax 0.9453 /
+  **dw 0.9500** — the decision layer fully rescues the factorization (ncw pattern)
+  but it lands under its multiclass twin (0.9503); seat **+0.00001 (6/12) = veto
+  #13**; both-challengers arm −0.00001. The target-factorization axis is now closed
+  ON THE CURRENT RECIPE, not by assumption transfer.
+
+**3. realmlp JOINT TPE (`tune_realmlp_joint.py` NEW — red-team of the Day-12
+single-axis ladder): 8 axes jointly (lr, epochs, wd, dropout, width, lpp, ls_eps,
+noise), TPE multivariate+group, incumbent enqueued trial 0 (reproduced dw 0.95105
+exactly), optuna sqlite resumable, 3.5h budget.** → resolution logged below.
 
 ### ▶▶ QUEUED for Day-15 (user-approved 07-17 night, ▶ RESOLVED Day-16 — see above): ORIGINAL-50K REFEREE — pre-registered design
 

@@ -157,5 +157,25 @@
     },
     "train_bs": 512,
     "seconds": 167.0
+  },
+  "softba1.0": {
+    "argmax": 0.9484277405260717,
+    "dw": 0.9486596637592424,
+    "overrides": {
+      "soft_ba_weight": 1.0,
+      "loss_prior_power": 0.0
+    },
+    "train_bs": 512,
+    "seconds": 102.6
+  },
+  "softba0.5": {
+    "argmax": 0.9388860352800702,
+    "dw": 0.95090488713276,
+    "overrides": {
+      "soft_ba_weight": 0.5,
+      "loss_prior_power": 0.0
+    },
+    "train_bs": 512,
+    "seconds": 116.3
   }
 }

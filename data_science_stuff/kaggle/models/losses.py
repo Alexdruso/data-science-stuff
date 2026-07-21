@@ -73,6 +73,35 @@ def smooth_ce_loss(
     return per_sample_loss.mean()
 
 
+def soft_ba_loss(y_true: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
+    """1 minus the soft balanced accuracy of the batch.
+
+    Soft recall of class ``c`` = mean predicted probability of ``c`` over the
+    samples whose label is ``c``; the loss is one minus the mean over the
+    classes present in the batch. A differentiable surrogate of the
+    balanced-accuracy metric itself: imbalance handling is intrinsic (every
+    class's recall enters the mean with equal weight), so it REPLACES the
+    balanced-softmax ``loss_prob_multipliers`` mechanism rather than
+    composing with it.
+
+    Args:
+        y_true: (n,) integer class labels.
+        y_pred: (n, n_classes) predicted probabilities (post-softmax, the
+            RealMLP convention).
+
+    Returns:
+        Scalar loss tensor in [0, 1].
+    """
+    p_true = y_pred.gather(1, y_true.unsqueeze(1)).squeeze(1)
+    recalls = [
+        p_true[y_true == c].mean()
+        for c in range(y_pred.size(1))
+        if bool((y_true == c).any())
+    ]
+    loss: torch.Tensor = 1.0 - torch.stack(recalls).mean()
+    return loss
+
+
 def logit_adjustment(class_counts: NDArray[Any], *, tau: float = 1.0) -> torch.Tensor:
     """Logit-adjustment offsets: ``tau * (log(counts) - mean(log(counts)))``.
 
