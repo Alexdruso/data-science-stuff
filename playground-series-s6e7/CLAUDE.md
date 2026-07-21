@@ -1564,6 +1564,25 @@ single-axis ladder): 8 axes jointly (lr, epochs, wd, dropout, width, lpp, ls_eps
 noise), TPE multivariate+group, incumbent enqueued trial 0 (reproduced dw 0.95105
 exactly), optuna sqlite resumable, 3.5h budget.** → resolution logged below.
 
+**4. PM brainstorm (3 fresh lenses: information-pathway / loss-geometry /
+evaluation-asymmetry — `notes/ideas_day17.md`; 4 entries screened out without
+compute, recorded there):**
+- **P1 driver reconstruction (`probe_impute_driver.py` NEW) — the headline
+  finding: a REAL replicated solo channel, then seat veto #14.** Fold-safe HGBR
+  sleep_duration ~ other 12 cols (val R2 ~0.151 — the generator-added
+  cross-column dependence IS exploitable, first direct confirmation) + 2 cols
+  [imp_sleep, sleep_completed] into an hgbc_te3 canary, TE shared per fold so
+  the delta isolates the channel. Paired 5-fold: **s42 +0.00018 argmax /
+  +0.00019 wt; s7 replication +0.00018 / +0.00011** — sign persists, ~+0.00015,
+  sub-bar. Seat (`probe_seat_impdrv.py`, with a base-canary CONTROL arm to net
+  out the generic 9th-leg effect): lri **+0.00004 (6/12)**, net of control
+  **+0.00002 (6/12)** = **veto #14**. Mechanism note: the missing-driver regime
+  DOES leak reconstructable driver signal (the archaeologist scan couldn't
+  cover this regime), but the te-family legs already span it at combiner level
+  — the knn/ncw signature (solo-positive, combiner-absorbed) at the exact
+  place the 3-dim model predicted a blind spot. The channel is now measured,
+  not assumed.
+
 ### ▶▶ QUEUED for Day-15 (user-approved 07-17 night, ▶ RESOLVED Day-16 — see above): ORIGINAL-50K REFEREE — pre-registered design
 
 **Question**: is any finals candidate differentially overfit to generator flip-noise?

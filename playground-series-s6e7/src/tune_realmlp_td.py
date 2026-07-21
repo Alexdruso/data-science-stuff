@@ -101,6 +101,17 @@ STAGE_S2: list[tuple[str, dict[str, object]]] = [
     ("softba0.5", {"soft_ba_weight": 0.5, "loss_prior_power": 0.0}),
 ]
 
+# Day-17 loss-geometry stage (ideas_day17 L1/L2): the two loss-SHAPE knobs that
+# were never measured on s6e7 — focal curvature (the flip rows are the hard
+# examples and they're learnable structure) and resampling-vs-loss-adjustment
+# (s6e6 prior negative, never measured here; composes with lpp).
+STAGE_L: list[tuple[str, dict[str, object]]] = [
+    ("focal0.5", {"focal_gamma": 0.5}),
+    ("focal1.0", {"focal_gamma": 1.0}),
+    ("swp0.3", {"sample_weight_power": 0.3}),
+    ("swp0.6", {"sample_weight_power": 0.6}),
+]
+
 
 def load_ckpt() -> dict[str, dict[str, object]]:
     if CKPT.exists():
@@ -213,6 +224,7 @@ def main() -> None:
     run_stage(STAGE_C)
     run_stage(STAGE_D)
     run_stage(STAGE_S2)
+    run_stage(STAGE_L)
 
     base_dw = results["base"]["dw"]
     base_am = results["base"]["argmax"]
