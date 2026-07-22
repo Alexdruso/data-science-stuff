@@ -1700,9 +1700,11 @@ aggregation-geometry / trajectory-marginalization / transductive):**
   class_weight="balanced" computes. Weight-matched deconfound arm
   (S6E7_PSEUDO_MATCH=1, explicit real-fold balanced weights, pseudo mass in real
   class shares) **FLIPS the sign: +0.00019 wt / +0.00005 argmax**
-  (`probe_pseudo_hgbc_match.txt`). Below the +0.0004 escalation gate ⇒ recorded,
-  no escalation (1-seed canary; channel real at the margin, expected
-  combiner-absorbed like every sibling).
+  (`probe_pseudo_hgbc_match.txt`) — but the same-day **seed-7 replication reads
+  −0.00015 wt / −0.00020 argmax** (`probe_pseudo_hgbc_match_s7.txt`,
+  S6E7_PSEUDO_SEED knob): 2-seed mean ≈ +0.00002 ⇒ **seed noise; transductive
+  cell measured-FLAT, closed** (the confound fix was still correct — the raw
+  arm's negative was an artifact; the deconfounded truth is zero, not positive).
 
 **4. Ops/finals (freeze ~Jul 27, 5 days out):** Jul-12 manifest verifies 10/10;
 `finals_audit.py` ALL OK across the menu; **NEW off-box tarball
@@ -1710,14 +1712,13 @@ aggregation-geometry / trajectory-marginalization / transductive):**
 `finals_backup_manifest_2026-07-22.sha256`) — the Jul-12 tarball predates the u4
 adoption; **user: copy the new tarball off-box.**
 
-**Day-18 tally: 5 measured reads (A1×2 families, C1×2 arms, tabms profile) + 2
-record-check kills + 1 submission-read opened (tebag), 0 adoptable levers; finals
-unchanged (#1 lrstack_u4_r, #2 user's pick from the unchanged menu). Day-19
-proposals:** (1) close the tebag read with the user's delta (adopt-or-close);
-(2) C1 seed-7 replication of the match arm ONLY if pitched as a cheap honesty
-check (~25 min CPU; gate unchanged); (3) freeze-tag execution ~Jul 27 (no writes
-into finals tags after; fresh tags only); (4) otherwise: next fresh-lens round —
-the armed queue is empty again.
+**Day-18 tally: 6 measured reads (A1×2 families, C1×3 arms incl. s7 replication,
+tabms profile) + 2 record-check kills + 1 submission-read opened (tebag), 0
+adoptable levers; finals unchanged (#1 lrstack_u4_r, #2 user's pick from the
+unchanged menu). Day-19 proposals:** (1) close the tebag read with the user's
+delta (adopt-or-close); (2) freeze-tag execution ~Jul 27 (no writes into finals
+tags after; fresh tags only); (3) otherwise: next fresh-lens round — the armed
+queue is empty again.
 
 ### ▶▶ QUEUED for Day-15 (user-approved 07-17 night, ▶ RESOLVED Day-16 — see above): ORIGINAL-50K REFEREE — pre-registered design
 
@@ -2261,7 +2262,7 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-22 | probe_tebag_compose | Test-transform TE bagging → exact public read (delta-transfer composition, gate 0 mismatches vs scored hgbc_te3_u_s42; 246 flips, 78.5% missing-driver). **SUBMITTED; adopt iff Δpub ≥ +0.00075 (user's report pending).** | read = Δpub (open) |
 | 2026-07-22 | tabms_te13_u_breadth | 6-seed breadth (s2024 ckpt-resumed + s2025/s31 new): solo E[priv] 0.95061 in-band BUT best pair ties incumbent within MC noise AND fingerprint = same md-churn as whole menu. **Hedge measured-out; #2 menu unchanged.** | 0.95061 (wt) |
 | 2026-07-22 | probe_pool_geom | Member-pooling function {logit, median, trimmed} vs arithmetic, realmlp×12 + hgbc×8 breadths: all ±0.00005 (bar +0.0007). **Pooling-geometry axis measured-closed.** | 0.95080/0.95054 (wt inc.) |
-| 2026-07-22 | probe_pseudo_hgbc | Confident-test pseudo-labels (τ=0.99, 32.2k rows) into hgbc_te3 canary: raw **−0.00014 wt** → class-weight confound caught → weight-matched arm **+0.00019 wt** (sign flip). Transductive channel real-but-tiny, ≪ +0.0004 gate; **no escalation**. | 0.95045 (wt, match arm) |
+| 2026-07-22 | probe_pseudo_hgbc | Confident-test pseudo-labels (τ=0.99, 32.2k rows) into hgbc_te3 canary: raw −0.00014 wt → class-weight confound caught → weight-matched arm +0.00019 wt (s42) BUT s7 replication **−0.00015 wt**; 2-seed mean ≈ 0. **Transductive cell measured-FLAT, closed.** | +0.00019/−0.00015 (wt Δ) |
 
 **LB**: lgbm 0.94886, xgboost 0.94894, **ensemble_v1b 0.94970 (best)**. The blend lifts once
 models are pre-corrected to their deployed surface. Next lever for a bigger jump is a non-GBDT base

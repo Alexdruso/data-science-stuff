@@ -46,16 +46,17 @@ from data_science_stuff.kaggle_utils import weighted_predict
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-SEED = 42
+SEED = int(os.environ.get("S6E7_PSEUDO_SEED", "42"))  # replication knob (s7 twin)
 TAU = 0.99
-TWIN = "hgbc_te3_u_s42"
+TWIN = f"hgbc_te3_u_s{SEED}"
 KEY_DRIVERS = ["stress_level", "physical_activity_level", "sleep_duration"]
 # S6E7_PSEUDO_MATCH=1 (deconfound arm): weight pseudo rows per class so the
 # class SHARES of total training mass equal the real fold's — isolates the
 # "extra on-manifold examples" channel from the prior shift that
 # class_weight="balanced" otherwise re-derives from the augmented mix.
 MATCH = os.environ.get("S6E7_PSEUDO_MATCH") == "1"
-CKPT = CACHE_DIR / ("ckpt_pseudo_match" if MATCH else "ckpt_pseudo")
+_SUF = ("_match" if MATCH else "") + (f"_s{SEED}" if SEED != 42 else "")
+CKPT = CACHE_DIR / f"ckpt_pseudo{_SUF}"
 
 
 def main() -> None:
@@ -150,9 +151,7 @@ def main() -> None:
         say(f"{name:7s} argmax {balanced_accuracy_score(ds.y, p.argmax(1)):.5f}  "
             f"wt {balanced_accuracy_score(ds.y, weighted_predict(p, w)):.5f}")
     say("screen bar +0.0007 paired; escalation = tau sweep + realmlp + 12-cell seat")
-    report = RESULTS_DIR / (
-        "probe_pseudo_hgbc_match.txt" if MATCH else "probe_pseudo_hgbc.txt"
-    )
+    report = RESULTS_DIR / f"probe_pseudo_hgbc{_SUF}.txt"
     report.write_text("\n".join(lines) + "\n")
     print(f"report -> {report}", flush=True)
 

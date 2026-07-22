@@ -68,8 +68,11 @@ rows the adversarial-shift diagnosis says we under-cover.
   (`probe_pseudo_hgbc.txt`). Confound noted post-read: the minority-heavy
   pool shifts what class_weight="balanced" computes → weight-matched
   deconfound arm (S6E7_PSEUDO_MATCH=1, explicit real-fold balanced weights,
-  pseudo mass added in real class shares) run same day → verdict in
-  `probe_pseudo_hgbc_match.txt`. Either way ≪ bar; no escalation.
+  pseudo mass added in real class shares) run same day: **+0.00019 wt (sign
+  flip)** — then the s7 replication read **−0.00015 wt** (2-seed mean ≈ 0).
+  The confound fix was correct (raw negative = artifact) but the deconfounded
+  truth is ZERO: **transductive cell measured-FLAT, closed.** Reports:
+  `probe_pseudo_hgbc{,_match,_match_s7}.txt`.
 - C2. Adversarial-weighted pseudo-labels (test-like rows only) — FOLD INTO C1
   as a diagnostic split (test-like vs not), not a separate run.
 
