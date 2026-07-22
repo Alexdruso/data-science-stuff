@@ -1650,6 +1650,75 @@ compute, recorded there):**
   place the 3-dim model predicted a blind spot. The channel is now measured,
   not assumed.
 
+### Day-18 (2026-07-22): TE-bag probe SUBMITTED (last unread lever → awaiting user delta), tabms hedge measured-out, fresh 3-lens brainstorm (2 nulls + 1 real-but-tiny transductive channel)
+
+**Day shape (user-approved plan to 21:00): queued items 1+2 + fresh-lens brainstorm,
+GPU∥CPU lanes throughout. User rulings: TE-bag probe = prep + submit same day.**
+
+**1. Test-transform TE bagging (`probe_tebag_compose.py` NEW) — CONVERTED TO A READ,
+submitted ~14:50, delta = user's report.** Lever operationalized (Day-16 never pinned
+it): replace each fold model's test-side TE encoding with the 5-fold MEAN of the test
+encodings (~√5 map-noise reduction; train/OOF untouched ⇒ OOF-invisible by
+construction). Composition = DELTA TRANSFER (sklearn 1.9 TargetEncoder's internal CV
+is unseeded-shuffled ⇒ retrains can't reproduce deployed bytes): lever's per-row Δ
+measured on same-model arms of a same-recipe retrain, applied to the DEPLOYED
+`test_hgbc_te3_u_s42.npy`. **Composition gate 0 mismatches** vs the scored reference
+CSV (retrain-noise 350 label rows, kept OUT of the probe by construction). Probe
+flips 246 rows (0.083%), **78.5% missing-driver / mostly AR↔UNH — the Day-2 v2-damage
+fingerprint, so mechanism prior = churn**. Pre-registered rule
+(`probe_tebag_preread.txt`): adopt only if Δpub > 0 AND ≥ +0.00075 (2× flip-count
+null-MC sd; near-clone Δpub→Δpriv corr≈0 caveat stated). Reference =
+hgbc_te3_u_s42.csv (reliable score on file). **⏳ OPEN: record the user-reported
+delta here, then adopt-or-close.**
+
+**2. tabms_te13 breadth hedge profile (queued item 2) — MEASURED OUT of the #2 menu**
+(`probe_tabms_profile.py` NEW → `probe_tabms_profile_day18.txt`). s2024 rerun
+completed from fold-3 ckpts + fresh s2025/s31 → 6-seed `tabms_te13_u_breadth`
+(fresh tag; OOF argmax 0.95056 / wt 0.95061; per-seed 0.9501–0.9503, tight).
+Solo E[priv] 0.95061 = inside the menu band, BUT (a) best tabms pair E[max]
+0.95082 ties best overall 0.95084 within MC noise, and (b) the disagreement
+fingerprint vs EVERY menu candidate is the same missing-driver AR↔UNH churn
+(u4: 994 flips, 83% md-share, 65% AR↔UNH) — not structurally distinct. Both
+pre-registered menu-entry conditions fail ⇒ hedge value zero; #2 menu unchanged
+(champion_v1 / 6b_r / realmlp_te13_u_breadth). Never submitted; costs nothing.
+
+**3. Fresh 3-lens brainstorm (`notes/ideas_day18.md`; lenses NOT used Day-13/17:
+aggregation-geometry / trajectory-marginalization / transductive):**
+- **A1 member-pooling geometry — MEASURED NULL** (`probe_pool_geom.txt`): repooled
+  breadth members {logit, median, trimmed} vs arithmetic for realmlp_te13_u (12
+  seeds) + hgbc_te3_u (8 seeds): every arm ±0.00005 (bar +0.0007). The one unswept
+  combiner-adjacent axis (the matrix swept the META over fixed legs) closed.
+- **Lens B (snapshot/EMA/TTA) — killed by RECORD CHECKS, zero compute**: epoch-window
+  averaging IS the package's `snapshot_k` (measured wash, Day-12 header); inference
+  TTA is mechanism-void (deployed CFG trains `numeric_noise_std=0.0`); SWA deferred
+  (prior gutted by the snapshot wash). The Day-10 "priced-out ≠ measured" debt paid.
+- **C1 confident-test pseudo-labels (transductive cell, never measured;
+  `probe_pseudo_hgbc.py` NEW) — REAL-BUT-TINY, the knn/ncw signature again.**
+  τ=0.99 → 32,204 test rows (10.9%, class dist [1.8k AR, 12.5k fit, 18k unh]) into
+  the hgbc_te3 canary train folds (TE surface held at twin's). Raw read **−0.00014
+  wt** — but confound caught: the minority-heavy pool shifts what
+  class_weight="balanced" computes. Weight-matched deconfound arm
+  (S6E7_PSEUDO_MATCH=1, explicit real-fold balanced weights, pseudo mass in real
+  class shares) **FLIPS the sign: +0.00019 wt / +0.00005 argmax**
+  (`probe_pseudo_hgbc_match.txt`). Below the +0.0004 escalation gate ⇒ recorded,
+  no escalation (1-seed canary; channel real at the margin, expected
+  combiner-absorbed like every sibling).
+
+**4. Ops/finals (freeze ~Jul 27, 5 days out):** Jul-12 manifest verifies 10/10;
+`finals_audit.py` ALL OK across the menu; **NEW off-box tarball
+`~/s6e7_finals_backup_2026-07-22.tar.gz`** (139 MB, 25 artifacts, u4-era lineage +
+`finals_backup_manifest_2026-07-22.sha256`) — the Jul-12 tarball predates the u4
+adoption; **user: copy the new tarball off-box.**
+
+**Day-18 tally: 5 measured reads (A1×2 families, C1×2 arms, tabms profile) + 2
+record-check kills + 1 submission-read opened (tebag), 0 adoptable levers; finals
+unchanged (#1 lrstack_u4_r, #2 user's pick from the unchanged menu). Day-19
+proposals:** (1) close the tebag read with the user's delta (adopt-or-close);
+(2) C1 seed-7 replication of the match arm ONLY if pitched as a cheap honesty
+check (~25 min CPU; gate unchanged); (3) freeze-tag execution ~Jul 27 (no writes
+into finals tags after; fresh tags only); (4) otherwise: next fresh-lens round —
+the armed queue is empty again.
+
 ### ▶▶ QUEUED for Day-15 (user-approved 07-17 night, ▶ RESOLVED Day-16 — see above): ORIGINAL-50K REFEREE — pre-registered design
 
 **Question**: is any finals candidate differentially overfit to generator flip-noise?
@@ -2189,6 +2258,10 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-19 | probe_ord_hgbc | Cumulative-link ordinal head (nested severity thresholds fit<at-risk<unhealthy) on identical te3 inputs: wt **−0.00026**, err-overlap 0.947. **Target-formulation cell measured-closed** (cascade kill's sibling); no CORN escalation. | 0.94999 (wt) |
 | 2026-07-19 | probe_seat_disp | Cross-seed dispersion (9 per-class seed-std cols, the channel breadth-averaging destroys) into lr8: 12-cell **−0.00004** (4/12). **Seat veto #11.** | lr8 0.95071 (holdout) |
 | 2026-07-19 | realmlp_te13_u_s7_f10 | K=10 seed-7 replication (red-team of the tree-canary transfer assumption): paired Δ **+0.000097** vs twin 0.950421 (s42 was +0.000226) — sign persists, size halves, ≪ gate. **Fold-count closure now NN-measured at 2 seeds.** | 0.950518 (wt) |
+| 2026-07-22 | probe_tebag_compose | Test-transform TE bagging → exact public read (delta-transfer composition, gate 0 mismatches vs scored hgbc_te3_u_s42; 246 flips, 78.5% missing-driver). **SUBMITTED; adopt iff Δpub ≥ +0.00075 (user's report pending).** | read = Δpub (open) |
+| 2026-07-22 | tabms_te13_u_breadth | 6-seed breadth (s2024 ckpt-resumed + s2025/s31 new): solo E[priv] 0.95061 in-band BUT best pair ties incumbent within MC noise AND fingerprint = same md-churn as whole menu. **Hedge measured-out; #2 menu unchanged.** | 0.95061 (wt) |
+| 2026-07-22 | probe_pool_geom | Member-pooling function {logit, median, trimmed} vs arithmetic, realmlp×12 + hgbc×8 breadths: all ±0.00005 (bar +0.0007). **Pooling-geometry axis measured-closed.** | 0.95080/0.95054 (wt inc.) |
+| 2026-07-22 | probe_pseudo_hgbc | Confident-test pseudo-labels (τ=0.99, 32.2k rows) into hgbc_te3 canary: raw **−0.00014 wt** → class-weight confound caught → weight-matched arm **+0.00019 wt** (sign flip). Transductive channel real-but-tiny, ≪ +0.0004 gate; **no escalation**. | 0.95045 (wt, match arm) |
 
 **LB**: lgbm 0.94886, xgboost 0.94894, **ensemble_v1b 0.94970 (best)**. The blend lifts once
 models are pre-corrected to their deployed surface. Next lever for a bigger jump is a non-GBDT base
