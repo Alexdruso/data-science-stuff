@@ -1732,6 +1732,22 @@ submissions` paginates (~20 rows default) — a raw-dump refresh without
 REBUILDS lbprobe_scores.csv from it, silently destroying score history (hit,
 restored to 118+tebag same evening). Always pull with `--page-size 200`.
 
+**Day-18 EVENING PITCH ROUND (user: "pitch me more stuff" → P0 ops + 2 measured
+same evening):**
+- **P1 exact-value RULE-TRIPLE TE (`probe_triple_te.py`) — NEGATIVE, cell closed.**
+  The one unmeasured resolution of the proven 3-dim label channel (te13 =
+  marginals, combo2 = buckets, rule-pair = pairs): triple key as a 14th TE column.
+  Reality: **10,450 cells, median 30 rows/cell** (NaN levels fragment the key —
+  the ~100 rows/cell pitch estimate was 3× optimistic) ⇒ thin-cell EB noise beats
+  any missed interaction: **argmax −0.00038 / wt −0.00029** paired vs the twin.
+  The archaeologist's "te13 saturates the channel" claim survives its last direct
+  test — the 3-dim channel is now measured at every resolution.
+- **P2 menu label fusion (`probe_menu_vote.py`) — EXACT TIE, altitude closed.**
+  6-way majority vote (ties → u4) disagrees with u4 on only 447 rows; OOF
+  0.95081 = u4's 0.95081; mc_cells E[priv] 0.95082 both, P(vote wins) 0.476.
+  The stack dominates the menu so completely that deployment-level label fusion
+  reproduces it — the last combination altitude is measured-closed.
+
 **Day-18 tally: 6 measured reads (A1×2 families, C1×3 arms incl. s7 replication,
 tabms profile) + 2 record-check kills + 1 submission-read opened (tebag), 0
 adoptable levers; finals unchanged (#1 lrstack_u4_r, #2 user's pick from the
@@ -2283,6 +2299,9 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-22 | tabms_te13_u_breadth | 6-seed breadth (s2024 ckpt-resumed + s2025/s31 new): solo E[priv] 0.95061 in-band BUT best pair ties incumbent within MC noise AND fingerprint = same md-churn as whole menu. **Hedge measured-out; #2 menu unchanged.** | 0.95061 (wt) |
 | 2026-07-22 | probe_pool_geom | Member-pooling function {logit, median, trimmed} vs arithmetic, realmlp×12 + hgbc×8 breadths: all ±0.00005 (bar +0.0007). **Pooling-geometry axis measured-closed.** | 0.95080/0.95054 (wt inc.) |
 | 2026-07-22 | probe_pseudo_hgbc | Confident-test pseudo-labels (τ=0.99, 32.2k rows) into hgbc_te3 canary: raw −0.00014 wt → class-weight confound caught → weight-matched arm +0.00019 wt (s42) BUT s7 replication **−0.00015 wt**; 2-seed mean ≈ 0. **Transductive cell measured-FLAT, closed.** | +0.00019/−0.00015 (wt Δ) |
+| 2026-07-22 | probe_triple_te | Exact-value rule-TRIPLE TE (14th TE col; the 3-dim channel's only unencoded resolution): 10,450 cells / median 30 rows — thin-cell noise wins: **argmax −0.00038 / wt −0.00029** paired. **Channel now measured at every resolution; closed.** | 0.94997 (wt) |
+| 2026-07-22 | probe_menu_vote | 6-way deployed-menu majority vote (ties→u4): 447-row disagreement with u4, OOF + E[priv] EXACT TIE (0.95081/0.95082, P(win) 0.476). **Label-fusion altitude measured-closed.** | 0.95081 (OOF) |
+| 2026-07-22 | lrstack_u4_r anchor | ⚠️ Full-history check: designated #1 had NEVER been submitted (not selectable). User-directed slot spent, audited bytes, reliable=true, score unread. **Finals menu now fully eligible.** | (score quarantined) |
 
 **LB**: lgbm 0.94886, xgboost 0.94894, **ensemble_v1b 0.94970 (best)**. The blend lifts once
 models are pre-corrected to their deployed surface. Next lever for a bigger jump is a non-GBDT base
