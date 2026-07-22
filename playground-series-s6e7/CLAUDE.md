@@ -1722,9 +1722,11 @@ designated #1 final — has NEVER been submitted to Kaggle (0 rows in the comple
 118-submission history) ⇒ it is NOT selectable as a final until it gets a slot.**
 The Day-13 adoption note flagged only realmlp_te13_u_breadth for anchoring; u4's
 own eligibility was overlooked (u4 = 95-row deployment twin of the submitted
-lrstack_u3_r, which is the fallback #1 if no slot is spent). RESOLUTION = user's
-call: submit lrstack_u4_r.csv (1 slot, before freeze ~Jul 27) OR demote #1 to
-lrstack_u3_r.csv. ⚠️ Ops trap found+fixed same evening: `kaggle competitions
+lrstack_u3_r, which is the fallback #1 if no slot is spent). **▶ RESOLVED same
+evening (user: "submit stack u4"): lrstack_u4_r.csv SUBMITTED with the audited
+bytes (finals_audit sha256 ed5a9bff... verified same day), scored COMPLETE,
+ingested reliable=true (score unread, quarantined CSV only). #1 is now
+selectable; finals menu fully eligible.** ⚠️ Ops trap found+fixed same evening: `kaggle competitions
 submissions` paginates (~20 rows default) — a raw-dump refresh without
 `--page-size 200` truncates `lbprobe_submissions_raw.csv` and the next ingest
 REBUILDS lbprobe_scores.csv from it, silently destroying score history (hit,
