@@ -1668,8 +1668,13 @@ flips 246 rows (0.083%), **78.5% missing-driver / mostly AR↔UNH — the Day-2 
 fingerprint, so mechanism prior = churn**. Pre-registered rule
 (`probe_tebag_preread.txt`): adopt only if Δpub > 0 AND ≥ +0.00075 (2× flip-count
 null-MC sd; near-clone Δpub→Δpriv corr≈0 caveat stated). Reference =
-hgbc_te3_u_s42.csv (reliable score on file). **⏳ OPEN: record the user-reported
-delta here, then adopt-or-close.**
+hgbc_te3_u_s42.csv (reliable score on file). **▶ RESOLVED same day (user directed
+the read): Δpub = −0.00024** — negative, 0.64× the null-MC sd (inside the churn
+band; not even reliably harmful, but nowhere near the adoption bar). **Lever
+CLOSED: test-transform TE bagging does not pay; stock per-fold test transforms
+stay. The last unread lever of the campaign is now a measured read.** Score
+ingested to the quarantined lbprobe CSV (raw dump refreshed to the 6-col CLI
+format; ingest mtime-rule PASS, reliable=true).
 
 **2. tabms_te13 breadth hedge profile (queued item 2) — MEASURED OUT of the #2 menu**
 (`probe_tabms_profile.py` NEW → `probe_tabms_profile_day18.txt`). s2024 rerun
@@ -2259,7 +2264,7 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-19 | probe_ord_hgbc | Cumulative-link ordinal head (nested severity thresholds fit<at-risk<unhealthy) on identical te3 inputs: wt **−0.00026**, err-overlap 0.947. **Target-formulation cell measured-closed** (cascade kill's sibling); no CORN escalation. | 0.94999 (wt) |
 | 2026-07-19 | probe_seat_disp | Cross-seed dispersion (9 per-class seed-std cols, the channel breadth-averaging destroys) into lr8: 12-cell **−0.00004** (4/12). **Seat veto #11.** | lr8 0.95071 (holdout) |
 | 2026-07-19 | realmlp_te13_u_s7_f10 | K=10 seed-7 replication (red-team of the tree-canary transfer assumption): paired Δ **+0.000097** vs twin 0.950421 (s42 was +0.000226) — sign persists, size halves, ≪ gate. **Fold-count closure now NN-measured at 2 seeds.** | 0.950518 (wt) |
-| 2026-07-22 | probe_tebag_compose | Test-transform TE bagging → exact public read (delta-transfer composition, gate 0 mismatches vs scored hgbc_te3_u_s42; 246 flips, 78.5% missing-driver). **SUBMITTED; adopt iff Δpub ≥ +0.00075 (user's report pending).** | read = Δpub (open) |
+| 2026-07-22 | probe_tebag_compose | Test-transform TE bagging → exact public read (delta-transfer composition, gate 0 mismatches vs scored hgbc_te3_u_s42; 246 flips, 78.5% missing-driver). **Δpub = −0.00024** (0.64× null-MC sd, churn band, sign matches mechanism prior). **Lever CLOSED — the last unread lever is now measured.** | Δpub −0.00024 |
 | 2026-07-22 | tabms_te13_u_breadth | 6-seed breadth (s2024 ckpt-resumed + s2025/s31 new): solo E[priv] 0.95061 in-band BUT best pair ties incumbent within MC noise AND fingerprint = same md-churn as whole menu. **Hedge measured-out; #2 menu unchanged.** | 0.95061 (wt) |
 | 2026-07-22 | probe_pool_geom | Member-pooling function {logit, median, trimmed} vs arithmetic, realmlp×12 + hgbc×8 breadths: all ±0.00005 (bar +0.0007). **Pooling-geometry axis measured-closed.** | 0.95080/0.95054 (wt inc.) |
 | 2026-07-22 | probe_pseudo_hgbc | Confident-test pseudo-labels (τ=0.99, 32.2k rows) into hgbc_te3 canary: raw −0.00014 wt → class-weight confound caught → weight-matched arm +0.00019 wt (s42) BUT s7 replication **−0.00015 wt**; 2-seed mean ≈ 0. **Transductive cell measured-FLAT, closed.** | +0.00019/−0.00015 (wt Δ) |
