@@ -7,6 +7,65 @@ from lifestyle/biometric features.
 
 ---
 
+## 🏁 FINALS DECISION — 2026-07-26 (user called endgame: "wrap up s6e7, pick the submissions")
+
+**SELECT THESE TWO ON KAGGLE (manual selection is MANDATORY — see below):**
+
+| slot | file | sha256 (16) | honest E[priv] | disagree vs #1 | P(beats #1) |
+|---|---|---|---|---|---|
+| **#1** | `submissions/lrstack_u4_r.csv` | `ed5a9bfff4b6ed51` | **0.95082** | — | — |
+| **#2** | `submissions/realmlp_te13_u_breadth.csv` | `8fd6904ef65c697b` | 0.95072 | 644 (0.218%) | **0.25** |
+
+Pair E[max] = **0.95083**, the top row of `results/probe_finals_pairs_day13pm.txt` (B=20k MC).
+
+**Why #1 `lrstack_u4_r`** — mean-dominant on every honest instrument: OOF 0.95081 dw,
+E[priv] 0.95082, ahead of the nearest eligible candidate by 1e-4 and of the rest by 1e-3+.
+Per the skill's rule-4 tie-break it is also the ensemble/stack, the safer private bet at a
+CV tie. It is the consolidated 8-seed-legs / 10-seed-outer-meta build; u5 was the third
+consecutive stack-depth wash and was never submitted, so u4 stays the preferred file.
+
+**Why #2 `realmlp_te13_u_breadth`** — it is the *only* eligible hedge with real tail mass.
+Analytic check (independent of the MC): a BA differential over N disagreeing rows has
+sd ≈ √N · ~5e-6, so realmlp (644 rows, deficit 1.0e-4) → P(win) ≈ 0.22, reproducing the
+MC's 0.25; champion_v1 (2,357 rows, deficit 1.5e-3) → ~6 sd → ~0.000. It hedges the
+**meta/decision layer** (it is a plain 12-seed single-family breadth — no LR meta, no blend
+weights, no cross-leg fitting), which is the one part of #1 that is fitted on OOF and could
+fail to transfer. It does NOT hedge the te13 feature recipe, since it is a leg of u4.
+
+**Rejected, with reasons:**
+- `champion_v1` (most decorrelated, 2,357 rows) — insures against "the te13 recipe is an
+  OOF/public artifact", a failure mode already tested and refuted: the u-family transfers
+  with no haircut (u3 pub ≈ honest OOF − 0.0003) and the te13 lift replicated across 4 GBDT
+  libraries + RealMLP + FTT. Costs ~0.0015 of mean for insurance the MC says never pays.
+- `lrstack6b_r` — the *correct* version of the surface-diversity trade if the user wants one
+  (δ_r-corrected ≈ 0.9504, 1,426-row disagreement, ~1-2% tail). Still ~4e-4 behind #1.
+  This is the one substitution worth making on taste; `champion_v1` is not.
+- `hgbc_te3_u_breadth` — its pair E[max] is inside MC noise, but the **Kaggle-submitted bytes
+  are the 5-seed-era file**; selecting it selects an artifact the MC never scored.
+- `lgbm_te3_u_breadth` — ties realmlp on E[max] but half the tail mass (0.122); eligibility
+  as a breadth file is unconfirmed. Does not change the answer.
+- `tabms_te13_u_breadth`, `rte13_r`, `lrstack_u5_r`, all `_dw32` variants — measured out
+  (Day-18 / Day-13 / Day-17 / Day-19); never submitted, hence not selectable.
+
+**⚠️ MANUAL SELECTION IS LOAD-BEARING.** Kaggle auto-selects the two best *public* scores.
+With ~48 `lbprobe_*` submissions that were explicitly hill-climbed against the public split
+(measured contamination: +0.00076 fakeable in 3 casual rounds, `results/lbprobe_ruler.txt`),
+best-public is very likely a probe artifact — precisely the s6e6 failure mode where the
+best-public pick took the worst private transfer. Click the two files above by hand,
+**≥48h before the ~2026-08-02 deadline** (per the campaign's own protocol).
+
+**Byte verification (done 2026-07-26):** both picks' sha256 are identical in
+`finals_backup_manifest_2026-07-15.sha256`, `_2026-07-22.sha256` and on disk today —
+stable across their submission dates (realmlp 07-19, u4 07-22) ⇒ the Kaggle submission rows
+carry the current bytes. `finals_audit.py` rerun same day: `results/finals_audit_2026-07-26.txt`
+ALL OK across the 6-file menu.
+
+**Stakes note:** `probe_rank_regime.py` measured that the #2 choice moves P(beat a rival)
+by ≤3pp in *every* regime (lead/tie/trail × any ρ). The #1 slot is the whole game; #2 is
+taste-level tail insurance.
+
+---
+
 ## ⚠️ CRITICAL: Row-order invariant — always load labels and IDs through build_features()
 
 `features.py::build_features()` sorts every dataframe by **`["id"]`** (`SORT_KEY`). All
@@ -1756,6 +1815,225 @@ delta (adopt-or-close); (2) freeze-tag execution ~Jul 27 (no writes into finals
 tags after; fresh tags only); (3) otherwise: next fresh-lens round — the armed
 queue is empty again.
 
+### Day-19 (2026-07-23): user-directed reframe — correctness audit + no-retrain decision-layer polish (no new lever hunt)
+
+**User explicitly reframed the remaining ~4 days before freeze: stop hunting new levers,
+spend the time on fine-tuning for generalization even if gains are unmeasurably small.**
+Two principle-justified (not measurement-justified) actions, both producing new files
+only — nothing already-submitted/audited was touched:
+
+1. **`finals_audit.py` hardened + rerun — ALL OK.** Fixed a real bug: the report date
+   and output filename were hardcoded to `2026-07-15` regardless of when the script
+   runs (would have silently mislabeled today's audit as an 8-day-old one). MENU
+   annotated with current roles (u4 #1, tied #2 trio, hgbc breadth inventory, u3 kept
+   read-only as superseded). Fresh run: all 6 menu CSVs OK (structure/id-set/
+   faithfulness-vs-array/sha256), including u4.
+2. **TE inner-CV seeding gap found + fixed in 2 of u4's 4 legs.** The Day-10 fix
+   (`TargetEncoder(cv=StratifiedKFold(shuffle=True, random_state=seed))`, guarding
+   against sklearn 1.9's unseeded-shuffle default) was ported to
+   `zoo_common.te13_block_for_fold` (the NN/TabM/FTT/CatBoost-via-helper path) but
+   never to `train_hgbc_te3.py`/`train_lgbm_te3.py`'s own inline
+   `TargetEncoder(cv=5, ...)` calls — confirmed via the sklearn 1.9 source
+   (`cv=<int>` ⇒ `shuffle=True` with no `random_state`). Ported the identical fix to
+   both. Doesn't change u4's already-deployed bytes (no retrain), but removes an
+   unnecessary nondeterminism source from any future rerun of these two trainers.
+   lbprobe-quarantine grep across the whole finals chain: clean (no matches).
+3. **Decision-layer bootstrap count 8→32, all 5 non-champion menu members
+   (`audit_decision_weights.py` NEW) — measured WASH, not adopted.**
+   `robust_decision_weights`'s own docstring notes a single NM fit has ~0.004 bacc
+   variance; 4× the bootstrap resamples is a pure variance-reduction move on the
+   already-cached OOF (no retraining). Result: weights shift (max|Δw| 0.02–0.03),
+   0.015–0.04% of OOF rows flip, but OOF bacc moves ≤5e-5 either direction (u4:
+   0.95081→0.95076) — inside the established noise floor, and test-set flips vs the
+   deployed CSVs are 36–99/295,753 rows. **Confirms the decision layer was already
+   converged at n_bags=8; no compelling reason to adopt.** 5 new `*_dw32.csv`
+   candidates exist (audited OK, sha256 logged) as inventory only — not added to the
+   finals menu.
+
+**Day-19 net: 0 new levers (deliberately — this was audit/polish, not a lever hunt), 1
+real bug fixed (hardcoded audit date), 1 real reproducibility gap fixed (unseeded TE in
+2 trainers), 1 confirmed-stable decision layer. Freeze ~Jul 27 (4 days out); still-open
+user actions: copy `~/s6e7_finals_backup_2026-07-22.tar.gz` off-box, make the formal
+Kaggle finals selection (#2 still open among the tied menu).**
+
+### Day-20 (2026-07-24): back to lever-hunting on a NEW lens — "the deployed artifact is not what its instruments believe" (bookkeeping, not information)
+
+**Framing.** Days 11–18 all hunted new *information* and the 3-dim label-channel proof
+correctly killed nearly all of it. Day-20's lenses concede that model completely and
+attack a different object: population/surface mismatch in the instruments themselves.
+This is the one claim class the 3-dim proof, the 17 seat vetoes and `probe_veto_power`'s
+pooled bound do NOT cover — all three are statements about information, these are
+statements about bookkeeping.
+
+**1. `probe_dw_shift.py` NEW — the decision layer vs the population it is fitted on.**
+Every prior decision-layer probe varied the OPTIMIZER (n_bags 8→32, direct-bacc NM
+polish, Bayes certificate, per-class power, regime/band metas, joint assignment) while
+holding the fitting POPULATION fixed at the unweighted OOF rows. Three cells, all closed:
+- **Label shift — asserted kill UPGRADED to a measured one.** Record check found the
+  Day-2 Tier-C entry "EM label-shift (Δ<0.2pp)" was *asserted, never measured* (no probe,
+  no results file, no traceable origin — and it sits in the list the Day-6 kill-audit
+  flagged as unreliable). Now measured: **BBSE π̂_test = [0.8606, 0.0566, 0.0828] vs
+  π_train [0.8587, 0.0577, 0.0836] = +0.20 / −0.11 / −0.09 pp**, z 2.5–2.9 against a
+  bootstrap null (sd 0.0008), **replicated on two independent surfaces** (u4 stack and
+  hgbc breadth agree in sign and size). SLD-EM agrees directionally (z +5.0 at-risk) but
+  its absolute values are uncalibrated, hence the null band. The old 0.2pp number was
+  right. **Non-lever regardless, analytically**: BA is the mean of class-*conditional*
+  recalls ⇒ prior-invariant, so no π correction can move this metric.
+- **⚡ Adv-weighted decision weights (the real swing) — SUB-BAR, closed.** Mechanism: BA's
+  recalls are expectations over P(x|y=c), and the campaign has a measured train→test
+  shift (adv-AUC 0.65) ⇒ w tuned on the train x-population is not the test-optimal w.
+  Retuned w against the test-like population (row weights = density ratio from the
+  cached cross-fitted AV scores, q99.5-clipped, **ESS 571,841/690,088 = 82.9%**), read
+  HONESTLY (fit on one OOF half, score adv-weighted BA on the held-out half, 5 seeded
+  splits): **u4 +0.000043 (sd 0.000097, signs +−−++); hgbc breadth −0.000037** vs the
+  pre-registered +0.0010 bar. Full-data adv-tuned w moves **121/295,753 test rows
+  (0.04%)**.
+- **OOF-vs-test posterior SHARPNESS — killed at zero cost.** Hypothesis: OOF rows are
+  scored by ONE fold model, test rows by a 5-model average ⇒ weights tuned on a noisier
+  surface. Controlling the covariate-shift confound (test vs the most test-like OOF
+  decile): max-p gap **−0.00117** (u4) / −0.00218 (hgbc) — wrong sign. Averaging does not
+  sharpen this surface ⇒ no mechanism, the nested-CV follow-up is unnecessary.
+- **Free side-finding**: deployed bagged w beat *both* half-fit refits on every split, and
+  wildly different w vectors ([0.95,0.77,1.0] vs [0.79,1.0,0.83]) score within 2e-5 —
+  **the BA surface in w-space is nearly flat**, which independently explains the Day-19
+  n_bags 8→32 wash and bounds the whole "which point in the indifference set" family.
+
+**2. ⚡ te13-era REPAIR-SURFACE read (`probe_nanlevel_audit.py` NEW; `te13`/`te13_report`
+modes added to `diag_repair.py`) — the only ≥0.001 upside on the board, measured NULL
+with the absorbing mechanism identified.** The inherited assumption: repair-training was
+worth **+0.0008** on the volume-honest Day-7 read, the repaired lineage was later
+demoted, and the number that retired it (δ_r ≈ 0.0009) compared u3 vs `lrstack6b_r` —
+**recipe-confounded** (6b_r is pre-te13). The comparison holding val inputs fixed at test
+mechanism while varying ONLY the training surface had never been run at te13.
+- **E1.1 audit PASSES both bars**: trigger rules exact (train NaN rate is 0 off-trigger;
+  test uniform to 3 dp); **24,310 test rows = 8.22% sit in cells with ZERO train support**
+  (all 4 columns); te13 'nan'-level TE shift max L1 **0.0532** — but carried by bmi alone
+  (activity 0.0016, water 0.0045, diet 0.0103). Decisive nuance: the mechanism is real in
+  *composition*, near-empty in *label content* — P(y | col NaN) vs prior is L1 **0.0015**
+  for activity (occasional smokers ≈ the prior), 0.109 only for bmi (2.0% of rows). The
+  "activity-NaN is a rule dimension with zero train support" argument dies here.
+- **E1.2 decisive read FAILS the +0.0006 bar, tightly.** Three arms, identical fold splits
+  and val-remask RNG, val inputs fixed at test mechanism, HGBC+Susol+te13 consumer.
+  **ΔTESTVOL vs no-repair: −0.00001 (m100) / −0.00002 (m050)**; paired row-bootstrap sd
+  0.00008, 95% CI [−0.0002, +0.0002] ⇒ the bar sits ~7 sd away, **not underpowered**. The
+  weight-free tv-argmax column agrees; plain-surface delta +0.00003 (repair still
+  costless, replicating Day-13 `_rt`); **m050 ≡ m100 ⇒ the Day-7 half-rate preference does
+  not survive either.**
+- **⚡ Mechanism (the strongest finding): the damage decomposition at te13.** Day-4 plain
+  LGBM: total −0.0020 = **placement −0.0010** + volume −0.0010. Day-20 te13: total −0.0011
+  = **placement −0.00006** + volume −0.0011. **The placement term — the only component a
+  repair can recover — is already gone at te13 (2% of its Day-4 size); all residual damage
+  is deleted information, which no repair buys back.** The pre-te13 +0.0008 was buying off
+  a coupling penalty the current recipe no longer pays. Secondary read on the 91,757
+  newly-NaN'd rows: repair still positive at +0.00057/+0.00068, but Day-5 saw +0.0067 on
+  that same subset — a **10× shrink**, diluting to zero at 13.3% of rows.
+- **Verdict: do NOT escalate to an `_rt` te13 breadth + stack before the freeze** (0.0000
+  ± 0.0002 expected, ~5× under the action gate, against 8 legs × 8 seeds + a stack
+  rebuild + a submission slot). Retro-explains Day-13's cross-surface veto #9 and the
+  400-row u3-vs-`rte13_r` near-clone: **once te13 is in the recipe the training surface is
+  not a lever at any consumer level.**
+
+**3. ⚡ OOF SELECTION BIAS (`probe_oof_selection.py` NEW) — the `oof_*.npy` arrays are not
+uniformly honest; measured at +0.000186, sub-escalation, but it CORRECTS TWO MIS-SIGNED
+VERDICTS in this log.** Source-verified mechanism (not hypothesised): `realmlp.py:705-731`
+scores every epoch with `balanced_accuracy_score` on the VAL FOLD, keeps the max, and
+`best_val_probs_` becomes the OOF for those rows (`train_realmlp_td.py:192`) ⇒ realmlp's
+OOF is a max-over-6-epochs statistic computed on the rows it is then scored on. HGBC
+(sklearn internal `validation_fraction`, carved from fold-train) and CatBoost (fixed
+iterations, no eval_set — the 6GB CTR workaround) are honest by construction. No
+instrument in the campaign can see this: all 55 split-half cells, LOFO, the seat tests,
+`probe_veto_power`'s pooled bound and the finals E[max] MCs consume these arrays as
+ground truth. Protocol: fold 1 / seed 42, 20 stratified A/B halvings of the 138,018-row
+val fold; DEPLOYED (select on A∪B, score A∪B) vs HONEST (select on A, score B, both
+directions) plus a selection-set-size CONTROL.
+- **realmlp_te13: DEPLOYED−HONEST = +0.000186** (se 2.5e-5, 20/20 splits; control bound
+  +0.000281) — real, but < the +0.0003 escalation bar. Per-epoch val BA is nearly tied
+  (epochs 3/4/5 within 6e-5), so there is little noise to harvest; the counterfactual scale
+  for *any* leg selecting on val BA at this fold size is +0.00021…+0.00037 ⇒ **not
+  realmlp-specific**.
+- **⚡ `train_lgbm_te3.py`'s early stopping NEVER FIRES — premise refuted at the mechanism
+  level.** Val multi_logloss is monotone to the 1000-iteration cap (1 up-step of 3.5e-6 in
+  999 steps, still improving 0.0033 nats over the last 100) ⇒ the leg is effectively
+  `n_estimators=1000` fixed and its OOF is **honest**: DEPLOYED−HONEST = +0.000000. Same
+  for `lgbm_bagw`. (xgboost_bagw does fire @283: +0.000051, 11/20 — noise.)
+- **⚡ Day-10 epoch-selection verdicts were MIS-SIGNED by this very bias.** Honest deltas
+  vs bacc-selection: **snap4 +0.000325 (39/40 positive)**, snap3 +0.000234, snap2 +0.000174,
+  **bll −0.000068** (recorded as −0.0004), last −0.000068. `snapshot_k` was logged a WASH
+  because the incumbent's own OOF carries ~+0.00019 of max-over-epochs inflation — almost
+  exactly the effect being tested. Neither clears the +0.0004 bar, so **no adoption**, but
+  the log should stop carrying "bll NEGATIVE / snapshot WASH" as kills: honestly bll is a
+  wash and snapshot averaging is a small positive.
+- **Decision impact: NONE, honestly.** (a) LR meta leg weighting unaffected — the bias is
+  **common-mode** in every seat/split-half instrument (arms share the same realmlp legs, so
+  +0.000186 cancels exactly); where a challenger *was* a realmlp variant the correction
+  pushes it more negative, so those vetoes hold a fortiori. (b) #2 finals menu unaffected —
+  OOF-derived E[max] overstates realmlp-containing candidates by ≤~0.0002 vs the
+  realmlp-free `champion_v1`, whose measured mean deficit is ~0.0012 ⇒ no flip, and the
+  rank-regime table already caps the #2 choice at ≤3pp of P(win).
+- **What it DOES touch (true, decision-neutral):** the whole realmlp-over-GBDT *solo* gap
+  (0.9507 vs honest hgbc 0.9505 / lgbm 0.9506) sits inside the measured optimism ⇒
+  **"realmlp is the strongest solo leg" is not established at this resolution**; and Day-8's
+  realmlp adoption evidence corrects from +0.0005 solo / +0.00042 blend-gate to ~+0.0003 /
+  +0.0002-0.0003 — still positive, still 12/12, **adoption stands** at a smaller effect size.
+- Caveats stated by the probe: one fold / one seed per leg, while deployed legs are 8-12-seed
+  breadths where the per-seed tilt lands on different rows and dilutes ⇒ **+0.000186 is an
+  upper bound** for the deployed arrays; `mlp` argued immaterial but not measured.
+  `data_science_stuff/` byte-untouched (per-epoch capture via an in-probe runtime monkeypatch).
+
+**4. ⚡ MICRO-POSITIVE ADDITIVITY (`probe_additivity.py` NEW) — the screening PROTOCOL
+itself, never tested in 19 days: INCONCLUSIVE between bars, ~50% shrinkage, and it
+REFUTES "micro-positives are noise" for this cell.** Every screen in this campaign is
+per-lever against a +0.0007/+0.001 bar — but that bar is a RANKABILITY bar (from the
+LB-blind protocol: no instrument can rank sub-0.001 gaps, so never spend a submission on
+one). It does not automatically apply to ACCUMULATING unbiased same-artifact gains. One
+`hgbc_te3` arm carrying all three measured sub-bar positives simultaneously (TPE basin
+config + TE `smooth=5` + `S6E7_IMP` driver-reconstruction block), paired in-script against
+a stock arm on identical folds and identical seeded TE inner-CV, 2 seeds:
+
+| seed | Δ wt | Δ argmax | boot sd | 95% CI (wt) | label flips |
+|---|---|---|---|---|---|
+| 42 | +0.00018 | +0.00020 | 0.00011 | [−0.00005, +0.00040] | 3,156 |
+| 7 | +0.00027 | +0.00020 | 0.00011 | [+0.00007, +0.00049] | 2,929 |
+| **mean** | **+0.00023** | **+0.00020** | 0.00008 | — | — |
+
+Between-seed spread 0.00009 ≈ the bootstrap sd (no extra seed dispersion); the weight-free
+argmax read is **exactly +0.00020 at both seeds**. **VERDICT: 2e-5 short of the +0.00025
+additive bar, 1.3e-4 above the +0.0001 refutation bar — neither pre-registered trigger
+fired; bars were NOT moved.** Escalation trigger did not fire ⇒ the realmlp arm was NOT
+run (priced ~2.5-3 h GPU + a from-scratch smooth=5 te13 cache rebuild for an expected
++0.0002 ± 0.0001).
+- **The finding: they DO partially add** — the 3-way arm beats every one of its parts at
+  both seeds on both instruments (new information; "micro-positives are noise" is refuted
+  here) — **but at ~50-60% of nominal** (observed/nominal 62%, or 48% against the
+  re-measured ledger), i.e. **exactly the ~40-50% shrinkage the winner's-curse objection
+  predicted**. Half of a sub-bar sum is still sub-bar: +0.00023 is ~3× under the canary bar.
+- **Day-14 F2 did NOT cover this** (F2 stacked three *combiner-seat* micro-positives at a
+  saturated meta; this is training-side change to a leg the stack demonstrably loads onto,
+  `probe_combiner_u`: lr = lr2) — but F2 and this probe agree quantitatively at ~50% of
+  nominal, suggesting the shared mechanism is **shrinkage of tail-selected effects**, not
+  the combiner's absorption. That is a better explanation of both than either had alone.
+- **⚠️ LEDGER CORRECTION**: `hgbc_te3_u_s42t` (basin) is **+0.00025 wt / +0.00014 argmax**
+  vs its stock twin, not the +0.00010 recorded above (that line rounded 0.9505 vs 0.9504
+  off the run logs). Caveat: both arrays predate the Day-19 seeded-TE fix, so ~5e-5 of
+  run-to-run TE noise is inside it. smooth5 and imp confirmed as recorded; the probe's
+  per-fold imputer R² reproduces `probe_impute_driver` to 4 dp.
+- **Not adopted**: would mean rebuilding u4's hgbc leg (8 seeds) + the stack + a submission
+  slot + an audit for an expected ~+0.0002 — the same cost/benefit that failed the Day-20
+  repair-surface escalation. Cheap unrun follow-up if ever wanted: leave-one-out ablation
+  of the 3-way arm (3 arms × 2 seeds, ~55 min CPU) to see if one component carries it all.
+
+**Day-20 net: 7 measured cells across 4 new lenses, 0 adoptable levers (campaign-normal).
+Scorecard: 2 ASSERTED kills upgraded to MEASURED (EM label-shift +0.20pp with a null band
+and 2-surface replication; repair-surface at te13); 1 inherited +0.0008 assumption retired
+WITH its absorbing mechanism identified (placement term is 2% of its Day-4 size); 2
+MIS-SIGNED verdicts corrected (bll is a wash not a −0.0004 kill; snapshot_k=4 is +0.00033
+not a wash); 1 ledger correction (basin +0.00025); 1 source-verified instrument bias
+quantified and shown common-mode/decision-neutral; 1 protocol question answered
+(micro-positives add at ~50% of nominal). Finals UNCHANGED: #1 `lrstack_u4_r`, #2 still the
+user's pick from the tied menu. Freeze ~Jul 27 (3 days out); still-open user actions
+unchanged from Day-19 (copy the backup tarball off-box; make the formal Kaggle finals
+selection).**
+
 ### ▶▶ QUEUED for Day-15 (user-approved 07-17 night, ▶ RESOLVED Day-16 — see above): ORIGINAL-50K REFEREE — pre-registered design
 
 **Question**: is any finals candidate differentially overfit to generator flip-noise?
@@ -2302,6 +2580,7 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-22 | probe_triple_te | Exact-value rule-TRIPLE TE (14th TE col; the 3-dim channel's only unencoded resolution): 10,450 cells / median 30 rows — thin-cell noise wins: **argmax −0.00038 / wt −0.00029** paired. **Channel now measured at every resolution; closed.** | 0.94997 (wt) |
 | 2026-07-22 | probe_menu_vote | 6-way deployed-menu majority vote (ties→u4): 447-row disagreement with u4, OOF + E[priv] EXACT TIE (0.95081/0.95082, P(win) 0.476). **Label-fusion altitude measured-closed.** | 0.95081 (OOF) |
 | 2026-07-22 | lrstack_u4_r anchor | ⚠️ Full-history check: designated #1 had NEVER been submitted (not selectable). User-directed slot spent, audited bytes, reliable=true, score unread. **Finals menu now fully eligible.** | (score quarantined) |
+| 2026-07-23 | audit_decision_weights (n_bags 8→32) | Bootstrap-count stability check on 5 menu candidates (no retrain, pure variance-reduction move): weights shift max\|Δw\| 0.02–0.03, OOF flips 0.015–0.04%, bacc Δ ≤5e-5 both directions, test flips vs deployed 36–99/295,753 rows. **WASH — decision layer already converged at n_bags=8; 5 new `_dw32` files audited OK but not adopted.** | u4 0.95081→0.95076 (wt) |
 
 **LB**: lgbm 0.94886, xgboost 0.94894, **ensemble_v1b 0.94970 (best)**. The blend lifts once
 models are pre-corrected to their deployed surface. Next lever for a bigger jump is a non-GBDT base
