@@ -103,6 +103,44 @@ byte-verified after the run. Inventory added: none adopted; `src/run_ji_breadth.
 `src/run_basin_breadth.sh` left in place (unrun) as the escalation recipe, should a
 future lever ever clear the gate.
 
+### ▶ THE GAP VETO #18 DOES NOT COVER — pre-registration #2 (same day)
+
+Veto #18 is a statement about the **stack**. Final **#2 is `realmlp_te13_u_breadth` — a
+SOLO leg with no combiner**, so the absorption mechanism does not apply to it. The
++0.000198 recipe delta passes through to a solo submission by construction. This is a
+real gap in the veto, not a rescue of the dead pitch.
+
+**Prize, stated honestly BEFORE running (do not let the run inflate it):** the good
+outcome is ji-breadth landing at ≈ u4's level with ~700-1000 rows of disagreement
+(σ≈1.4e-4), which moves pair E[max] 0.95083 → **~0.95088, i.e. ~+5e-5**, on a slot
+`probe_rank_regime` already measured at **≤3pp of P(beat rival) in every regime**.
+**u4 stays #1 regardless of what this reads**: OOF cannot rank <0.001 (campaign rule),
+and a solo beating an 8-leg stack by ~1e-4 on OOF is exactly the pattern
+`probe_original_referee` diagnosed as instrument artifact.
+
+**Honest prior — the delta is weak.** Per-fold argmax ji − stock (s42):
+`+0.000398, +0.000390, +0.000076, −0.000114, +0.000180` → mean +0.000186, sd 0.000217,
+**se 9.7e-5 ⇒ 1.91 sd, 4/5 positive, two folds carrying most of it.** And every delta
+this campaign has escalated to a more-averaged instrument has SHRUNK: joint basin
++0.00050→+0.00022, hgbc TPE +0.00047→+0.0001, focal +0.00037→+0.00004, realmlp K=10
++0.00023→+0.00010. Six instances, one direction. Expect ~50%.
+
+**Cheap canary first (campaign's own canary→confirm pattern), matched N=4:** stock-breadth-4
+over seeds {42, 7, 123, 2024} is free (all 8 stock per-seed OOFs are on disk); ji-breadth-4
+needs **3 GPU runs (~2h), not 7 (~4.5h)**.
+
+**PRE-REGISTERED BARS on the matched-N=4 paired dw-OOF delta (ji-b4 − stock-b4):**
+- **≥ +0.00010** (≈50% of nominal = the campaign's own measured shrinkage) **and** sign
+  consistent ⇒ extend to N=8 ({99, 2025, 31, 7777}) for a deliverable.
+- **≤ +0.00002** ⇒ the recipe delta does not survive averaging; **stop, 2h spent**.
+- between ⇒ INCONCLUSIVE, no swap. No bar-moving.
+- **Then, and only then:** the N=8 artifact must beat `realmlp_te13_u_breadth`'s
+  E[priv] 0.95072 by more than noise on the pairs MC, **and** earn a submission slot +
+  `finals_audit.py` pass + byte-verification before it is clickable. Until all of that,
+  **#2 stays `realmlp_te13_u_breadth.csv`**.
+
+Fresh `S6E7_RUN_TAG` on every run; u4's and the current #2's bytes are untouched.
+
 ---
 
 ## 🏁 FINALS DECISION — 2026-07-26 (user called endgame: "wrap up s6e7, pick the submissions")
