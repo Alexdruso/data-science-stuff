@@ -7,6 +7,59 @@ from lifestyle/biometric features.
 
 ---
 
+## 🎯 PRE-REGISTRATION — 2026-07-26 "hail Mary": leg-upgrade PASS-THROUGH (`probe_passthrough.py`)
+
+**Written BEFORE the run. Bars NOT to be moved afterwards.**
+
+User asked for a hail Mary. The largest measured-positive left on the board is Day-20's
+additivity finding: sub-bar micro-positives DO partially add (~50-60% of nominal) at the
+LEG level. Day-20 declined the escalation against a +0.00025 bar. The un-measured step
+between that and a deliverable is the **pass-through coefficient from leg-delta to
+STACK-delta**. Every prior test of a modified leg was an ADDED-leg/seat test (17 vetoes,
+`probe_seat_*`); a *replacement* of a leg the stack demonstrably loads onto
+(`probe_combiner_u`: lr = lr2, top-2 legs carry the whole stack) has never been measured.
+
+**Zero new compute**: both upgraded arms already exist on disk with OOF **and** test arrays.
+
+Nominals, dw-weighted OOF, matched single-seed (`results/cv_scores.csv`):
+
+| position | stock (s42) | upgraded | Δ |
+|---|---|---|---|
+| hgbc_te3 | 0.950255 | `hgbc_te3_u_s42t` (TPE basin) | **+0.000255** |
+| realmlp_te13 | 0.950449 | `realmlp_te13_imp_u_s42ji` (joint basin × IMP) | **+0.000198** |
+| | | **combined nominal** | **+0.000453** |
+
+(`s42ji` is itself already-shrunk: j alone +0.000218 + imp alone +0.000134 = +0.000352
+nominal → +0.000198 observed = 56%, independently reproducing the additivity result.)
+
+**Instrument**: the standard 12-cell split-half LR-stack harness (`probe_seat_day17._arm`,
+pooled MDE 6.5e-5 per `probe_veto_power`) — ample power to separate +0.0002 from +0.00005.
+Arms are matched-N=1 at the two swapped positions (the upgraded arms have one seed; the
+other 6 legs are identical across arms, so the read is paired).
+
+**PRE-REGISTERED BARS on `lr_both − lr_stock`:**
+- **≥ +0.00020** (≈44% of nominal, at/below the already-measured 48-62% shrinkage band)
+  ⇒ **ESCALATE**: build both upgraded legs to full breadth parity (8 seeds each — deployed
+  legs are 8-12 seed breadths, and breadth itself is worth +0.0001-0.0003, so a
+  short-breadth artifact would read negative vs u4 on seed count alone), rebuild the
+  stack, and adopt as #1 **only if** the full-breadth paired read ALSO clears +0.00020.
+- **≤ +0.00005** ⇒ pass-through is absent; the pitch **DIES** here, u4 stays, zero GPU spent.
+- **in between** ⇒ INCONCLUSIVE. Report, do **not** adopt. No post-hoc bar moving — that
+  discipline has held for 20 days and a hail Mary does not license breaking it.
+
+**Deliberately excluded**: `smooth5` (+0.00008 — needs a brand-new te13 cache tag, `smooth`
+is frozen at `'auto'` in the cache key; new infra at freeze for the smallest component);
+`snapshot_k=4` (its +0.00033 is a Day-20 selection-bias *correction* re-applied to a
+Day-10 "wash", not a fresh paired arm — needs its own confirmation before entering a
+bundle); K=10 folds (−0.00004 on this consumer).
+
+**Safety, non-negotiable**: fresh `S6E7_RUN_TAG`; u4's arrays and CSV bytes are NEVER
+touched; **`lrstack_u4_r.csv` remains the clicked #1** unless a new artifact earns a
+submission slot + `finals_audit.py` pass + byte-verification. This repo has been bitten
+twice by exactly that gap (u4 never-submitted; hgbc stale bytes).
+
+---
+
 ## 🏁 FINALS DECISION — 2026-07-26 (user called endgame: "wrap up s6e7, pick the submissions")
 
 **SELECT THESE TWO ON KAGGLE (manual selection is MANDATORY — see below):**
