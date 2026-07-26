@@ -58,6 +58,51 @@ touched; **`lrstack_u4_r.csv` remains the clicked #1** unless a new artifact ear
 submission slot + `finals_audit.py` pass + byte-verification. This repo has been bitten
 twice by exactly that gap (u4 never-submitted; hgbc stale bytes).
 
+### ▶ RESULT (same day, `results/probe_passthrough.txt`) — **DIES at the pre-registered bar**
+
+```
+  lr_stock     0.950717   (baseline)
+  lr_hg        0.950699   -0.000018   nominal +0.00026   pass-through   -7.1%   6/12
+  lr_rm        0.950729   +0.000012   nominal +0.00020   pass-through   +5.9%   7/12
+  lr_both      0.950728   +0.000012   nominal +0.00045   pass-through   +2.6%   6/12
+  lr_deployed  0.950705   -0.000012   (8-12 seed breadths vs singles)    7/12
+HEADLINE  lr_both - lr_stock = +0.000012  (se 0.000035, +0.33 sd from 0)
+```
+
+**Pass-through is ~2.6% of nominal and statistically indistinguishable from zero**
+(+0.33 sd, 6/12 positive) — far below the +0.00005 death bar. Speculative GPU lane
+killed on the read; both finals re-verified byte-identical afterwards.
+
+**⚡ This is a stronger and more general result than the 17 seat vetoes, and it is NEW.**
+Those vetoes showed the combiner absorbs *added* legs. This shows it also absorbs
+*replacements of the legs it loads onto* — a leg improved by +0.00045 solo delivers
++0.00001 to the stack. **Veto #18, and it is the one that generalizes**: it kills the
+entire class of "improve a base leg" levers at the deliverable level, which is the class
+the whole micro-portfolio pitch lived in. Day-20's additivity finding survives intact as
+a *leg*-level fact; it simply has no channel to the stack.
+
+**Mechanism (free by-product, and it retro-explains the record):** `lr_deployed` — the
+real 8-12 seed breadths — also reads **−0.000012 vs the same legs at ONE seed**. Breadth
+deepening, worth +0.0001-0.0003 solo, is likewise absorbed. The common cause is that the
+**LR meta is itself an averaging/variance-reduction operator**, so leg-level changes that
+work *by* averaging or by small mean shifts are exactly what it already extracts. Only a
+leg different *in kind* could move it — and 20 days of measurement say none exists in
+this inventory. (Caveat, stated: these two reads are ~0.3 sd, so the mechanism claim is
+supported by sign and by consistency with the 17 vetoes, not established on its own.)
+
+**Stack-level additivity**: parts sum to −0.000006 vs both at +0.000012 — all three
+numbers are inside noise, so the additivity question is simply *not posed* at this level.
+
+**Not a ceiling claim** ([[feedback_premature_ceiling]]): this closes the leg-upgrade
+route to the stack. It says nothing about a lever that changes the stack's inputs in
+kind. It does mean the remaining measured-positive inventory (basin, imp, smooth5,
+snapshot_k, K=10) has no route to the deliverable and should not be re-pitched as one.
+
+**Finals UNCHANGED**: #1 `lrstack_u4_r.csv`, #2 `realmlp_te13_u_breadth.csv`, both
+byte-verified after the run. Inventory added: none adopted; `src/run_ji_breadth.sh` +
+`src/run_basin_breadth.sh` left in place (unrun) as the escalation recipe, should a
+future lever ever clear the gate.
+
 ---
 
 ## 🏁 FINALS DECISION — 2026-07-26 (user called endgame: "wrap up s6e7, pick the submissions")
@@ -2633,6 +2678,7 @@ Standing gate for every candidate: adv-weighted Δ>+0.001 AND test-like Δ>0; LB
 | 2026-07-22 | probe_triple_te | Exact-value rule-TRIPLE TE (14th TE col; the 3-dim channel's only unencoded resolution): 10,450 cells / median 30 rows — thin-cell noise wins: **argmax −0.00038 / wt −0.00029** paired. **Channel now measured at every resolution; closed.** | 0.94997 (wt) |
 | 2026-07-22 | probe_menu_vote | 6-way deployed-menu majority vote (ties→u4): 447-row disagreement with u4, OOF + E[priv] EXACT TIE (0.95081/0.95082, P(win) 0.476). **Label-fusion altitude measured-closed.** | 0.95081 (OOF) |
 | 2026-07-22 | lrstack_u4_r anchor | ⚠️ Full-history check: designated #1 had NEVER been submitted (not selectable). User-directed slot spent, audited bytes, reliable=true, score unread. **Finals menu now fully eligible.** | (score quarantined) |
+| 2026-07-26 | probe_passthrough | ⚡ HAIL MARY, pre-registered before the run. Does a LEG upgrade pass through to the STACK? REPLACED (not added) the two legs the stack loads onto with their upgraded arms (hgbc basin +0.000255, realmlp joint×IMP +0.000198; nominal +0.000453), 12-cell split-half, matched N=1. **lr_both − lr_stock = +0.000012 (se 3.5e-5, +0.33 sd, 6/12) = 2.6% pass-through** ⇒ **DIES** at the ≤+0.00005 bar. **Veto #18 and the general one**: the combiner absorbs leg REPLACEMENTS, not just additions ⇒ the whole "improve a base leg" class has no route to the deliverable. Free by-product: the deployed 8-seed breadths read −0.000012 vs the same legs at ONE seed ⇒ the LR meta is itself an averaging operator. Finals unchanged; both byte-verified after. | +0.000012 (paired) |
 | 2026-07-23 | audit_decision_weights (n_bags 8→32) | Bootstrap-count stability check on 5 menu candidates (no retrain, pure variance-reduction move): weights shift max\|Δw\| 0.02–0.03, OOF flips 0.015–0.04%, bacc Δ ≤5e-5 both directions, test flips vs deployed 36–99/295,753 rows. **WASH — decision layer already converged at n_bags=8; 5 new `_dw32` files audited OK but not adopted.** | u4 0.95081→0.95076 (wt) |
 
 **LB**: lgbm 0.94886, xgboost 0.94894, **ensemble_v1b 0.94970 (best)**. The blend lifts once
