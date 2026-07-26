@@ -141,6 +141,25 @@ needs **3 GPU runs (~2h), not 7 (~4.5h)**.
 
 Fresh `S6E7_RUN_TAG` on every run; u4's and the current #2's bytes are untouched.
 
+**⚠️ INCIDENT (2026-07-26, first canary attempt — 50 min lost, caught before it
+contaminated anything).** `run_ji_breadth.sh` omitted **`S6E7_TE13=1`**. Nothing errored:
+`MODEL_NAME` simply drops its `_te13` segment, so the lane trained `realmlp_imp` (no te13
+block) and wrote it under a *different* key — a silent recipe swap, not a crash. Caught by
+the model name in the log (`realmlp_imp_u_s7ji`, not `realmlp_te13_imp_u_s7ji`) and
+corroborated by the scores (0.9503 vs s42ji's 0.95065 — te13 is worth ~+0.0004 here, so
+the gap is exactly the missing block). Second defect found in the same log: the lane was
+**launched twice** and two instances raced on the same array files (identical output rows,
+but only because the runs are deterministic — a genuine race).
+Cleanup: 6 arrays + 3 junk submissions + 5 `cv_scores.csv` rows deleted; **finals bytes
+re-verified intact throughout** (`ed5a9bff` / `8fd6904e`) — the fresh-`RUN_TAG` discipline
+did its job and kept the damage entirely outside the finals lineage.
+Hardening now in `run_ji_breadth.sh`: explicit `S6E7_TE13=1` with a comment marking it
+load-bearing, a **post-run assert** that the expected `oof_realmlp_te13_imp_u_s<seed>ji.npy`
+key actually appeared (aborts the lane on recipe drift), and a **mkdir-based single-instance
+lock**. Generalisable lesson for this repo: `MODEL_NAME` is assembled from optional env
+segments, so a missing feature flag is a *silent rename*, never an error — always assert
+the output key, never just the exit status.
+
 ---
 
 ## 🏁 FINALS DECISION — 2026-07-26 (user called endgame: "wrap up s6e7, pick the submissions")
