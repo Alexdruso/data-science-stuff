@@ -141,6 +141,15 @@ needs **3 GPU runs (~2h), not 7 (~4.5h)**.
 
 Fresh `S6E7_RUN_TAG` on every run; u4's and the current #2's bytes are untouched.
 
+**⚠️ TIE-BREAK, fixed 2026-07-27 BEFORE the canary number was read (the second gate above
+is stricter than the first, and this is where discipline would otherwise slip): the N=8
+artifact's expected edge is +0.0001-0.0002 on an OOF-derived MC, and this campaign's own
+rule is that OOF cannot rank <0.001 — so that gate will read as a TIE, not a win. A TIE
+MEANS NO SWAP.** The deployed #2 is byte-verified against two historical manifests and is
+already scored on Kaggle; a fresh artifact is neither. **Status quo wins ties.** "More
+than noise" must not be softened into "ties or better" after GPU has been spent on the
+N=8 build.
+
 **⚠️ INCIDENT (2026-07-26, first canary attempt — 50 min lost, caught before it
 contaminated anything).** `run_ji_breadth.sh` omitted **`S6E7_TE13=1`**. Nothing errored:
 `MODEL_NAME` simply drops its `_te13` segment, so the lane trained `realmlp_imp` (no te13
