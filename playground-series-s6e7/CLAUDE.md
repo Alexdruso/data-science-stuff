@@ -267,6 +267,19 @@ and a re-click — against a candidate with no public/private evidence. So:
   proxy-closure to a real one, which is worth having in the log either way).
 - between ⇒ inconclusive, no action.
 
+**(C) AVERAGE-then-STACK vs STACK-then-AVERAGE — the pooling POSITION relative to the
+combiner.** The deployed #1 averages the 8 seeds of each te3-family leg *first*, then
+clipped-logits the mean and fits one meta on it. The alternative — one meta per seed,
+then average the 8 stacks — has never been run, and the two are **not equivalent** because
+`clipped_logit` and the meta are nonlinear: `meta(mean_s p_s) ≠ mean_s meta(p_s)`. Day-18's
+`probe_pool_geom` swept the pooling *function* (logit / median / trimmed vs arithmetic)
+for members of a leg; it never touched the pooling *position*. This is the one cell where
+the campaign's two big mechanisms make **opposing** predictions: veto #18's ("the LR meta
+is itself an averaging operator") says the order barely matters, while rule #3's (per-row
+noise drives argmax deltas) says stack-then-average could be *better*, since each per-seed
+meta sees a noisier input and the final average then removes meta-level noise too. Either
+answer is informative, which is the bar for spending the CPU. Same bars as (A) and (B).
+
 **Honest prior: both read ~0.** For (A), `probe_covariate_shift` measured importance
 weighting on the BASE as flat because the shift is *pure covariate* (P(y|x) fixed), and
 `probe_dw_shift` measured the adv-weighted decision layer at +0.00004. For (B), Day-20
