@@ -358,13 +358,21 @@ promising reads died on escalation.
   ONE member and flagged the dilution across an 8-12-seed breadth as its biggest residual
   uncertainty. Reusing today's cached per-epoch val probabilities (zero GPU): **BIAS(1) =
   +0.000184** — a *third* independent replication of that instrument — decaying
-  1.00 / 0.68 / 0.24 / 0.15 / −0.11 / −0.07 / −0.36 / −0.02 to **BIAS(8) = −0.000003**.
-  ⇒ **the deployed 8-seed breadth OOF arrays are effectively HONEST.** Consequences, all
-  in the safe direction: the cross-leg LEVEL reads are re-established, Day-20's retraction
-  of *"realmlp is the strongest solo leg"* is itself retracted, and the #2 pick's
-  E[priv] 0.95072 was **not** inflated — so the existing #2 is *strengthened*, not
-  changed. (Deployed seeds also vary the fold split, which scatters the tilt further ⇒
-  ~0 is an upper bound.)
+  1.00 / 0.68 / 0.24 / 0.15 / −0.11 / −0.07 / −0.36 / −0.02 to **BIAS(8) ≈ 0**. State it
+  as **≈0 ± ~3e-5**, not as the point estimate −0.000003: the M=5..8 scatter
+  (−2e-5, −1e-5, −7e-5, −0.3e-5) is the honest precision, and the printed `se` column is
+  the se of the honest *mean*, not of the bias. ⇒ **the deployed 8-seed breadth OOF arrays
+  are effectively HONEST.** Consequences, all in the safe direction: the #2 pick's E[priv]
+  0.95072 was **not** inflated, so the existing #2 is *strengthened*, not changed.
+  (Deployed seeds also vary the fold split, scattering the tilt further ⇒ ≈0 is an upper
+  bound.)
+  **⚠️ Precisely what this does and does not restore.** It removes the *inflation-artifact*
+  objection to the cross-leg LEVEL reads — Day-20's "realmlp is not established as the
+  strongest solo leg **because of the optimism**" no longer holds. It does **not** make the
+  claim true: realmlp 0.9507 vs lgbm_te3 0.9506 is a **1e-4** gap and this campaign's own
+  rule is that OOF cannot rank <0.001, so it was never establishable at that resolution
+  with or without the bias. Correct phrasing: *no longer dis-established by an artifact,
+  still not established, because the gap is under the rankability floor.*
 - **`realmlp_te13_u_breadth12` finally evaluated as a #2 candidate** (`probe_breadth12.txt`;
   it has sat on disk unassessed since Day-13). This is the one #2-slot mechanism screening
   rule #3 does *not* kill in advance — it IS the averaging rather than a lever diluted by
