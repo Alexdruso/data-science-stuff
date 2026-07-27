@@ -225,6 +225,55 @@ escalated to a more-averaged instrument shrank ~50%; applying that to +0.000325 
 ~+0.00016, i.e. between the bars. **#1 stays `lrstack_u4_r` regardless** (OOF cannot
 rank <0.001). Fresh model name on every run; u4's and the current #2's bytes untouched.
 
+### ▶ PRE-REGISTRATION #4 — 2026-07-27 (post-freeze): the two AGGREGATE-level cells screening rule #3 does not discount
+
+**Written BEFORE the runs. Bars NOT to be moved.**
+
+Rule #3 says a per-member lever is worth ≈1/M at the deployed breadth, which prices the
+whole per-member class out. It **exempts levers acting on the aggregate** — the combiner,
+the decision layer, the feature channel, M itself. Auditing that exempt list against the
+log turns up exactly **two cells that were never measured**, and both are one stage of the
+pipeline rather than one member of an ensemble:
+
+**(A) The META's fitting POPULATION.** The Day-13 coverage matrix swept the combiner's
+hypothesis class, regularization, fitting objective, calibration shape and structure —
+and declared the LR stack "a measured local optimum across every combiner axis". It never
+varied **which rows the meta is fit on**. Day-20 attacked the fitting population of the
+*decision layer* and explicitly noted "every prior probe varied the optimizer"; the same
+gap exists one stage earlier and was not noticed. Mechanism: adv-AUC 0.65 ⇒ the meta's
+coefficients are fit on a train x-population that is not the test one.
+
+**(B) The decision layer is TUNED on a 1-model-per-row surface and APPLIED to a
+5-model-average surface.** Day-20 raised this and closed it on a **proxy** — "max-p gap
+−0.00117, wrong sign ⇒ no mechanism, the nested-CV follow-up is unnecessary". That proxy
+measures *calibration sharpness*; the quantity that actually matters is *per-row
+prediction noise*, which averaging reduces regardless of what it does to mean confidence.
+**Today's 1/M result is precisely a demonstration that per-row noise drives argmax-metric
+deltas in ways a confidence proxy does not see**, so the closure is reopened — this time
+measured, not proxied. Nested design: inside each fold, train 5 sub-models on 4/5 of the
+fold-train and predict the val fold with their MEAN, so val rows are scored by a 5-model
+average of models that never saw them — matching the test surface's averaging structure.
+The fold's te13 block is held fixed across sub-models so the variable under test is
+model-averaging alone.
+
+**⚠️ THE FREEZE RAISES THE BAR, DELIBERATELY.** Both cells would change the **deployed #1
+artifact** (A its meta, B its weights JSON), which is frozen, byte-verified, already
+submitted and about to be clicked. Reopening costs a rebuild, a submission slot, an audit
+and a re-click — against a candidate with no public/private evidence. So:
+
+- **≥ +0.0005** on the honest instrument ⇒ report to the user as a *proposal to reopen the
+  freeze*, with the cost stated. Do **not** act unilaterally.
+- **≤ +0.0001** ⇒ the cell is closed **by measurement** (for B, that upgrades a
+  proxy-closure to a real one, which is worth having in the log either way).
+- between ⇒ inconclusive, no action.
+
+**Honest prior: both read ~0.** For (A), `probe_covariate_shift` measured importance
+weighting on the BASE as flat because the shift is *pure covariate* (P(y|x) fixed), and
+`probe_dw_shift` measured the adv-weighted decision layer at +0.00004. For (B), Day-20
+measured the BA surface in w-space to be nearly flat (w vectors differing by 0.2 scoring
+within 2e-5). These are cheap CPU cells run to convert two assumptions into measurements
+before the deadline, not levers anyone should expect to pay.
+
 ---
 
 ## ▶▶ DAY-21 RESULTS (2026-07-27) — both #2-slot canaries read; ⚡ the shared decay law is the day's real finding
