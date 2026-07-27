@@ -227,6 +227,121 @@ rank <0.001). Fresh model name on every run; u4's and the current #2's bytes unt
 
 ---
 
+## ▶▶ DAY-21 RESULTS (2026-07-27) — both #2-slot canaries read; ⚡ the shared decay law is the day's real finding
+
+**Both pre-registered reads landed against unmoved bars. Finals UNCHANGED: #1
+`lrstack_u4_r.csv`, #2 `realmlp_te13_u_breadth.csv`, byte-verified before and after every
+run (`ed5a9bff` / `8fd6904e`, identical in the 07-15 and 07-22 manifests; `finals_audit`
+2026-07-27 ALL OK across the 6-file menu).**
+
+### ▶ RESULT — pre-registration #2, the ji canary (`results/probe_ji_canary.txt`)
+
+Lane resumed after the overnight kill (seed 2024 had trained all 5 folds and was
+`Terminated` before writing its arrays; a stale `results/.ji_breadth.lock` blocked
+restart). Per-fold ckpts made the resume ~15 min and the hardened post-run key assert
+passed — the recipe did not drift.
+
+```
+per-seed (dw-weighted OOF):  s42 +0.000206  s7 +0.000288  s123 +0.000281  s2024 +0.000213
+                             mean +0.000247  se 0.000022  4/4 positive
+breadth prefixes:   N=1 +0.000206   N=2 +0.000138   N=3 +0.000089   N=4 +0.000080
+HEADLINE  ji_b4 - stock_b4 = +0.000080     VERDICT: INCONCLUSIVE (bars +0.00010 / +0.00002)
+```
+
+**No swap, and no extension to N=8** — the pre-registration licensed that only at
+≥+0.00010. The striking part is the dissociation: the ji recipe delta is **highly
+significant at every individual seed** (4/4, se 2.2e-5, mean +0.000247) and **almost
+entirely gone once both arms are breadth-averaged**.
+
+### ▶ RESULT — pre-registration #3, snapshot_k (`probe_snap_breadth{,_prereg_m4,_m8}.txt`)
+
+Honest A/B instrument, fold 1. **M=1 reads +0.000331 against Day-20's +0.000325 — an
+independent replication of that instrument, i.e. a validity check passed before any
+verdict was taken.** Then:
+
+| M (members) | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|---|---|---|---|
+| snap4 − bacc | +.000331 | +.000214 | +.000140 | **+.000117** | +.000081 | +.000057 | +.000030 | **+.000035** |
+| snap3 − bacc | +.000231 | +.000172 | +.000084 | +.000070 | +.000034 | +.000018 | +.000015 | +.000001 |
+| snap2 − bacc | +.000176 | +.000106 | +.000031 | +.000024 | −.000026 | −.000030 | −.000039 | −.000035 |
+
+- **Pre-registered M=4 verdict: +0.000117 ⇒ INCONCLUSIVE, no swap** (that file is
+  preserved verbatim as `probe_snap_breadth_prereg_m4.txt`).
+- **Extension to M=8** — the size the deployed #2 actually is — **+0.000035 ⇒ STOP.**
+  Not bar-moving: the trajectory is monotone, so extending can only move the verdict
+  *toward* STOP, and M=8 is the number that governs the deliverable. `snap2` goes outright
+  **negative** from M=5.
+- **Two caveats, both pointing the safe way.** (a) Members here share one fold split and
+  one TE block and differ only in `random_state`; the deployed breadth also varies the
+  fold split and TE block, i.e. *more* member diversity ⇒ averaging kills the same
+  variance component *harder* ⇒ **+0.000035 is an UPPER BOUND on the deployed delta.**
+  (b) Reads are plain-argmax BA while the consumer applies decision weights — second-order
+  at 1e-4 given Day-20's "the BA surface in w-space is nearly flat", and nothing is adopted.
+
+### ⚡ THE FINDING — per-member gains decay ≈ 1/M under member averaging, and the two levers trace the SAME curve
+
+Normalised to their own M=1 value:
+
+| M | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|---|---|---|---|
+| snap4 (honest A/B) | 1.00 | 0.65 | 0.42 | 0.35 | 0.24 | 0.17 | 0.09 | 0.11 |
+| ji (naive paired dw-OOF) | 1.00 | 0.67 | 0.43 | 0.39 | — | — | — | — |
+| 1/M | 1.00 | 0.50 | 0.33 | 0.25 | 0.20 | 0.17 | 0.14 | 0.12 |
+| 1/√M | 1.00 | 0.71 | 0.58 | 0.50 | 0.45 | 0.41 | 0.38 | 0.35 |
+
+**Two different levers, two different instruments, normalised curves agreeing to corr
+0.999 over M=1..4** (max abs difference 0.035). Power-law fit: snap4 ≈ M^−1.15 over 8
+points, ji ≈ M^−0.71 over 4 — **decidedly faster than 1/√M, near 1/M**.
+
+This matters more than either slot decision, because **the two levers are mechanistically
+different.** `snap4` IS a variance-reduction move (average the top-k epochs), so its
+substitution with breadth averaging is unsurprising. `ji` is a **mean shift** (a different
+TPE config basin plus the IMP driver-reconstruction block) — it *should* have survived
+averaging, and it did not. So the honest generalisation is not "variance-reduction levers
+don't stack" but the stronger:
+
+> **At an argmax-threshold metric, a per-member improvement small relative to
+> member-to-member posterior noise is absorbed by averaging over members, at ≈1/M —
+> whether the lever is mechanistically a variance reducer or a mean shift.**
+
+Mechanism: BA sees the posterior only through `argmax(w·p)`, so a sub-1e-3 posterior
+improvement can pay only by flipping boundary rows. Averaging M members already removes
+the member-specific noise that put those rows near the boundary — and it removes it from
+the **stock** arm too, which has more of it to lose. The gap closes from the incumbent's
+side, not the challenger's.
+
+**⇒ SCREENING RULE #3, to sit beside the 3-dim label channel and veto #18:**
+*a lever measured at one member is worth ≈1/M of its measured size at the deployed
+breadth.* A +0.0003 single-member delta is ~+0.00004 at an 8-seed leg — under every
+deployment gate this campaign has. **Screen new levers at the deployed M, never at M=1.**
+
+One mechanism at three altitudes — epoch → seed → meta — retro-explains a long list of
+separately-recorded entries: the Day-10 snapshot "wash"; Day-12's HGBC basin +0.00047 →
++0.0001; Day-17's joint basin +0.00050 → +0.00022 and focal +0.00037 → +0.00004; Day-15's
+realmlp K=10 +0.00023 → +0.00010; Day-19's n_bags 8→32 wash; Day-18's pooling-geometry
+null and the geometric-vs-arithmetic wash; and most tellingly **veto #18's free
+by-product** — `lr_deployed`, the real 8-12-seed breadths, reading −0.000012 vs the same
+legs at ONE seed. The campaign's "6/6 escalated deltas shrank ~50%" folklore is now a
+measured curve with an exponent.
+
+**Not a ceiling claim** ([[feedback_premature_ceiling]]): it says a lever must be large at
+the deployed M, not that no such lever exists. It does mean single-member screens have
+been overstating this campaign's candidates by roughly 8× — which is *why* so many
+promising reads died on escalation.
+
+### Day-21 ops (freeze day)
+
+- `finals_audit.py` → `results/finals_audit_2026-07-27.txt`: **ALL OK** (6 CSVs, structure
+  / id-set / faithfulness-vs-array / sha256).
+- **Doc defect found and fixed**: the finals block called #2 a "12-seed breadth". Verified
+  by reconstruction — the deployed arrays are EXACTLY the mean of the **8** per-seed arrays
+  (42, 7, 123, 2024, 99, 2025, 31, 7777), max|Δ| = 0.0 on both OOF and test.
+  `realmlp_te13_u_breadth12` is a different, never-submitted array (max|Δ| 0.11).
+  This also confirms the canaries were matched against the right incumbent.
+- Days 19-21 of probes/logs committed (they had never been); freeze tag cut.
+
+---
+
 ## 🏁 FINALS DECISION — 2026-07-26 (user called endgame: "wrap up s6e7, pick the submissions")
 
 **SELECT THESE TWO ON KAGGLE (manual selection is MANDATORY — see below):**
