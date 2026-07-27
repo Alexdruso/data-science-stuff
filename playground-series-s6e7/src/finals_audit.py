@@ -14,11 +14,12 @@ misalignment once produced a 0.5-AUC submission). For every finals-menu CSV:
 --regen <key>: rebuild the CSV from the current arrays first (used for
 realmlp_te13_u_breadth, whose CSV predated today's 8-seed recombine).
 
-Run: python src/finals_audit.py -> results/finals_audit_2026-07-15.txt
+Run: python src/finals_audit.py -> results/finals_audit_<today>.txt
 """
 
 from __future__ import annotations
 
+import datetime
 import hashlib
 import json
 import sys
@@ -35,6 +36,10 @@ from train_common import load_dataset
 from data_science_stuff.kaggle_utils import weighted_predict
 
 # csv name -> array key (None = champion label file)
+# lrstack_u4_r = #1 finalist; champion_v1/lrstack6b_r/realmlp_te13_u_breadth =
+# tied #2 menu (Day-18); hgbc_te3_u_breadth = inventory candidate; lrstack_u3_r
+# = superseded by u4 (Day-13 wash), kept here read-only so a stale copy can
+# never silently pass unaudited.
 MENU: dict[str, str | None] = {
     "lrstack_u4_r.csv": "lrstack_u4_r",
     "lrstack_u3_r.csv": "lrstack_u3_r",
@@ -86,7 +91,8 @@ def main() -> None:
     if "--regen" in sys.argv:
         regen(sys.argv[sys.argv.index("--regen") + 1], test_ids)
 
-    lines = ["finals-integrity audit 2026-07-15"]
+    today = f"{datetime.date.today():%Y-%m-%d}"
+    lines = [f"finals-integrity audit {today}"]
     ok_all = True
     for csv_name, key in MENU.items():
         path = SUBMISSIONS_DIR / csv_name
@@ -117,7 +123,7 @@ def main() -> None:
     lines.append("ALL OK" if ok_all else "!! AUDIT FAILURES — do not select finals")
     report = "\n".join(lines)
     print(report)
-    (RESULTS_DIR / "finals_audit_2026-07-15.txt").write_text(report + "\n")
+    (RESULTS_DIR / f"finals_audit_{today}.txt").write_text(report + "\n")
 
 
 if __name__ == "__main__":

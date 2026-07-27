@@ -74,7 +74,16 @@ sys.path.insert(0, str(Path(__file__).parent))
 from train_common import RESULTS_DIR, load_dataset
 from zoo_common import te13_block_for_fold
 
-MEMBER_SEEDS = [42, 7, 123, 2024]  # the deployed breadth's first four seeds
+import os
+
+# Default = the pre-registered matched-N=4 canary. `S6E7_SNAP_MEMBERS` extends the SAME
+# instrument to the deployed breadth's full 8 seeds — the M value that actually governs
+# the deliverable. Per-member epoch captures are cached, so extending never refits.
+MEMBER_SEEDS = [
+    int(s)
+    for s in os.environ.get("S6E7_SNAP_MEMBERS", "42,7,123,2024").split(",")
+    if s.strip()
+]
 FOLD = 1
 SPLIT_SEED_BASE = 42  # fold split comes from the seed-42 lineage (shared by members)
 AB_SEED = 20260727
@@ -156,22 +165,11 @@ def capture_member(
     return np.stack(captured)
 
 
-def rule_probs(P: NDArray[np.float64], sel_pos: NDArray[np.int64], k: int) -> NDArray[np.float64]:
-    """Val probs under a selection rule, with the epoch(s) chosen on `sel_pos` only."""
-    scores = np.asarray([bacc(_Y[sel_pos], P[e][sel_pos]) for e in range(len(P))])
-    if k == 0:
-        return P[int(np.argmax(scores))]
-    top = np.argsort(-scores)[: min(k, len(P))]
-    return np.mean(P[top], axis=0)
-
-
 def main() -> None:
-    global _Y
     ds = load_dataset()
     y = ds.y
     tr_idx, va_idx = fold_indices(y, SPLIT_SEED_BASE, FOLD)
     y_va = y[va_idx]
-    _Y = y_va
 
     from train_mlp import NNData
     from zoo_common import te_block_for_fold
@@ -208,30 +206,55 @@ def main() -> None:
     ]
     print("\n".join(lines))
 
+    cache = RESULTS_DIR / "cache" / "snap_breadth"
+    cache.mkdir(parents=True, exist_ok=True)
     members: list[NDArray[np.float64]] = []
     for s in MEMBER_SEEDS:
         t0 = time.time()
-        P = capture_member(X_all, cat_names, y, tr_idx, va_idx, s)
+        cp = cache / f"epochs_f{FOLD}_m{s}.npy"
+        if cp.exists():
+            P = np.load(cp)
+            how = "from cache"
+        else:
+            P = capture_member(X_all, cat_names, y, tr_idx, va_idx, s)
+            np.save(cp, P)
+            how = f"captured in {time.time() - t0:.0f}s"
         members.append(P)
         msg = (
-            f"member s{s}: {len(P)} epochs captured in {time.time() - t0:.0f}s  "
+            f"member s{s}: {len(P)} epochs {how}  "
             f"full-val BA per epoch {np.round([bacc(y_va, P[e]) for e in range(len(P))], 6).tolist()}"
         )
         lines.append(msg)
         print(msg)
 
-    # honest evaluation at every member count
+    # Selection depends only on (member, selection half, rule) — never on M. Precompute
+    # the chosen epoch INDICES once (cheap, tiny) and reuse them at every member count,
+    # so extending to M=8 costs an argmax pass, not a re-selection pass.
+    splits = [half_split(y_va, rep) for rep in range(N_SPLITS)]
+    sel_idx: dict[tuple[int, int, int, str], NDArray[np.int64]] = {}
+    for mi, P in enumerate(members):
+        for rep, (a, b) in enumerate(splits):
+            for side, (sel, _sco) in enumerate(((a, b), (b, a))):
+                sc = np.asarray([bacc(y_va[sel], P[e][sel]) for e in range(len(P))])
+                order = np.argsort(-sc)
+                for rname, k in RULES.items():
+                    sel_idx[(mi, rep, side, rname)] = order[: max(k, 1)]
+
     lines += ["", "honest deltas vs bacc-selection (mean over 2*N_SPLITS scored halves):"]
     traj: dict[str, list[float]] = {r: [] for r in RULES}
     for m in range(1, len(members) + 1):
-        use = members[:m]
         acc: dict[str, list[float]] = {r: [] for r in RULES}
-        for rep in range(N_SPLITS):
-            a, b = half_split(y_va, rep)
-            for sel, sco in ((a, b), (b, a)):
-                for rname, k in RULES.items():
-                    probs = np.mean([rule_probs(P, sel, k) for P in use], axis=0)
-                    acc[rname].append(bacc(y_va[sco], probs[sco]))
+        for rep, (a, b) in enumerate(splits):
+            for side, (_sel, sco) in enumerate(((a, b), (b, a))):
+                for rname in RULES:
+                    probs = np.mean(
+                        [
+                            members[mi][sel_idx[(mi, rep, side, rname)]][:, sco].mean(axis=0)
+                            for mi in range(m)
+                        ],
+                        axis=0,
+                    )
+                    acc[rname].append(bacc(y_va[sco], probs))
         base = np.asarray(acc["bacc"])
         row = [f"  M={m}  bacc {base.mean():.6f}"]
         for rname in RULES:
@@ -267,10 +290,9 @@ def main() -> None:
 
     out = "\n".join(lines)
     print("\n".join(lines[-6:]))
-    (RESULTS_DIR / "probe_snap_breadth.txt").write_text(out + "\n")
+    suffix = "" if len(members) == 4 else f"_m{len(members)}"
+    (RESULTS_DIR / f"probe_snap_breadth{suffix}.txt").write_text(out + "\n")
 
-
-_Y: NDArray[np.int64] = np.zeros(0, dtype=np.int64)
 
 if __name__ == "__main__":
     main()

@@ -21,6 +21,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from lightgbm import LGBMClassifier, early_stopping, log_evaluation
+from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import TargetEncoder
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -62,7 +63,14 @@ def main() -> None:
     print(f"LGBM te3: {len(te_names)} TE cols + regularized-shallow config")
 
     def fit_fold(tr_idx, val_idx, seed, fold):  # noqa: ANN001, ANN202
-        enc = TargetEncoder(cv=5, smooth="auto", target_type="multiclass")
+        # seeded inner CV (Day-10 audit finding, ported from zoo_common's
+        # te13_block_for_fold: sklearn 1.9's cv=<int> default is an UNSEEDED
+        # shuffled StratifiedKFold — nondeterministic TE draws on every rerun).
+        enc = TargetEncoder(
+            cv=StratifiedKFold(n_splits=5, shuffle=True, random_state=seed),
+            smooth="auto",
+            target_type="multiclass",
+        )
         te_tr = enc.fit_transform(te_tr_view.iloc[tr_idx], ds.y[tr_idx])
         te_va = enc.transform(te_tr_view.iloc[val_idx])
         te_te = enc.transform(te_te_view)
