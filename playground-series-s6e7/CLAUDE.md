@@ -160,6 +160,62 @@ lock**. Generalisable lesson for this repo: `MODEL_NAME` is assembled from optio
 segments, so a missing feature flag is a *silent rename*, never an error — always assert
 the output key, never just the exit status.
 
+### ▶ PRE-REGISTRATION #3 — 2026-07-27: does `snapshot_k=4` survive BREADTH AVERAGING? (`probe_snap_breadth.py`)
+
+**Written BEFORE the run. Bars NOT to be moved afterwards.**
+
+Same uncovered gap as pre-registration #2: final #2 is a SOLO leg, so a leg-level
+recipe delta reaches the deliverable by construction. The candidate is the largest
+honestly-measured un-run delta on the board — Day-20 `probe_oof_selection` Experiment C,
+which re-adjudicated the epoch-selection rules with an HONEST instrument (select the
+rule on half A, score on half B, 40 splits):
+
+| rule | honest BA | Δ vs bacc | n>0 / 40 |
+|---|---|---|---|
+| bacc (deployed) | 0.950790 | — | — |
+| snap2 | 0.950964 | +0.000174 | 35 |
+| snap3 | 0.951023 | +0.000234 | 39 |
+| **snap4** | **0.951114** | **+0.000325** | **39** |
+
+It has never been run as a real 5-fold arm. Zero new infra: `S6E7_SNAP=4` already
+exists in `train_realmlp_td.py` and **changes `MODEL_NAME` to `realmlp_te13_snap4`**, so
+arrays and checkpoint dirs are distinct from the finals lineage by construction (unlike
+`S6E7_REALMLP_PARAMS`, which does not rename and needs a manual `S6E7_RUN_TAG`).
+
+**⚠️ Why the obvious experiment (run two 5-fold arms, compare dw-OOF) is the WRONG
+instrument.** A bacc-selected arm's OOF is inflated by max-over-epochs selection on the
+rows it is then scored on (+0.000186, measured); a snap-k arm averages the top-k epochs
+and is inflated LESS. A naive paired dw-OOF read is therefore biased **downward against
+snap4** by roughly the inflation gap — which is exactly how Day-10 recorded snapshot
+averaging as a "wash" (naive snap3 read +0.00009 vs honest +0.000234). This probe uses
+the same honest A/B instrument that produced the +0.000325 headline, extended to
+averaged members.
+
+**The question is not "is snap4 better at one member" (measured, yes) but "does it
+survive averaging over members".** Mechanism prior, stated before the run: snapshot
+averaging reduces the variance of a single member's val posterior; breadth averaging
+reduces the same variance component. **If they substitute, the deployed 8-seed breadth
+has already collected the gain and there is nothing to swap in** — the same shape as
+veto #18's "the LR meta is itself an averaging operator".
+
+**Protocol** (fold 1, u surface, 4 members = model seeds 42/7/123/2024 sharing ONE fold
+split and ONE TE block so their val rows are identical and averageable; 20 stratified
+A/B halvings, both directions; per-epoch val probs captured by the `probe_oof_selection`
+monkeypatch). Reported at M=1..4 so the shrinkage trajectory is visible.
+
+**PRE-REGISTERED BARS on the honest (snap4 − bacc) delta at M=4:**
+- **≥ +0.00015** and sign-consistent ⇒ **ESCALATE** to a real 5-fold `S6E7_SNAP=4` arm
+  (seeds 42/7/123/2024, ~1.5 h GPU) → N=8 → #2 swap **only** under the Lane-A rules:
+  beats the deployed #2 on the pairs MC by more than noise, **and** earns a submission
+  slot + `finals_audit.py` pass + byte verification.
+- **≤ +0.00005** ⇒ the two averaging mechanisms substitute; **STOP**, ~25 min spent.
+- between ⇒ INCONCLUSIVE, no swap. No post-hoc bar moving.
+
+**Honest prior — expect this to stop or land inconclusive.** 6/6 deltas this campaign
+escalated to a more-averaged instrument shrank ~50%; applying that to +0.000325 gives
+~+0.00016, i.e. between the bars. **#1 stays `lrstack_u4_r` regardless** (OOF cannot
+rank <0.001). Fresh model name on every run; u4's and the current #2's bytes untouched.
+
 ---
 
 ## 🏁 FINALS DECISION — 2026-07-26 (user called endgame: "wrap up s6e7, pick the submissions")
@@ -186,6 +242,11 @@ MC's 0.25; champion_v1 (2,357 rows, deficit 1.5e-3) → ~6 sd → ~0.000. It hed
 **meta/decision layer** (it is a plain 12-seed single-family breadth — no LR meta, no blend
 weights, no cross-leg fitting), which is the one part of #1 that is fitted on OOF and could
 fail to transfer. It does NOT hedge the te13 feature recipe, since it is a leg of u4.
+**Composition verified 2026-07-27**: the deployed arrays reproduce EXACTLY as the mean of
+the **8** per-seed arrays (42, 7, 123, 2024, 99, 2025, 31, 7777) — max|Δ| = 0.0 on both
+OOF and test. It is an **8-seed** breadth; the "12-seed" wording above was wrong.
+`realmlp_te13_u_breadth12` (the Day-13 overnight 12-seed key) is a DIFFERENT array
+(max|Δ| 0.11 vs the deployed one) and was never submitted.
 
 **Rejected, with reasons:**
 - `champion_v1` (most decorrelated, 2,357 rows) — insures against "the te13 recipe is an
