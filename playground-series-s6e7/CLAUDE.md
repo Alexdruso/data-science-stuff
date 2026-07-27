@@ -287,6 +287,110 @@ measured the BA surface in w-space to be nearly flat (w vectors differing by 0.2
 within 2e-5). These are cheap CPU cells run to convert two assumptions into measurements
 before the deadline, not levers anyone should expect to pay.
 
+### ▶ RESULTS — pre-registration #4 (post-freeze aggregate cells)
+
+**(A) META FITTING POPULATION — CLOSED BY MEASUREMENT** (`probe_meta_population.py` →
+`results/probe_meta_population.txt`). 12 split-half cells, adv density-ratio row weights
+built by Day-20's exact recipe (sd 0.455, **ESS 571,841/690,088 = 82.9%** — well powered),
+always *scored* unweighted on the held-out half because the deliverable is plain BA:
+
+```
+  lr        0.950705   (incumbent)
+  lr_advd   0.950703   -0.000002  (sd 0.000148, se 0.000043,  8/12)
+  lr_adv    0.950686   -0.000020  (sd 0.000142, se 0.000041,  6/12)
+```
+
+Best challenger **−0.000002** ⇒ under the +0.0001 closure bar. **The combiner coverage
+matrix is now complete on the population axis** — the LR stack is a local optimum in
+*which rows it is fit on* as well as in hypothesis class, regularization, objective,
+calibration and structure. Consistent with `probe_covariate_shift`: the shift is pure
+covariate, P(y|x) is unchanged, so reweighting the fit has nothing to find.
+**⚠️ Read `lr_adv` as the load-bearing arm** (clean, full fit rows). `lr_advd`
+additionally reweights the decision layer by acceptance-sampling the fit half, which
+retains only ~25-30% of its rows — so that arm carries a variance handicap that can only
+push it down. The closure holds a fortiori, but this is one clean negative plus one
+handicapped one, not two clean negatives.
+
+**(B) TUNE/APPLY SURFACE MISMATCH — CLOSED BY MEASUREMENT** (`probe_dw_surface_match.py`
+→ `results/probe_dw_surface_match.txt`). hgbc_te3 canary, 5 outer × 5 inner, te13 block
+held fixed per fold so the variable is model-averaging alone; 20 honest halves, both
+weight vectors scored on the *same* matched surface so the 64%-vs-80% level confound
+cancels exactly.
+
+```
+  SURFACE_D  (deployed, 1 model/row)   BA 0.950254   w_D = [0.9503, 0.9503, 1.0]
+  SURFACE_M  (matched, 5-model mean)   BA 0.950426   w_M = [0.9403, 0.9680, 1.0]
+  max|w_M - w_D| = 0.0177
+HEADLINE  BA(surface_M, w_M) - BA(surface_M, w_D) = -0.000030  (se 0.000016, 8/20 positive)
+```
+
+**Matching the tuning surface to the applied surface does not help — it is very slightly
+NEGATIVE.** Day-20's proxy-closure is upgraded to a measured one. Mild bonus finding: the
+noisier deployed surface is if anything the *better* one to tune on, a small
+regularization effect (weights fitted on a noisy surface generalize a touch better than
+weights fitted on a clean one).
+
+**⚠️ This cell's caveat points the UNSAFE way — the first one today that does, so it is
+flagged rather than buried.** SURFACE_M's sub-models each see 64% of the data (4/5 of 80%)
+and are therefore individually noisier than a deployed fold model, while the deployed
+*test* surface for a breadth leg averages 5 folds × 8 seeds ≈ 40 models. So the real
+tune/apply noise gap is **larger** than the one constructed here, and this read could
+**underestimate** the mismatch cost. The level confound cancels; the noise-magnitude
+confound does not. **What actually bounds the answer is independent of this probe**:
+Day-20 calibrated the BA surface in w-space as w vectors differing by **0.2** scoring
+within **2e-5**, and the two weight vectors here differ by **0.0177** — an order of
+magnitude less. The closure rests on that calibration, with the −0.000030 as corroboration
+rather than as the sole evidence.
+
+**(C) POOLING POSITION — CLOSED BY MEASUREMENT** (`probe_stack_order.py` →
+`results/probe_stack_order.txt`). Same 12 cells; the 5 non-breadth legs held fixed in both
+arms so the only difference is where the seed average sits relative to the nonlinear
+combiner:
+
+```
+  stack_then_avg4   0.950779   vs deployed +0.000074  (se 0.000028,  9/12)
+  avg_then_stack    0.950705   (incumbent)
+  stack_then_avg    0.950696   vs deployed -0.000009  (se 0.000019,  8/12)
+```
+
+**The matched comparison is the 8-stack arm** (the deployed legs are 8-seed breadths):
+**−0.000009**, under the closure bar. `meta(mean_s p_s)` and `mean_s meta(p_s)` differ by
+~1e-5 here — the Jensen gap through `clipped_logit` + a near-linear meta is real but
+negligible. **Where the two campaign mechanisms disagreed, veto #18 wins**: the LR meta
+really does behave as an averaging operator, so moving the averaging across it changes
+almost nothing.
+
+**⚡ And it is a FOURTH instance of the 1/M pattern.** The 4-stack arm reads **+0.000074
+(2.6 se, 9/12)** — but it is *not* matched (4 members against the deployed 8), and taking
+it to the matched 8 collapses it to −0.000009. Same shape as snap4, ji and the selection
+bias: an apparent positive at low member count that averaging removes. It would have been
+easy to report "+0.000074, 9/12 positive" as a lever; rule #3 is exactly what says not to.
+
+### ▶ Where that leaves the exempt list
+
+Rule #3 prices out the per-member class; these three cells were the aggregate-level
+exemptions. Auditing the pipeline stage by stage, the exempt list is now **exhausted as
+far as anyone in this campaign has been able to name it**:
+
+| stage | swept | verdict |
+|---|---|---|
+| features / encoding | every resolution of the 3-dim label channel (te13, combo2, pairs, exact triple), kNN density, freq, driver posteriors, rule deduction, external data | saturated |
+| fold scheme | K ∈ {5, 10, 15}; learning-curve slope 552k→644k | flat |
+| legs | 4 GBDT libraries, RealMLP, TabM, FTT, MLP, cascade, TabPFN-3, S1/DANN, distillation | 18 vetoes |
+| meta | hypothesis class · regularization · objective · calibration · structure · **population (A)** · **pooling position (C)** | local optimum on every axis |
+| decision layer | optimizer · bag count · Bayes certificate · per-class power · regime metas · joint assignment · population · **tune/apply surface (B)** | converged; 0 flips at q=0.8 |
+| M itself | breadth 1→12; solo level saturates by M≈6; `breadth12` ties `breadth8` | closed |
+
+Note the meta's OOF columns are already breadth averages over 8 *different* fold
+partitions, so a "repeated-CV meta surface" variant is covered implicitly.
+
+**This is not a ceiling claim** ([[feedback_premature_ceiling]]). Rule #3 explicitly
+exempts levers several × the seed-to-seed spread, and the table above says only that the
+inventory contains none that anyone has been able to name — not that none exists. What it
+does mean is that further per-member screening on this inventory has negative expected
+value, and the remaining variance in the outcome is private-split luck plus the two
+outstanding administrative actions (see `FINALS_ACTION.md`).
+
 ---
 
 ## ▶▶ DAY-21 RESULTS (2026-07-27) — both #2-slot canaries read; ⚡ the shared decay law is the day's real finding
