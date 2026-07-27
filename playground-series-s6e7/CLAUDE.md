@@ -338,7 +338,42 @@ promising reads died on escalation.
   (42, 7, 123, 2024, 99, 2025, 31, 7777), max|Δ| = 0.0 on both OOF and test.
   `realmlp_te13_u_breadth12` is a different, never-submitted array (max|Δ| 0.11).
   This also confirms the canaries were matched against the right incumbent.
-- Days 19-21 of probes/logs committed (they had never been); freeze tag cut.
+- Days 19-21 of probes/logs committed (they had never been); freeze tag
+  **`s6e7-freeze-2026-07-27`** cut.
+- **Fresh off-box tarball `~/s6e7_finals_backup_2026-07-27.tar.gz`** (139 MB, 25
+  artifacts) + `results/finals_backup_manifest_2026-07-27.sha256`. **`diff` of the sorted
+  07-22 and 07-27 manifests is EMPTY**: five days of probes — including two GPU canary
+  lanes and the 07-26 wrong-model incident — left every finals-lineage artifact
+  bit-for-bit unchanged. The fresh-`RUN_TAG` / distinct-key discipline is now *checkable*,
+  not asserted. **USER ACTION: copy the tarball off-box.**
+- **⚡ The backup was TEST-RESTORED for the first time** (four tarballs have been made
+  over the campaign and none was ever verified): extracted to a clean directory,
+  `sha256sum -c` on the manifest = **25/25 OK**. A backup nobody has restored is a
+  hypothesis, not a backup.
+
+### ▶ Two closing zero-compute reads (freeze-day gap-filling)
+
+- **`probe_bias_dilution.py` NEW — Day-20's largest open caveat RESOLVED, in the
+  predicted direction.** Day-20 measured the epoch-selection OOF optimism at +0.000186 on
+  ONE member and flagged the dilution across an 8-12-seed breadth as its biggest residual
+  uncertainty. Reusing today's cached per-epoch val probabilities (zero GPU): **BIAS(1) =
+  +0.000184** — a *third* independent replication of that instrument — decaying
+  1.00 / 0.68 / 0.24 / 0.15 / −0.11 / −0.07 / −0.36 / −0.02 to **BIAS(8) = −0.000003**.
+  ⇒ **the deployed 8-seed breadth OOF arrays are effectively HONEST.** Consequences, all
+  in the safe direction: the cross-leg LEVEL reads are re-established, Day-20's retraction
+  of *"realmlp is the strongest solo leg"* is itself retracted, and the #2 pick's
+  E[priv] 0.95072 was **not** inflated — so the existing #2 is *strengthened*, not
+  changed. (Deployed seeds also vary the fold split, which scatters the tilt further ⇒
+  ~0 is an upper bound.)
+- **`realmlp_te13_u_breadth12` finally evaluated as a #2 candidate** (`probe_breadth12.txt`;
+  it has sat on disk unassessed since Day-13). This is the one #2-slot mechanism screening
+  rule #3 does *not* kill in advance — it IS the averaging rather than a lever diluted by
+  it. Read: dw-OOF **0.950800 vs 0.950719 = +0.000081**, with only **115/295,753 test-label
+  disagreements (0.039%)**. By the tie-break fixed this morning that is a **tie ⇒ NO
+  SWAP** — and it agrees with the honest fold-1 curve, where the solo breadth level
+  saturates by M≈6 (0.950934 / 0.950962 / 0.950958 / 0.950966 at M=5..8). It was also
+  never submitted, and √115·5e-6 ≈ 5e-5 of tail sd is no hedge worth a slot.
+  **The "more seeds" axis for the solo #2 is closed by measurement.**
 
 ---
 
