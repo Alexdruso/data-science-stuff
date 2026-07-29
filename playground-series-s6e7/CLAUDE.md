@@ -135,6 +135,81 @@ Exponent ≈ 0 ⇒ escalate to the deployed M and read the level.
 
 ---
 
+## ▶▶ DAY-22 RESULTS (2026-07-29) — ⚡ the M-slope is a VALIDATED INSTRUMENT, and screening rule #3 is WRONG AS STATED
+
+**Finals UNCHANGED and byte-verified: #1 `lrstack_u4_r.csv` (`ed5a9bff`), #2
+`realmlp_te13_u_breadth.csv` (`8fd6904e`). Nothing here reaches the +0.001 deliverable
+bar. `FINALS_ACTION.md` is unchanged and the user's pending Kaggle click stands.**
+
+### ▶ Phase 1 — the controls (`probe_mslope.py` → `results/probe_mslope.txt`), VALIDATION PASS
+
+Day-21 induced rule #3 ("a per-member gain is worth ≈1/M at the deployed breadth") from
+**two levers that both decayed**, with no known-real comparison and no null distribution.
+This probe supplies both, magnitude-matched to ≈+0.0003 (the size of `snap4`/`ji`), on the
+`realmlp_te13_u` 8-seed arrays, decision weights **frozen** on the all-8 breadth so no read
+is a re-tuning of `w`, deltas averaged over 60 random seed orderings:
+
+| control | mechanism | exponent | boot sd | predicted |
+|---|---|---|---|---|
+| **C1** mix toward `onehot(y)` | uniform **mean shift** | **−0.027** | 0.012 | ≈ 0 |
+| **C2** seed-half vs seed-half, sign picked at M=1 | **selection noise** | **−0.417** | 0.178 | ≈ −0.5 |
+| **C3** shrink toward a *disjoint* 4-member average (identical mean) | **variance reduction** | **−1.002** | 0.086 | ≈ −1 |
+
+Gate: C1 above the C2 null band `[−0.773, −0.060]` ✓, C3 below it ✓, C1−C3 separation
+**11.2 sd** (bar ≥3) ✓ ⇒ **PASS**. All three land on their point predictions.
+
+**C1b (shrink toward the deployed u4 stack posterior) read −1.086, not ≈0 — my stated
+prediction was wrong, and the reason is the finding**: the u4 stack is itself an average
+over 8 legs × 8 seeds, so "shrink toward a better posterior" is *mechanically a variance
+reducer*, and it behaves like C3, not like C1. Reported as a failed prediction, not
+quietly dropped.
+
+### ▶ Phase 2 — the instrument on real levers (`probe_mslope_phase2.py`)
+
+| lever | seeds | M=1 delta | exponent | verdict |
+|---|---|---|---|---|
+| **`te13` recipe** (`realmlp_te13_u` vs `realmlp_u`) — a **KNOWN-REAL** +0.0004 lever, the 07-11 find | 3 | +0.000309 | **+0.146** (sd 0.065) | **MEAN SHIFT — does not dilute** |
+| `snap4` (Day-21 honest A/B, refit over M=1..4) | — | +0.000331 | −0.768 | null band / variance reduction |
+| `snap3` / `snap2` | — | — | −0.908 / −1.527 | **variance reduction** |
+| `ji` (Day-21 single ordering) | 4 | +0.000206 | −0.714 | inside the null band |
+
+**`te13` is the load-bearing read here**: a real, large, non-synthetic recipe lever whose
+advantage is *flat in M* (if anything it grows: +0.000309 → +0.000403 → +0.000351). It is
+the non-synthetic confirmation of C1 and it is what makes the instrument usable rather
+than an artefact of the synthetic controls.
+
+### ⚡⚡ THE FINDING — rule #3 is not a law about M, it is a law about MECHANISM
+
+> **A lever's decay exponent identifies what kind of thing it is.**
+> **≈ 0** — information/mean shift: worth its **full M=1 size** at any deployed breadth.
+> **≈ −0.5** — indistinguishable from selection noise.
+> **≈ −1** — variance reduction: substitutes for breadth averaging, worth ~1/M, dead at M≥8.
+
+Day-21's rule #3 — *"a lever measured at one member is worth ≈1/M at the deployed breadth;
+screen at the deployed M, never at M=1"* — generalised from a sample of two, and **both
+happened to be variance reducers**. As stated it is false for the only class that matters:
+`te13`, the single largest lever of the entire campaign, does not dilute at all. Rule #3
+was therefore pricing out the wrong class, and it was also *more expensive than necessary*
+(it demanded building the full deployed M).
+
+**⇒ SCREENING RULE #3′, replacing #3**: measure the delta at M = 1,2,3,4 and fit the
+exponent. Screen by **exponent first, magnitude second**. Four members, scale-free, no
+deployed-size build required.
+
+**⚠️ And the uncomfortable corollary, which is the part worth writing down**: a variance
+reducer is significantly positive at **every individual member** — that is what it does —
+and worth nothing at M=8. So *"replicated 4/4 seeds, se 2.2e-5"* — **the exact evidence
+`ji` presented on Day-21** — is the **signature of a variance reducer**, not evidence of
+information. Per-seed significance cannot distinguish the two. The M-slope can. This
+retro-explains the campaign's whole "6/6 escalated deltas shrank ~50%" folklore without
+needing a winner's-curse story for every case.
+
+**Not a ceiling claim** ([[feedback_premature_ceiling]]): the instrument makes screening
+*cheaper and sharper*, and it says an information lever survives to the deployed breadth
+intact. It does not say one exists.
+
+---
+
 ## 🎯 PRE-REGISTRATION — 2026-07-26 "hail Mary": leg-upgrade PASS-THROUGH (`probe_passthrough.py`)
 
 **Written BEFORE the run. Bars NOT to be moved afterwards.**
