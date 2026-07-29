@@ -72,6 +72,25 @@ C3  variance reduction        -1.002 +/- 0.086
 
 All three land on their point predictions; C1 and C3 separate by **11.2 sd**.
 
+**One check the controls needed.** C1 mixes toward `onehot(y)`, which adds mass in
+proportion to class frequency — so it shifts the optimal decision weights too (measured:
+max|Δw| = 0.104). If the "≈0" anchor were an artefact of scoring C1 under the *stock*
+arm's weights, the whole scale would be. Re-reading every control under three instruments,
+including plain argmax (no decision layer at all):
+
+| control | `w` stock | `w` challenger | argmax |
+|---|---|---|---|
+| C1 mean shift | −0.042 | −0.035 | **+0.031** |
+| C2 selection noise | −0.325 | −0.847 | −1.539 |
+| C3 variance reduction | −1.010 | −1.072 | **−1.004** |
+
+The **information-vs-variance-reduction** discrimination is robust: C1 ≈ 0 and C3 ≈ −1
+under all three, separating by 1.035 at 3.4 sd even with no decision layer. But **C2 is
+strongly instrument-dependent**, so the noise "null band" is not universal — quote verdicts
+by distance from the two robust anchors, not from the null band. That is a real limitation
+and it is why the two negative levers below are reported as *"not information"* rather than
+as *"variance reduction"* specifically.
+
 ## The real-lever test, and the surprise
 
 Synthetic controls prove the exponent *can* separate constructed mechanisms. The question

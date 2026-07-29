@@ -164,6 +164,36 @@ over 8 legs × 8 seeds, so "shrink toward a better posterior" is *mechanically a
 reducer*, and it behaves like C3, not like C1. Reported as a failed prediction, not
 quietly dropped.
 
+### ▶ Phase 1b — is the control scale robust to the DECISION-LAYER choice? (`probe_mslope_c1check.py`)
+
+C1 is the only control anchoring the "≈0" end, and **C1 shifts the optimal weights too**
+(stock `[1, 0.949, 0.800]` vs C1-perturbed `[1, 0.846, 0.735]`, max|Δw| **0.1037**) — so
+"frozen-`w` is neutral for the controls" needed measuring, not arguing. Each control
+re-read under three instruments, including **plain argmax, which has no decision layer to
+be confounded by**:
+
+| control | `w` stock | `w` challenger | **argmax** (calibration-free) |
+|---|---|---|---|
+| **C1** mean shift | −0.042 ± 0.013 | −0.035 ± 0.012 | **+0.031 ± 0.012** |
+| **C2** selection noise | −0.325 ± 0.264 | −0.847 ± 0.388 | −1.539 ± 0.630 |
+| **C3** variance reduction | −1.010 ± 0.113 | −1.072 ± 0.086 | **−1.004 ± 0.303** |
+
+**✅ The primary discrimination — information (C1) vs variance reduction (C3) — is ROBUST
+to the calibration choice.** C1 sits at ≈0 and C3 at ≈−1 under all three instruments;
+under calibration-free argmax they separate by 1.035 at 3.4 sd. The scale is measured, not
+asserted, and the frozen-`w` reading of the controls was sound.
+
+**⚠️ HONEST LIMITATION, and it revises how verdicts should be stated.** C2 is **strongly
+instrument-dependent** (−0.33 / −0.85 / −1.54) with large sd — so the null band
+`[−0.773, −0.060]`, quoted throughout the Phase-2 tables, is **specific to the `w_stock`
+instrument** and should not be treated as universal. Under argmax the noise null sits near
+C3 and the two are not separable.
+⇒ **State verdicts by distance from the two ROBUST anchors (C1 ≈ 0, C3 ≈ −1), and treat the
+C2 band as secondary.** No Day-22 verdict changes under this correction: te13 **+0.558**
+sits above C1 (information); `imp` **−0.850** and `ji` **−1.107** sit at C3 and far from
+C1 (not information). The "variance reduction vs selection noise" sub-distinction was
+already flagged as unseparated for both, and this is why.
+
 ### ▶ Phase 2 — the instrument on real levers (`probe_mslope_phase2.py`)
 
 | lever | seeds | M=1 delta | exponent | verdict |
