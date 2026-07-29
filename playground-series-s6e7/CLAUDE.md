@@ -248,6 +248,46 @@ te13**. So the correct statement is *`ji` is not information* — which is exact
 question that matters, and it **refutes Day-21's own framing** of ji as "a genuine mean
 shift that should have survived averaging and did not." It never was a mean shift.
 
+### ▶ Phase 2e — `imp` alone (`probe_imp_exponent.py`): the `ji` decomposition completes
+
+`run_imp_breadth.sh` built seeds 7/123 of the PURE `imp` arm (stock config + the Day-17
+driver-reconstruction block, no joint-TPE basin), giving 3 matched seeds. Seed 2024 was
+deliberately not run — 3 seeds is the minimum for an exponent and matches te13's; stated,
+not silently truncated. Same honest per-arm instrument:
+
+```
+   M           1         2         3
+   delta     +0.000173  +0.000098  +0.000068
+   EXPONENT  -0.850  (bootstrap sd 0.416)
+```
+
+**The full scale, one table:**
+
+| lever | exponent | class |
+|---|---|---|
+| **`te13` recipe** (real, +0.0004) | **+0.558** ± 0.138 | **INFORMATION** |
+| C1 oracle mean shift (synthetic) | −0.027 ± 0.012 | information (oracle, fully expressed at M=1) |
+| C2 selection noise (synthetic) | −0.417 ± 0.178 | noise — the **null band** |
+| **`imp`** (driver reconstruction) | **−0.850** ± 0.416 | not information (2.0 sd below 0) |
+| C3 variance reduction (synthetic) | −1.002 ± 0.086 | variance reduction |
+| **`ji`** (basin × imp) | **−1.107** ± 0.458 | not information (2.4 sd below 0) |
+
+⚡ **This re-characterises Day-17's headline.** The driver-reconstruction channel was
+recorded as *"a REAL replicated solo channel"* (+0.00015, two seeds) that seat vetoes #14
+and #17 then showed was combiner-absorbed. The M-slope says something stronger and
+simpler: **it is not an information channel at the ensemble level at all** — a brand-new
+*feature block* that nonetheless behaves like a variance reducer (3.4 sd below te13). The
+plausible mechanism is that a smoothed reconstructed driver stabilises each member in the
+missing-driver region rather than adding signal the ensemble did not already span — which
+is exactly what the archaeologist's 3-dimensional label-channel proof predicts.
+
+⚠️ Uncertainty stated: at ±0.416 `imp` overlaps the null band, so "variance reduction" vs
+"selection noise" is not separated. **"Not information" is the separated claim.**
+
+⚠️ Consequence for the activity-reconstruction gap found in Phase 3: it is in the *same
+family* as `imp`, so today's instrument prices it well below how it looked on discovery.
+Do not pitch it as a lever without an M-slope read.
+
 ### ▶ Phase 2c — DECISION RULE for te13's honest read, fixed BEFORE the number landed
 
 `probe_mslope_te13_honest.py` re-reads `te13` and `ji` with an honest per-arm decision
