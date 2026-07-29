@@ -255,6 +255,27 @@ missing-driver rows never have to teach a model the mixture. Sleep binned with t
 estimate). So the strongest reconstructable driver channel had never been built. That is
 the one genuinely new fact this leg produced.
 
+**Result — and it is decisive in the region the leg was designed for** (`probe_sm_screen.py`
+section A, `results/log_sm_screen.txt`):
+
+| model | dw-BA all | **missing-driver (178,413)** | complete |
+|---|---|---|---|
+| `sm_d22` | 0.94601 | **0.88469** | 0.96741 |
+| `realmlp_te13_u_breadth` (#2) | 0.95072 | **0.88931** | 0.97213 |
+| `lrstack_u4_r` (#1) | 0.95081 | **0.88962** | 0.97216 |
+
+**SM is worse on the missing-driver rows — the 86%-of-error region it was built to attack —
+by 0.0049.** That is the cleanest possible refutation: not "it adds nothing at the
+combiner", but "the explicit Bayes factorisation is a worse estimator of `P(y|x_obs)` than
+the trees' direct one, exactly where the factorisation was supposed to help." Error overlap
+with u4 is **0.908** (core-member fingerprint); it fixes 3,734 of u4's 40,579 errors (9.2%),
+55.7% of those in the missing-driver region.
+
+Blend preview (below) is the deployment read; the formal 12-cell seat test was **started and
+deliberately killed** to free cores for the two load-bearing instrument reads, since SM was
+already closed by a pre-registered bar and a stack-level seat could not change that. Stated,
+not silently dropped.
+
 **Result: `sm_d22` solo dw-BA 0.9460** (vs 0.95072 for the deployed realmlp breadth).
 Blend preview into the deployed breadth under frozen `w`, λ ∈ {0.02, 0.05, 0.10, 0.20},
 M = 1..8: **flat-to-negative everywhere**, monotonically worse in λ (λ=0.2 costs −0.0010).
