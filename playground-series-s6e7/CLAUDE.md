@@ -7,6 +7,134 @@ from lifestyle/biometric features.
 
 ---
 
+## 🎯 PRE-REGISTRATION #5 — 2026-07-29 (Day-22): is the **M-slope** an INSTRUMENT? (`probe_mslope.py`)
+
+**Written BEFORE any number is read. Bars NOT to be moved afterwards.**
+
+### The gap this attacks
+
+Day-21's screening rule #3 ("a per-member gain is worth ≈1/M at the deployed breadth")
+was induced from **two levers** (`snap4`, `ji`), both of which decayed. It was never
+tested against a lever *known* to be real, and it has **no null distribution** — so
+"ji decays at M^−0.71" currently cannot be distinguished from "any 1e-4-scale reading
+decays like that". Rule #3 is therefore a heuristic, not an instrument.
+
+If the decay exponent *does* separate mechanisms, it becomes something much stronger
+than a screening rule: a **diagnostic that tells you what kind of thing you measured**,
+from arrays already on disk, before spending any GPU. That is the claim under test.
+
+**The specific hypothesis** (mechanistic, stated as three point predictions):
+
+| lever mechanism | what averaging does to it | predicted exponent |
+|---|---|---|
+| **uniform mean shift** (real information: every member moves toward the truth) | nothing — the shift survives averaging by linearity | **≈ 0** |
+| **selection noise** (two arms differ only by seed; sign picked at M=1) | difference of two means shrinks by CLT | **≈ −0.5** |
+| **variance reduction** (the lever removes member noise) | competes *directly* with breadth averaging, which removes the same component from the stock arm too | **≈ −1** |
+
+⚠️ **The consequence, if true, is uncomfortable for this campaign's own evidence
+standard**: a variance-reducing lever is *significantly positive at every individual
+seed* (it lowers each member's noise) and *worth nothing at M=8*. "Replicated 4/4
+seeds, se 2.2e-5" — the exact evidence `ji` presented — is **the signature of a
+variance reducer, not of information.** Per-seed significance cannot tell the two
+apart. The M-slope can.
+
+### Design — magnitude-matched synthetic controls, disk-only, zero GPU
+
+All four `te13/te3` legs have the full 8 per-seed OOF arrays on disk
+(`realmlp_te13_u`, `hgbc_te3_u`, `lgbm_te3_u`, `catboost_te3_u`), so every control
+below is pure numpy on existing arrays.
+
+Base surface = a real leg's per-seed OOF. To make the mean-shift and variance-reduction
+arms *mechanically identical apart from the mechanism under test*, both are built on the
+same noise-injected base with the **same** noise draw `ε_m`:
+
+- stock member:      `q_m  = renorm(p_m + σ·ε_m)`
+- **C1 mean shift**: `q_m' = renorm(p_m + σ·ε_m + λ·e_y)`   (same ε; uniform shift toward truth)
+- **C3 var. reduc.**: `q_m' = renorm(p_m + (σ/2)·ε_m)`      (same ε, halved; **identical mean**)
+- **C1b label-free**: shift toward the deployed stack posterior instead of `e_y` (corroboration only)
+- **C2 null**:        arm A vs arm B = disjoint seed halves of the same leg, **sign chosen by
+  the M=1 read** (this reproduces the winner's-curse selection every real screen performs);
+  many partitions × orderings ⇒ the **null distribution of the exponent** and the slope MDE.
+
+`σ` and `λ` are calibrated by bisection so that **every arm reads ≈ +0.0003 at M=1** — the
+magnitude of `snap4`/`ji`. Magnitude matching is the whole point: an exponent difference
+measured between a +0.0009 lever and a +0.0003 lever would be confounded.
+
+Metric = the deployed one: balanced accuracy under **fixed** decision weights (fitted once
+per leg on the all-8-seed breadth, then frozen and applied to every arm at every M) so the
+read isolates the posterior change and never the re-tuning of `w`. Plain argmax reported as
+a secondary. Deltas averaged over many random seed orderings at each M.
+
+**C1 is instrument calibration and is QUARANTINED from every candidate path**: it consumes
+`e_y` and can never become a lever. It exists only to fix the "real information" end of the
+scale.
+
+### PRE-REGISTERED VALIDATION GATE (read this before anything else today)
+
+> **Does the exponent of the magnitude-matched KNOWN-REAL arm (C1) separate from the
+> magnitude-matched KNOWN-FAKE arms (C2 null band, C3) by more than the exponent
+> estimator's own noise?**
+
+- **PASS** = C1's exponent is above the C2 null band's upper edge **and** C3's exponent is
+  below it, with the C1−C3 separation ≥ 3× the null sd of the exponent. ⇒ the M-slope is a
+  validated instrument; proceed to apply it (Phase 2/3 below).
+- **FAIL** = the three arms' exponents are mutually inseparable at 1e-4 magnitudes. ⇒ the
+  M-slope cannot discriminate; **rule #3 stays a heuristic, this lane closes, and the day
+  pivots.** Report the negative — it is itself a correction to a Day-21 claim.
+
+### Phase 2 (only on PASS) — re-adjudicate what is already on disk
+
+Score the existing multi-seed contrasts with the validated instrument and report the
+exponent for each: `ji` (4 seeds, the rule-#3 exemplar), and the cross-family contrasts
+`hgbc_te3` / `lgbm_te3` / `catboost_te3` / `realmlp_te13` (8 seeds each — these are
+*recipe*-level differences, so they are the closest thing on disk to known-real levers
+that are not synthetic).
+
+⚠️ **Stated inventory limit, no silent truncation**: `te3knn`, `te3nb`, `te3ncw`, `te3p`,
+`te3rp`, `te3tri`, `s42t` (basin), `snap3`, `bll` and the other rejected micro-positives
+are **single-seed on disk**. An exponent needs ≥3 members per arm, so the "re-screen the
+whole rejected inventory" sweep is **not affordable** and is NOT being run. At most one
+candidate gets seeds built, chosen by Phase 3.
+
+### Phase 3 (only on PASS) — the candidate the instrument would license
+
+The one lever class veto #18 and rule #3 both explicitly leave open is a leg that differs
+**in kind**. Candidate: **structured marginalization of the missing driver** — for the
+178k missing-driver rows (86% of all residual error),
+
+  `P(y | x_obs) = Σ_b P̂(band_b | x_obs) · P̂(y | band_b, stress, activity)`
+
+with `P̂(band | x_obs)` a **3-class band classifier** (which side of the rule's 6/7 sleep
+cuts) and `P̂(y | cell)` fitted on the 511k complete-driver rows — **both fitted where the
+driver is observed**, and composed analytically, so the missing-driver rows never have to
+teach a model the mixture.
+
+**Prior art it must be distinct from, stated before building** (if it is not distinct, it
+is the same channel and is already dead):
+- `probe_miss_tta` (FLAT) marginalized over the **mask** at predict time using the model's
+  own `P(y|x_obs)`. It introduced no new estimator. This introduces two, fitted on the
+  complete rows.
+- Day-2's marginalization used the **marginal** `P(d)`, not `P(d | x_obs)`.
+- Day-17 `probe_impute_driver` (+0.00015 solo, seat vetoes #14/#17) fed a **point estimate**
+  `Ê[sleep|x_obs]` as a *feature*, leaving the model to learn the composition, and predicted
+  the **value** (R²=0.151) rather than the **band** the rule actually needs.
+
+**Phase-3 escalation bar, fixed now**: it is built at ≥3 seeds and screened by **exponent
+first**. Exponent in the C2 null band or below ⇒ **dead regardless of its M=1 size**.
+Exponent ≈ 0 ⇒ escalate to the deployed M and read the level.
+
+### Deliverable bars, fixed now (these do NOT move)
+
+- Nothing reaches a finals slot without clearing **+0.001 at the deployed M** on the honest
+  instrument, a submission slot, a `finals_audit.py` pass and byte verification.
+- **Day-21's tie-break stands: a tie means NO swap.** Status quo wins ties.
+- **#1 `lrstack_u4_r.csv` and #2 `realmlp_te13_u_breadth.csv` are the finals** unless
+  something clears the bar above. `FINALS_ACTION.md` is not to be contradicted; the user's
+  pending Kaggle click by ~Jul 31 is unaffected by anything in this lane.
+- Fresh `S6E7_RUN_TAG` on every run; u4's and #2's arrays and CSV bytes are never touched.
+
+---
+
 ## 🎯 PRE-REGISTRATION — 2026-07-26 "hail Mary": leg-upgrade PASS-THROUGH (`probe_passthrough.py`)
 
 **Written BEFORE the run. Bars NOT to be moved afterwards.**
