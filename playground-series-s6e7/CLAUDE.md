@@ -178,6 +178,37 @@ advantage is *flat in M* (if anything it grows: +0.000309 → +0.000403 → +0.0
 the non-synthetic confirmation of C1 and it is what makes the instrument usable rather
 than an artefact of the synthetic controls.
 
+> **⚠️ CONFOUND FOUND IN THIS TABLE, resolved below (`probe_mslope_te13_honest.py`).**
+> Frozen-`w` is neutral for C1/C2/C3 (they perturb ONE arm, so both arms share a
+> calibration) but **not** for `te13` or `ji`, which compare two different feature
+> matrices. The `ji` attribution run proves the point: the two arms want materially
+> different decision weights — stock `[1, 0.874, 0.900]` vs ji `[1, 1.161, 1.101]` after
+> renormalising — so imposing the stock arm's `w` on the challenger is a real penalty.
+> The frozen-`w` rows for `te13` and `ji` are therefore **level-confounded**; the exponent
+> is more robust (a fixed calibration penalty is largely M-independent) but that has to be
+> measured, not asserted. See "Phase 2b" below for the honest per-arm read.
+
+### ▶ Phase 2b — `ji`'s sign flip ATTRIBUTED (three instruments on the same 4 matched seeds)
+
+Day-21's `ji` canary (`probe_ji_canary.py:47-49`) fits `tune_decision_weights` **in-sample,
+per arm, on the full OOF**, then scores the same rows. That bundles two effects my frozen-`w`
+read strips out — per-arm *calibration* (legitimate, deployment-matched) and in-sample dw
+*optimism* (not legitimate). Separating them:
+
+| instrument | M=1 | M=2 | M=4 | exponent (M=1..4) |
+|---|---|---|---|---|
+| plain **argmax** (calibration-free) | +0.000186 | +0.000225 | +0.000110 | **−0.38** |
+| **per-arm in-sample dw** (Day-21's) | +0.000198 | +0.000135 | +0.000021 | **−1.62** |
+| **`w` frozen on the stock arm** (Phase 2) | −0.000027 | −0.000049 | −0.000176 | undefined |
+
+Per-seed argmax deltas are +0.000186 / +0.000338 / +0.000196 / +0.000257 — so `ji` **is**
+positive at every seed on a calibration-free instrument; the Phase-2 negative was the
+frozen-`w` penalty, not a property of `ji`. **The three instruments disagree on level and
+agree on direction: `ji` dilutes.** Day-21's STOP verdict stands, now with a mechanism
+instead of a single trajectory. What is *new* is that the amount of dilution is itself
+instrument-dependent (−0.38 vs −1.62), which is why Phase 2b was necessary before any
+exponent could be quoted for a two-matrix lever.
+
 ### ⚡⚡ THE FINDING — rule #3 is not a law about M, it is a law about MECHANISM
 
 > **A lever's decay exponent identifies what kind of thing it is.**
