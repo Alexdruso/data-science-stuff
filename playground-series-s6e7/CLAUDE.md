@@ -209,6 +209,30 @@ instead of a single trajectory. What is *new* is that the amount of dilution is 
 instrument-dependent (−0.38 vs −1.62), which is why Phase 2b was necessary before any
 exponent could be quoted for a two-matrix lever.
 
+### ▶ Phase 2c — DECISION RULE for te13's honest read, fixed BEFORE the number landed
+
+`probe_mslope_te13_honest.py` re-reads `te13` and `ji` with an honest per-arm decision
+layer (weights fitted on the fit half, scored on the eval half, 12 cells, all subsets per
+size). The verdict rule, written down in advance so the headline is not chosen after the
+fact:
+
+- **exponent > −0.060** (above the C2 null band) ⇒ te13 confirms C1 **non-synthetically**;
+  the "real information does not dilute" headline stands.
+- **exponent inside the null band** ⇒ the honest statement becomes *"the instrument is
+  validated on constructed perturbations; the one real-lever confirmation did not survive
+  per-arm calibration."* Rule #3′ still holds on C1/C2/C3 and the sample-of-two critique of
+  Day-21 is untouched — but the CLAUDE.md table above **and** `notes/mslope_writeup.md`
+  (which asserts te13 as confirmation in two places) must both be edited.
+
+⚠️ **Either way the wording is "consistent with", not "confirms"**: te13 has only 3 seeds,
+so the exponent is fit on 3 points with a non-monotone trajectory. A passing read is weak
+evidence on its own; it is the *agreement* with C1 that carries it.
+
+Same discipline for `imp` when its seeds land: screen it on the **honest per-arm**
+instrument (it is a two-matrix comparison and inherits the identical confound), and note
+that its ceiling is +0.00013 — a scientific data point for rule #3′, **not** a route to the
+#2 slot. A flat exponent must not be re-read as a finals candidate.
+
 ### ▶ Phase 3 — STRUCTURED MARGINALIZATION (`train_sm.py`, leg `sm_d22`): built, and **DEAD at the pre-registered bar**
 
 The one lever class veto #18 and rule #3 both leave open is a leg that differs *in kind*.
