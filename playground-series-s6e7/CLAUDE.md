@@ -209,6 +209,42 @@ instead of a single trajectory. What is *new* is that the amount of dilution is 
 instrument-dependent (−0.38 vs −1.62), which is why Phase 2b was necessary before any
 exponent could be quoted for a two-matrix lever.
 
+### ▶ Phase 3 — STRUCTURED MARGINALIZATION (`train_sm.py`, leg `sm_d22`): built, and **DEAD at the pre-registered bar**
+
+The one lever class veto #18 and rule #3 both leave open is a leg that differs *in kind*.
+Built as pre-registered: `P(y|x_obs) = Σ_{b,s,a} P̂(b|x_obs)P̂(s|x_obs)P̂(a|x_obs)·P̂(y|b,s,a)`,
+with the cell posterior fitted fold-safely on the 511,675 complete-driver rows and the
+three driver imputers fitted **label-free on train+test pooled** (986k rows) — so the
+missing-driver rows never have to teach a model the mixture. Sleep binned with the rule's
+6/7 cuts forced as bin edges.
+
+**Free diagnostic worth keeping** — the driver imputers, in-sample on observed rows:
+
+| driver | k | logloss gain vs prior | top-1 vs prior |
+|---|---|---|---|
+| `physical_activity_level` | 3 | **+0.5515** | **0.712** vs 0.339 |
+| `sleep_duration` (11 bins) | 11 | +0.1261 | 0.221 vs 0.195 |
+| `stress_level` | 3 | +0.0515 | 0.471 vs 0.432 |
+
+⚡ **Activity is by far the most recoverable driver, and Day-17's `imp` block reconstructs
+`sleep_duration` ONLY** (`imp_features.py:23`, `DRIVER = "sleep_duration"`, a point
+estimate). So the strongest reconstructable driver channel had never been built. That is
+the one genuinely new fact this leg produced.
+
+**Result: `sm_d22` solo dw-BA 0.9460** (vs 0.95072 for the deployed realmlp breadth).
+Blend preview into the deployed breadth under frozen `w`, λ ∈ {0.02, 0.05, 0.10, 0.20},
+M = 1..8: **flat-to-negative everywhere**, monotonically worse in λ (λ=0.2 costs −0.0010).
+The delta crosses zero ⇒ the exponent is **undefined** ⇒ by the pre-registered Phase-3 bar
+("blend delta negative or crossing zero ⇒ dead, do not reach for a λ that makes it look
+alive") **SM is CLOSED. Inventory only, not a partial win.**
+
+Honest reading: the factorised form is a *correct* Bayes decomposition, and it is still
+worse — because under MCAR the trees already estimate `P(y|x_obs, pattern)` directly and
+the composition buys nothing, exactly as the Day-2 marginalisation and `probe_miss_tta`
+verdicts said. The 11-bin cell table is also a coarser sleep resolution than te13's, which
+alone would cost more than the composition could return. **The distinctness argument
+pre-registered for this leg was real; the channel is still empty.**
+
 ### ⚡⚡ THE FINDING — rule #3 is not a law about M, it is a law about MECHANISM
 
 > **A lever's decay exponent identifies what kind of thing it is.**
