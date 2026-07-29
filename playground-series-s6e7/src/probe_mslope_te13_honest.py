@@ -32,13 +32,12 @@ from pathlib import Path
 
 import numpy as np
 from joblib import Parallel, delayed
-from sklearn.metrics import balanced_accuracy_score
+
 from sklearn.model_selection import StratifiedShuffleSplit
 
 sys.path.insert(0, str(Path(__file__).parent))
+from fast_dw import ba_fast, fit_dw
 from train_common import RESULTS_DIR, load_dataset
-
-from data_science_stuff.kaggle_utils import tune_decision_weights, weighted_predict
 
 N_SPLITS = 6
 NULL_LO, NULL_HI = -0.773, -0.060
@@ -59,8 +58,16 @@ ARMS: list[tuple[str, list[str], list[str]]] = [
 
 
 def _decide(y_fit, p_fit, p_eval, y_eval) -> float:  # noqa: ANN001
-    dw = np.asarray(tune_decision_weights(y_fit, p_fit))
-    return float(balanced_accuracy_score(y_eval, weighted_predict(p_eval, dw)))
+    """Honest per-arm decision layer: fit w on the fit half, score on the eval half.
+
+    Uses `fast_dw.fit_dw` (coarse-to-fine grid) rather than `tune_decision_weights`
+    (Nelder-Mead): on this piecewise-constant objective the grid is ~30x faster AND finds
+    a strictly better optimum (+0.000077 BA on the deployed 8-seed breadth, verified in
+    `fast_dw.selftest`). Identical fitter on both arms, so it is common-mode in the delta.
+    """
+    dw = fit_dw(y_fit, p_fit)
+    counts = np.bincount(y_eval, minlength=p_eval.shape[1])
+    return ba_fast(y_eval, np.argmax(p_eval * dw, axis=1), counts)
 
 
 def _cell(C, S, y, f, e, m_max):  # noqa: ANN001, ANN202

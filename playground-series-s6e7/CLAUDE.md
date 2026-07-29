@@ -178,6 +178,10 @@ advantage is *flat in M* (if anything it grows: +0.000309 → +0.000403 → +0.0
 the non-synthetic confirmation of C1 and it is what makes the instrument usable rather
 than an artefact of the synthetic controls.
 
+> **✅ CONFOUND RESOLVED — see "Phase 2d" below. Both levers were re-read with an honest
+> per-arm decision layer and the verdicts got SHARPER, not weaker: te13 **+0.558**, ji
+> **−1.107**. The frozen-`w` confound pointed the conservative way for te13.**
+
 > **⚠️ CONFOUND FOUND IN THIS TABLE, resolved below (`probe_mslope_te13_honest.py`).**
 > Frozen-`w` is neutral for C1/C2/C3 (they perturb ONE arm, so both arms share a
 > calibration) but **not** for `te13` or `ji`, which compare two different feature
@@ -208,6 +212,41 @@ agree on direction: `ji` dilutes.** Day-21's STOP verdict stands, now with a mec
 instead of a single trajectory. What is *new* is that the amount of dilution is itself
 instrument-dependent (−0.38 vs −1.62), which is why Phase 2b was necessary before any
 exponent could be quoted for a two-matrix lever.
+
+### ⚡⚡ Phase 2d — THE DECISIVE READ (`probe_mslope_te13_honest.py`): honest per-arm decision layer, 12 cells, all subsets per size
+
+Both levers re-read with weights fitted on the fit half and scored on the eval half — the
+deployment-matched instrument, no in-sample optimism, no frozen-`w` calibration penalty:
+
+| lever | M=1 | M=2 | M=3 | M=4 | **exponent** | verdict |
+|---|---|---|---|---|---|---|
+| **`te13`** (known-real, +0.0004) | +0.000216 | +0.000354 | +0.000391 | — | **+0.558** ± 0.138 | **INFORMATION** |
+| **`ji`** (Day-21's exemplar) | +0.000295 | +0.000201 | +0.000133 | +0.000055 | **−1.107** ± 0.458 | variance reduction |
+
+**Both pre-registered branches resolve in the strong direction.** te13's exponent is
+**+0.558, i.e. 4.5 sd ABOVE the null band's upper edge (−0.060)** — so the "real
+information does not dilute" claim keeps its non-synthetic confirmation, and the earlier
+frozen-`w` read (+0.146) was *conservative*, not inflated. The wording stays "consistent
+with" (3 points), but it is now consistent at 4.5 sd rather than 2 sd.
+
+**⚡ And te13's advantage does not merely survive averaging — it GROWS (+0.000216 →
++0.000391, monotone).** That sharpens the whole framework:
+
+> **Averaging REVEALS information and DESTROYS noise.**
+> At M=1 both arms are noisy, and member noise randomly throws boundary rows to the wrong
+> side, *masking* a systematic edge. Averaging removes that mask, so a real information
+> advantage is more fully expressed at M=8 than at M=1. C1's ≈0 is the *oracle* case (a
+> uniform shift is already fully expressed at M=1, so it neither grows nor shrinks); a
+> realistic information lever, partly masked at M=1, reads **b > 0**.
+
+Revised scale: **b > 0 information · b ≈ −0.5 selection noise · b ≈ −1 variance reduction.**
+
+**⚠️ Honest uncertainty on `ji`**: −1.107 ± 0.458 *overlaps* the null band (only 0.7 sd
+below its lower edge), so "variance reduction" vs "selection noise" is not separated. What
+IS separated, decisively, is **information**: ji sits 2.4 sd below zero and **3.6 sd below
+te13**. So the correct statement is *`ji` is not information* — which is exactly the
+question that matters, and it **refutes Day-21's own framing** of ji as "a genuine mean
+shift that should have survived averaging and did not." It never was a mean shift.
 
 ### ▶ Phase 2c — DECISION RULE for te13's honest read, fixed BEFORE the number landed
 

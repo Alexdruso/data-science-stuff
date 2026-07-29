@@ -32,7 +32,8 @@ import numpy as np
 from sklearn.metrics import balanced_accuracy_score
 
 sys.path.insert(0, str(Path(__file__).parent))
-from train_common import RESULTS_DIR, load_dataset, robust_decision_weights
+from fast_dw import fit_dw
+from train_common import RESULTS_DIR, load_dataset
 
 SEEDS = [42, 7, 123, 2024, 99, 2025, 31, 7777]
 LEG = "realmlp_te13_u"
@@ -69,7 +70,7 @@ def main() -> None:
     if cache.exists():
         w_c1 = np.asarray(json.loads(cache.read_text()))
     else:
-        w_c1 = robust_decision_weights(y, c1_full.astype(np.float64))
+        w_c1 = fit_dw(y, c1_full.astype(np.float64))
         cache.write_text(json.dumps(w_c1.tolist()))
 
     lines: list[str] = []
