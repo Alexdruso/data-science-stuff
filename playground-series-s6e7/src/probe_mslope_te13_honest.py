@@ -40,6 +40,15 @@ from fast_dw import ba_fast, fit_dw
 from train_common import RESULTS_DIR, load_dataset
 
 N_SPLITS = 6
+# ⚠️ SUPERSEDED AS A VERDICT THRESHOLD by `probe_mslope_c1check.py` (Phase 1b): the C2
+# selection-noise band is STRONGLY INSTRUMENT-DEPENDENT (-0.33 w_stock / -0.85 w_chal /
+# -1.54 argmax), so these numbers are specific to the w_stock instrument and are NOT a
+# universal null. The robust anchors are C1 ≈ 0 (information) and C3 ≈ -1 (variance
+# reduction), which separate by 3.4 sd even under calibration-free argmax.
+# READ VERDICTS BY DISTANCE FROM C1 AND C3, not from this band; and say "not information"
+# rather than "variance reduction" when a negative overlaps both. The VERDICT strings
+# printed below are kept for continuity with the Day-22 logs — no verdict changes under
+# the corrected reading.
 NULL_LO, NULL_HI = -0.773, -0.060
 OUT = RESULTS_DIR / "probe_mslope_te13_honest.txt"
 
