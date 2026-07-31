@@ -117,6 +117,109 @@ unless something clears the bar above; `FINALS_ACTION.md` is not to be contradic
 
 ---
 
+## ▶▶ DAY-23 RESULTS (2026-07-31, FINAL DAY) — `dp` CLOSED at the pre-registered bar; **driver STRENGTH does not rescue the reconstruction family**
+
+**Finals UNCHANGED and byte-verified before AND after the run: #1 `lrstack_u4_r.csv`
+(`ed5a9bff`), #2 `realmlp_te13_u_breadth.csv` (`8fd6904e`). `finals_audit` 2026-07-31 ALL OK
+across the 6-file menu. Zero finals-lineage files were written today — every artifact landed
+under distinct `_dp` keys.**
+
+### ▶ The lane
+
+3 GPU seeds (42/7/123), 15:16–16:02, ~15.5 min/seed, no incidents; the `S6E7_TE13=1` +
+post-run-key assert hardening carried over from `run_imp_breadth.sh` and the recipe did not
+drift (`oof_realmlp_te13_dp_u_s{42,7,123}.npy` all appeared as expected).
+
+**Raw solo dw-OOF, paired against the same-seed stock twins** (`results/cv_scores.csv`):
+
+| seed | stock `realmlp_te13_u` | `dp` | Δ |
+|---|---|---|---|
+| 42 | 0.950449 | 0.950514 | **+0.000065** |
+| 7 | 0.950421 | 0.950506 | **+0.000085** |
+| 123 | 0.950511 | 0.950457 | **−0.000054** |
+| | | **mean** | **+0.000032** (2/3) |
+
+Already below `imp`'s +0.00013 solo — the *stronger* driver, given as a full posterior plus the
+rule's own band partition, is worth *less* at one member than the weaker driver as a scalar.
+
+### ▶ The decisive read (`probe_dp_exponent.py` → `results/probe_dp_exponent.txt`)
+
+Honest per-arm decision layer, 12 cells, all `C(3,M)` subsets per size:
+
+```
+   M           1         2         3
+   delta     +0.000072  -0.000016  -0.000023
+   se        +0.000025  +0.000018  +0.000035
+   norm.     +1.000000  -0.216962  -0.326813
+   EXPONENT  nan   (bootstrap sd 0.734, only 12/400 resamples finite)
+```
+
+**VERDICT: DEAD.** The delta **crosses zero** between M=1 and M=2, so the exponent is
+undefined — which the pre-registration explicitly covered ("an exponent that cannot be fit is
+not evidence of information"), the same rule Phase-3 `sm_d22` was closed under. No escalation,
+no level read, bars not moved.
+
+**This is a sharper negative than `imp`.** `imp` stayed positive and decayed
+(+0.000173 → +0.000098 → +0.000068, exponent −0.850). `dp` starts at **less than half** of
+imp's M=1 and **inverts**. The pre-registered question — *does driver strength change the
+exponent?* — is answered cleanly: **no.** The most recoverable driver (+0.5515 nats, top-1
+0.712 vs 0.339) behaves no better than the least recoverable one; the reconstruction family is
+not an information channel at the ensemble level regardless of how much driver signal is
+recoverable, exactly as the 3-dimensional label-channel proof predicts.
+
+⚠️ **Honest statement of what is and isn't established.** M=1 is +0.000072 at **2.9 se**, so a
+small *single-member* effect is real. M=2 and M=3 are −0.000016 (se 1.8e-5) and −0.000023
+(se 3.5e-5) — both within ~1 se of zero, so the correct claim is **"≈0 at M≥2"**, *not*
+"reliably negative". The undefined exponent is a genuine limitation of the instrument on a
+sign-changing delta, not a verdict dressed up as one. What is decisively excluded is the
+information end: nothing here resembles te13's +0.558.
+
+### ▶ Day-7's `train_dp.py` veto RE-EARNED on the modern recipe
+
+Day-7 measured driver posteriors as features at −0.0002 solo (pre-te13, repaired surface, LGBM
+consumer) and that verdict had been carried on a stale instrument ever since. It now holds at
+te13, on the u surface, through the smooth consumer, with the strongest driver and the rule-band
+masses added. **Instructive contrast with the other two pre-TE-era re-runs**: FTT went
+0.9478 → 0.9504 and TabM 0.9489 → 0.9504 because te13 lifted the *whole leg*. `dp` is an
+**additive block on a leg that already has te13**, so no such lift is available — the te13
+block already spans what the driver posteriors carry. That is the mechanism, and it is the same
+one the archaeologist's kill-shot named.
+
+### ▶ Free by-product: a fifth instance of the averaging law, and the first that INVERTS
+
+snap4, ji, the 4-stack pooling arm and the OOF selection bias all decayed toward zero under
+member averaging. `dp` is the first measured case that crosses to the other side. Consistent
+with Day-22's sharpened framing — *averaging REVEALS information and DESTROYS noise* — a lever
+with no information content has nothing to reveal, so once averaging strips the member noise
+that produced its M=1 positive, what remains is the block's cost (20 extra input columns) rather
+than its benefit.
+
+### ▶ Reusable infra added (permanent, inert at default)
+
+- **`src/dp_features.py`** — `dp_block(ds)`: 20 label-free columns (P(driver|x_obs) × 3 drivers,
+  11+3+3, plus the three rule-band masses `P(sleep<6)/P(6≤sleep<7)/P(sleep≥7)`). Fold-INVARIANT
+  by construction (no label involved ⇒ nothing to cross-fit), asserts array shape, row-sum and
+  the train/test split point against the row-order invariant.
+- **`S6E7_DP=1`** in `train_realmlp_td.py` with `MODEL_NAME` segment `_dp`; `S6E7_REPAIR_FIT` +
+  `DP` is now an explicit assert (the cached posteriors are u-surface; serving them against
+  remasked fold-train rows would be a silent surface mismatch).
+- **`src/run_dp_breadth.sh`**, **`src/probe_dp_exponent.py`**.
+- ⚠️ **Deliberately did NOT reuse `imp_features.imp_block_for_fold`**: its cache key
+  `imp_{tag}_s{seed}_f{fold}.npz` does not encode the driver, so a second driver would have
+  collided byte-for-byte with the 20 existing `imp_u_*` entries and silently served stale sleep
+  blocks. **That latent trap is still there** for anyone who adds a driver to that module.
+
+### ▶ Day-23 net
+
+1 measured cell, 0 adoptable levers (campaign-normal), 1 **document-level defect found and
+fixed that mattered more than any lever**: the deadline was wrong by two days in every file and
+unsourced since Day-2, so the "≥48 h before the deadline" protocol margin never existed. Finals
+unchanged, re-verified twice. **Not a ceiling claim** ([[feedback_premature_ceiling]]) — it
+closes the driver-reconstruction family at both ends of driver strength, and says nothing about
+a channel nobody has named.
+
+---
+
 ## 🎯 PRE-REGISTRATION #5 — 2026-07-29 (Day-22): is the **M-slope** an INSTRUMENT? (`probe_mslope.py`)
 
 **Written BEFORE any number is read. Bars NOT to be moved afterwards.**
