@@ -3,7 +3,117 @@
 **Task**: 3-class classification — predict `health_condition` ∈ {`at-risk`, `fit`, `unhealthy`}
 from lifestyle/biometric features.
 **Metric**: Balanced accuracy (mean per-class recall).
-**Deadline**: ~August 2, 2026.
+**Deadline**: **2026-07-31 23:59** — corrected 2026-07-31 from the "~August 2" that every
+document in this repo had carried unsourced since Day-2. Source: `kaggle competitions list -s
+playground-series-s6e7` (deadline column only — no scores read, LB-blind protocol intact); the
+Python API returns the same value with `tzinfo=None`, so the timezone is **not** established
+from the API. Kaggle's convention is UTC; assume the earlier (local) reading when acting.
+
+---
+
+## 🎯 PRE-REGISTRATION #6 — 2026-07-31 (Day-23, FINAL DAY): does DRIVER STRENGTH rescue the reconstruction family? (`dp_features.py` / `probe_dp_exponent.py`)
+
+**Written BEFORE the GPU lane finished and BEFORE any number was read. Bars NOT to be
+moved afterwards.**
+
+### ⚠️ FIRST: the deadline in this file was WRONG
+
+`kaggle competitions list -s playground-series-s6e7` reports **`2026-07-31 23:59`**, not the
+"~August 2" this document had carried, unsourced, since Day-2. The Python API returns the same
+value with `tzinfo=None`, so the timezone is **not established** — Kaggle's convention is UTC
+(01:59 CEST Aug 1); act on the earlier (local) reading. **The campaign's "select finals ≥48 h
+before the deadline" protocol was calibrated against a date nobody ever queried, and that margin
+never existed.** Header + `FINALS_ACTION.md` corrected. The only action that decides this
+competition is the user's manual click, and it is now same-day.
+
+### The gap this attacks
+
+Day-22's M-slope priced `imp` — Day-17's driver-reconstruction channel — at exponent
+**−0.850**, "not information", and re-characterised the Day-17 "REAL channel" as a variance
+reducer. But `imp` reconstructs the **weakest** of the three missing drivers
+(`sleep_duration`, R² 0.151), as a **scalar point estimate**. Day-22's own `train_sm.py`
+diagnostic found the opposite end of the range had never been built:
+
+| driver | logloss gain vs prior | top-1 vs prior |
+|---|---|---|
+| `physical_activity_level` | **+0.5515** | **0.712** vs 0.339 |
+| `sleep_duration` (11 bins) | +0.1261 | 0.221 vs 0.195 |
+| `stress_level` | +0.0515 | 0.471 vs 0.432 |
+
+**The question**: does driver *strength* change the exponent, or is the whole reconstruction
+family a variance reducer regardless of how much driver signal is recoverable? Day-22 explicitly
+deferred this ("it is in imp's family, so price it by M-slope before pitching it"). Either
+answer is informative, which is the bar for spending the GPU.
+
+### The arm — `dp`, 20 columns, near-zero build cost
+
+`dp_features.dp_block`: `P(driver | x_obs)` for all three drivers (11 + 3 + 3 cols) **plus the
+three rule-band masses of the sleep posterior** (`P(sleep<6)`, `P(6≤sleep<7)`, `P(sleep≥7)` —
+the rule's own two cuts are exact bin edges of `train_sm.SLEEP_EDGES`). The band columns are the
+Rung-2-parallel argument that made te13 pay: a tree gets that partition from splits for free, a
+smooth net cannot synthesise it from an 11-way posterior.
+
+The posteriors were already on disk (`results/sm_imp_*.npy`, `985,841 × k`, built by
+`train_sm.py`) ⇒ **no imputer to fit**. Consumer = **RealMLP** (`S6E7_DP=1`, `MODEL_NAME`
+segment `_dp`), seeds 42/7/123, matched with the stock arm *and* with `imp`'s 3 seeds so all
+three exponents are directly comparable.
+
+**Leak-safety**: the imputers predict a *driver*, never the label, fitted on train+test pooled
+observed rows — the construction `train_dp.py` was accepted under. The block is therefore
+fold-INVARIANT and needs no cross-fitting.
+
+⚠️ **Deliberately NOT reusing `imp_features.imp_block_for_fold`**: its cache key
+`imp_{tag}_s{seed}_f{fold}.npz` does **not encode the driver**, so a second driver would collide
+byte-for-byte with the 20 existing `imp_u_*` entries and silently serve stale sleep blocks — the
+identical bug class `_kseg()` was added for on Day-15. New module, new flag, new `MODEL_NAME`
+segment ⇒ distinct keys by construction. `S6E7_REPAIR_FIT` + `DP` is now an explicit assert
+(the cached posteriors are u-surface; serving them against remasked fold-train rows would be a
+silent surface mismatch).
+
+### Prior art it must be distinct from, stated before building
+
+Day-7's **`train_dp.py` did exactly this and measured FAIL** (3 transductive driver posteriors,
++9 cols, solo −0.0002, blend +0.0001). What makes this a legitimate re-run rather than a repeat:
+that verdict is **pre-te13, repaired-surface, LGBM-consumer**. It is the same "pre-TE-era veto
+re-earned on the deployed recipe" pattern that moved FTT 0.9478 → 0.9504 and TabM 0.9489 →
+0.9504 (both of which then failed their seat tests honestly). Additions this time: the strongest
+driver as a *posterior* rather than the weakest as a point estimate, the rule-band masses, and
+the smooth consumer.
+
+### PRE-REGISTERED BARS (screening rule #3′ — exponent first, magnitude second)
+
+Instrument = the honest per-arm decision layer (`probe_mslope_te13_honest._cell`: weights fitted
+on the fit half, scored on the eval half, 12 cells, all `C(3,M)` subsets per size, 400 bootstrap
+resamples). `dp` vs stock is a **two-matrix** comparison, so frozen-`w` would inherit the
+Phase-2b calibration confound — the honest instrument is the only admissible one.
+
+- **exponent ≤ −0.060** (the C2 band's upper edge; i.e. at/below `imp` −0.850 or C3 −1.002)
+  ⇒ **DEAD regardless of its M=1 size.** No escalation, no level read.
+- **exponent > 0** (the te13 +0.558 / C1 information end) ⇒ **ESCALATE**: extend to the deployed
+  M and read the level.
+- between ⇒ **INCONCLUSIVE.** Report, do not adopt.
+- A #2 swap additionally requires **≥ +0.001 at the deployed M**, a submission slot, a
+  `finals_audit.py` pass and byte verification. **A TIE MEANS NO SWAP** (Day-21's tie-break,
+  unchanged) — the deployed #2 is byte-verified and already scored on Kaggle; a fresh artifact
+  is neither.
+
+### ⏰ HARD STOP 17:00 CEST, fixed now
+
+A #2 swap needs: clear +0.001 → 5 more GPU seeds → submission slot → audit → byte verification
+→ **the user re-clicks**. That chain cannot start after 17:00 against a same-day deadline.
+**Anything not past its bar by 17:00 is closed by the clock and reported as such.** No bar gets
+softened to fit the schedule; 22 days of that discipline should not break on day 23.
+
+### Honest prior, stated before the number
+
+**Expect a clean negative**, for three independent reasons: (1) `imp` read −0.850 and this is
+the same family; (2) `train_dp.py` already measured this channel at −0.0002 solo; (3) the
+motivating +0.5515 / 0.712 diagnostic is **in-sample** and fitted on **train+test pooled**, and
+activity's mask is trigger-coupled in train but uniform in test (`P(NaN | smoking='occasional')`
+= 0.161 train vs 0.054 test — the Day-4 mechanism shift sits directly on this channel), so the
+fold-honest effect is smaller than the diagnostic suggests. **Reporting a clean negative against
+unmoved bars is the successful outcome.** Finals are `lrstack_u4_r` / `realmlp_te13_u_breadth`
+unless something clears the bar above; `FINALS_ACTION.md` is not to be contradicted.
 
 ---
 
@@ -1024,8 +1134,9 @@ OOF and test. It is an **8-seed** breadth; the "12-seed" wording above was wrong
 With ~48 `lbprobe_*` submissions that were explicitly hill-climbed against the public split
 (measured contamination: +0.00076 fakeable in 3 casual rounds, `results/lbprobe_ruler.txt`),
 best-public is very likely a probe artifact — precisely the s6e6 failure mode where the
-best-public pick took the worst private transfer. Click the two files above by hand,
-**≥48h before the ~2026-08-02 deadline** (per the campaign's own protocol).
+best-public pick took the worst private transfer. Click the two files above by hand.
+⚠️ **The "≥48h before the ~2026-08-02 deadline" instruction was WRONG** — the real deadline is
+**2026-07-31 23:59** (see the header). The 48 h margin is unachievable; click immediately.
 
 **Byte verification (done 2026-07-26):** both picks' sha256 are identical in
 `finals_backup_manifest_2026-07-15.sha256`, `_2026-07-22.sha256` and on disk today —

@@ -56,6 +56,13 @@ KNN = os.environ.get("S6E7_KNN", "") not in ("", "0")
 # smooth consumer is the remaining test (completed driver = the rule's own
 # coordinate). Additive: read is paired vs realmlp_te13.
 IMP = os.environ.get("S6E7_IMP", "") not in ("", "0")
+# S6E7_DP=1 (Day-23): append the label-free DRIVER-POSTERIOR block
+# (dp_features.dp_block, 20 cols — P(driver|x_obs) for all three drivers + the three
+# rule-band masses of the sleep posterior). Distinct from S6E7_IMP, which reconstructs
+# only sleep_duration and only as a scalar point estimate; activity is the most
+# recoverable driver (Day-22) and had never been fed to a strong leg. Additive:
+# everything else identical, so the read is paired vs realmlp_te13.
+DP = os.environ.get("S6E7_DP", "") not in ("", "0")
 # S6E7_ESEL=bll (Day-10 eve): epoch selection by balanced LOGLOSS instead of
 # balanced accuracy — the field verified BA-as-selection is noise-prone; our
 # strongest leg has always epoch-selected on BA. S6E7_SNAP=k: average softmax
@@ -79,6 +86,7 @@ MODEL_NAME = (
     + ("_te13" if TE13 else "")
     + ("_knn" if KNN else "")
     + ("_imp" if IMP else "")
+    + ("_dp" if DP else "")
     + ("_bll" if ESEL == "bll" else "")
     + (f"_snap{SNAP}" if SNAP else "")
 )
@@ -107,7 +115,10 @@ def main() -> None:
     nd = NNData(ds)
     nd_fit = None
     if ds.train_fit is not None:
-        assert not (RULE or KNN), "S6E7_REPAIR_FIT not wired for rule/knn recipes"
+        # DP: the cached posteriors were fitted on the PLAIN (u) matrix, so under
+        # repair-at-fit-only they would serve u-surface driver posteriors against
+        # remasked fold-train rows — a silent surface mismatch. Forbid the combo.
+        assert not (RULE or KNN or DP), "S6E7_REPAIR_FIT not wired for rule/knn/dp recipes"
         from dataclasses import replace
 
         nd_fit = NNData(replace(ds, train=ds.train_fit, train_fit=None))
@@ -157,6 +168,13 @@ def main() -> None:
             i_tr, i_te, _ni = imp_block_for_fold(ds, tr_idx, seed, fold, _BASE_TAG)
             te_tr_full = np.concatenate([te_tr_full, i_tr], axis=1)
             te_te = np.concatenate([te_te, i_te], axis=1)
+        if DP:
+            from dp_features import dp_block
+
+            # fold-invariant (label-free, no cross-fitting needed) — see dp_features.py
+            d_tr, d_te, _nd = dp_block(ds)
+            te_tr_full = np.concatenate([te_tr_full, d_tr], axis=1)
+            te_te = np.concatenate([te_te, d_te], axis=1)
         # per-fold mixed matrices (repair-at-fit-only): fold-train rows from the
         # remasked view, val rows plain — X_all.iloc[tr_idx] is then the fit surface
         cat_all, num_all, miss_all = nd.Xcat_tr, nd.Xnum_tr, nd.miss_tr

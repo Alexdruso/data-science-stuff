@@ -6,7 +6,16 @@ to read it to act on this.*
 
 ---
 
-## 1. Click these two submissions on Kaggle — deadline ~**July 31**
+## 1. Click these two submissions on Kaggle — deadline **2026-07-31 23:59**
+
+> **⚠️ CORRECTED 2026-07-31.** This file and `CLAUDE.md` previously said the deadline was
+> "~August 2". **It is not.** `kaggle competitions list -s playground-series-s6e7` reports
+> `2026-07-31 23:59:00`; the Python API returns the same value as a **naive** datetime
+> (`tzinfo=None`), so the timezone is not established from the API alone. Kaggle's own
+> convention is UTC (= 01:59 CEST on Aug 1), but **assume the earlier reading (23:59 local)**
+> and act accordingly. The campaign's "select ≥48 h before the deadline" protocol was
+> calibrated against a date nobody had ever checked and is now unachievable — which is
+> exactly why this is the first thing on the page.
 
 | slot | file | sha256 (first 16) |
 |---|---|---|
@@ -23,7 +32,8 @@ publicly and mean nothing privately (measured: +0.00076 of public score was fake
 three casual rounds). Auto-select would very likely hand in a probe artifact. This is
 exactly how s6e6 went wrong: the best-public pick took the worst private transfer.
 
-Do it at least 48 h before the ~August 2 deadline, in case the UI or your login misbehaves.
+**Do it now.** The 48 h margin this page used to recommend no longer exists — the deadline is
+tonight.
 
 ---
 
