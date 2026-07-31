@@ -1,4 +1,13 @@
-# S6E7 — WHAT YOU STILL HAVE TO DO
+# S6E7 — ✅ DONE (2026-07-31)
+
+> **The two finals were selected on Kaggle by the user on 2026-07-31, before the
+> `2026-07-31 23:59` deadline.** `lrstack_u4_r.csv` (#1) and `realmlp_te13_u_breadth.csv`
+> (#2), byte-verified `ed5a9bff` / `8fd6904e` on the day. Nothing below is outstanding;
+> it is kept as the record of what was handed in and why.
+
+---
+
+# S6E7 — WHAT YOU STILL HAVE TO DO (historical)
 
 *One page. Everything else about this competition is finished and frozen
 (`git tag s6e7-freeze-2026-07-27`). Full reasoning lives in `CLAUDE.md`; you do not need
