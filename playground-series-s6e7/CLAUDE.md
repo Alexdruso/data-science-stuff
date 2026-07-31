@@ -117,6 +117,98 @@ unless something clears the bar above; `FINALS_ACTION.md` is not to be contradic
 
 ---
 
+## ▶▶ DAY-23 EVENING — user challenge ("you give up too easily… it seems suspicious") ⇒ re-screening the REJECTED pile. **A THIRD MECHANISM CLASS FOUND: slow decayers. Two vetoes lose their standing; neither is a lever.**
+
+**Finals UNCHANGED and byte-verified after every lane (`ed5a9bff` / `8fd6904e`).**
+
+### ▶ The process defect the challenge exposed (conceded, not spun)
+
+Day-22 proved per-seed significance cannot distinguish information from variance reduction —
+then pointed the new instrument only at levers that were **already dead** (`imp`, `ji`, `snap`),
+all of which confirmed it. **The rejected pile — every arm closed under exactly the standard
+just invalidated — was never revisited.** The stated reason was that those arms are single-seed
+on disk and building seeds "is not affordable": a **budget** argument, which expires the moment
+the box is idle. Day-23 morning then compounded it — one GPU experiment while 12 cores sat idle,
+and a "hard stop" that is the right deadline for a *swap chain* wrongly applied to stop
+*learning*.
+
+### ▶ ⚠️ TWO SELF-CORRECTIONS — 3-point exponents are not trustworthy
+
+Both arms were first read at 3 seeds, reported as information, and **both corrected when
+extended**:
+
+| arm | 3-point read | extended read | members |
+|---|---|---|---|
+| `basin` (hgbc TPE config) | +0.475 ± 0.291 | **−0.158 ± 0.128** | 6 |
+| `k10` (fold scheme) | +0.007 ± 0.138 | **−0.269 ± 0.166** | 5 |
+
+`basin`'s trajectory is **non-monotone** (+0.000134 → +0.000163 → +0.000150 → +0.000144 →
++0.000138 → +0.000087); the M=1→M=2 rise dominated a 3-point log-log fit and manufactured the
+growth. **⇒ METHOD RULE: do not fit an exponent to 3 points, especially a non-monotone one.**
+(Day-22's te13 +0.558 is also 3 points, but its honest per-arm trajectory is *monotone*
+increasing — a different and less fragile situation than basin's. Do not equate them.)
+
+### ▶ ⚠️ TOOL DEFECT, mine, in `probe_exponent_any.py`
+
+Its canned verdict string routes through the **C2 null band** and printed *"indistinguishable
+from selection noise"* for both arms. **Day-22 Phase-1b explicitly DEPRECATED that band as
+instrument-specific** and said to read verdicts by distance from the robust C1/C3 anchors. By
+the correct rule both arms are **4.4 and 6.6 sd ABOVE C3** — decisively not variance reducers.
+The printed strings are misleading; the anchors are what the reports must be read by.
+
+### ⚡ THE ACTUAL FINDING — a third class the C1/C2/C3 scale did not name
+
+| arm | exponent | vs C3 (var. red.) | vs C1 (mean shift) | leg level |
+|---|---|---|---|---|
+| `basin` | −0.158 ± 0.128 | **+6.6 sd** | −1.0 sd | +0.000182 (8/8 seeds) |
+| `k10` | −0.269 ± 0.166 | **+4.4 sd** | −1.5 sd | +0.000145 (5/5 seeds) |
+
+Both are **slow decayers**: far from the ≈−1 variance-reduction class, decaying too much to
+call information, sitting between C1 and C2. The original per-seed screen could not see this
+distinction, and the campaign filed both as ordinary vetoes.
+
+**⇒ And this is what closes the question honestly.** Extrapolating `k10` at M^−0.269 from
++0.000166 to the deployed M=8 gives **≈ +0.0001** — an order of magnitude under the +0.001 bar.
+Granting these are real and slow-decaying, they are worth ~1e-4 at deployment. **The morning's
+ceiling claim was unjustified in its REASONING and appears correct in its CONCLUSION** — which
+are different things, and only the second one was ever in evidence.
+
+### ▶ Veto #18's MECHANISM tested at the deployed M (`probe_passthrough_basin8.py`, pre-registered)
+
+Veto #18 justified killing the whole "improve a leg" class with a mechanism: *"the LR meta is
+itself an averaging operator, so leg changes that work BY AVERAGING are what it already
+extracts."* That predicts a **non**-averaging lever should pass through. Veto #18 swapped the
+basin in at **ONE seed**, so it only ever saw the M=1 slice. The 8-seed basin breadth built
+tonight made the matched test possible for the first time:
+
+```
+  lr_stock   0.950705     lr_basin8  0.950742
+  DELTA      +0.000037   se 0.000029   6/12   pass-through 20.3%
+```
+
+**INCONCLUSIVE** between the pre-registered +0.00003 / +0.00010 bars. The tempting read —
+"20.3% vs veto #18's 2.6%, the mechanism survives" — is **not supportable**: 1.3 se from zero
+and **6/12 is a coin flip**. Neither vindicated nor refuted; if anything it leans absorbed.
+Bars not moved.
+
+### ▶ Also closed: `dp`'s seat test (`probe_seat_dp.py`) — the read skipped in the morning
+
+`lrdp` +0.000046 (10/12), `lrdp1` +0.000046 (9/12) ⇒ **VETO #19**, under the instrument's own
+6.5e-5 MDE. The 3-seed breadth reads **identical** to the single seed — another instance of
+veto #18's averaging-operator by-product.
+
+### ▶ Day-23 evening net
+
+New permanent infra: **`src/probe_exponent_any.py`** (generic M-slope screener — point it at
+arm/stock key patterns, so the pile is re-adjudicated by measurement not by memory),
+`probe_seat_dp.py`, `probe_passthrough_basin8.py`, an 8-seed `basin` breadth and 5 `k10` seeds.
+Two vetoes lose their standing as *evidence* while keeping their *verdict*; one new mechanism
+class named; two of my own over-readings retracted within the hour. **Zero levers, finals
+unchanged.** Not a ceiling claim — but the screen that would have hidden a lever has now been
+pointed at the pile, and what it found is real and ~10× too small.
+
+---
+
 ## ▶▶ DAY-23 RESULTS (2026-07-31, FINAL DAY) — `dp` CLOSED at the pre-registered bar; **driver STRENGTH does not rescue the reconstruction family**
 
 **Finals UNCHANGED and byte-verified before AND after the run: #1 `lrstack_u4_r.csv`
