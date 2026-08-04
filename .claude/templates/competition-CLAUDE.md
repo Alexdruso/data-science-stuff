@@ -10,7 +10,10 @@ Model it on the worked examples in `playground-series-s6e5/CLAUDE.md` (regressio
 
 **Task**: <binary classification / multiclass / regression> — predict `<TARGET>` (<plain description>)
 **Metric**: <AUC-ROC / RMSE / accuracy / …>
-**Deadline**: <YYYY-MM-DD>
+**Deadline**: <YYYY-MM-DD> — **queried from the source**, `kaggle competitions list -s <id>`,
+on <YYYY-MM-DD>. Never carry a deadline that no document sourced: an unsourced "~Aug 2" ran
+through 22 days of s6e7 planning and the real date was Jul 31, which deleted the endgame
+margin the whole protocol assumed.
 
 ---
 
@@ -103,7 +106,8 @@ All features implemented in `src/features.py::build_features()` (+ `compute_grou
 ## Modelling notes
 
 - **Shared utilities live in `data_science_stuff.kaggle`** (io / device / cv / blending /
-  decision / encoding / stacking / models) — import, never copy, season-specific scripts.
+  decision / encoding / stacking / screening / shift / models) — import, never copy,
+  season-specific scripts.
 - **CV**: `run_cv` from `data_science_stuff.kaggle.cv` (<5-fold stratified, random_state=42>).
   Scores logged to `results/cv_scores.csv`.
 - **GPU**: <which models use GPU and how>.
@@ -122,6 +126,39 @@ All features implemented in `src/features.py::build_features()` (+ `compute_grou
   `data_science_stuff.kaggle.decision.optimize_thresholds(oof, y)` → `(weights, score)`;
   save via `kaggle.io.save_threshold_weights` to `results/threshold_weights_*.json` and apply
   the identical weights to test.
+
+---
+
+<!--
+Keep this section once the easy gains are gone and every candidate reads ±0.0003. Delete it
+while the score is still moving in units of 0.001. The rules behind it are in the repo root
+CLAUDE.md ("Campaign lessons"); this is where you record *this* competition's numbers.
+-->
+
+## Plateau protocol
+
+- **Pre-registration.** Before running a candidate, write here: the arm, the instrument, the
+  prior (what you honestly expect), and the pass/fail bar. **Bars do not move after the number
+  lands.** A clean negative against an unmoved bar is a successful experiment.
+- **Screening bar.** Screen by the decay exponent
+  (`data_science_stuff.kaggle.screening.screen_mechanism`), then by magnitude at the deployed
+  ensemble size — never by a single-member read, and never by "significant at every seed".
+  Instrument calibration measured on this competition:
+  | control | expected `b` | measured |
+  |---|---|---|
+  | mean shift (`mean_shift_control`, label-consuming, quarantined) | ≈ 0 | <b> |
+  | selection noise (`selection_null_arms`) | ≈ -0.5 | <band> |
+  | variance reduction (`variance_reduction_control`) | ≈ -1 | <b> |
+- **Deliverable bar**: <the delta, at the deployed configuration, that would actually change a
+  submission>. Discard candidates whose plausible effect is below it — they are unrankable by
+  any signal available, so they are never worth a submission slot.
+- **Combiner route.** If the deliverable is a stack, state whether the lever has a route to it:
+  a stack over multi-seed breadths absorbs both added legs and improved legs. Only a leg that
+  differs *in kind* moves it.
+- **Cache keys** must encode every dimension that varies (tag, seed, fold, *and* the variant) —
+  a colliding key silently serves a stale block.
+- **Vetoes log**: <numbered list of closed lever classes, each with the measurement that closed
+  it — so a later session does not re-pitch one>.
 
 ---
 

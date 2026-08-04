@@ -16,9 +16,11 @@ A Python monorepo containing:
   `tune_decision_weights`, ...); the `kaggle/` subpackage holds the competition machinery
   extracted from s6e5/s6e6: `io` (paths/params/submissions), `device` (LightGBM CUDA probe),
   `cv` (`run_cv` fold loop), `blending` (Nelder-Mead blend weights, diversity report),
-  `decision` (threshold weights, Bayes cost matrix, cascade recombination), `encoding`
-  (fold-safe target encoding, quantile bins, frequency features), `stacking` (`stack_oof`,
-  Caruana selection), and `models` (MLP scaffold, RealMLP-TD, imbalance losses).
+  `decision` (threshold weights — grid and Nelder-Mead fitters, bootstrap bagging, Bayes cost
+  matrix, cascade recombination), `encoding` (fold-safe target encoding, quantile bins,
+  frequency features), `stacking` (`stack_oof`, Caruana selection), `screening` (the M-slope
+  mechanism instrument, from s6e7), `shift` (adversarial validation + mask-mechanism
+  diagnostics, from s6e7), and `models` (MLP scaffold, RealMLP-TD, imbalance losses).
 
 ## Setup
 
@@ -110,6 +112,70 @@ Three invariants are critical and have each caused (or nearly caused) real failu
 
 Per-competition `CLAUDE.md` files capture the dataset, EDA findings, current best, and an
 experiments log; read them before working in a competition directory.
+
+## Campaign lessons (earned, mostly on s6e7 — read before proposing a lever)
+
+Late in a campaign the scores plateau and every candidate looks like ±0.0003. These are the
+rules that separate the real ones from the rest. Each cost days to learn; none is obvious.
+
+**Measuring a candidate**
+
+1. **Screen by the decay exponent, not by per-seed significance.** Measure the paired delta at
+   M = 1, 2, 3, 4 members and fit `|delta| ~ M**b`: `b > 0` is information (averaging *reveals*
+   it), `b ≈ -0.5` is selection noise, `b ≈ -1` is variance reduction and is dead at any
+   deployed breadth. "Positive at every seed with a tiny standard error" is exactly what a
+   worthless lever looks like — a variance reducer is significantly positive at every single
+   member by construction. Use `kaggle.screening.screen_mechanism`; derivation and the measured
+   controls are in `playground-series-s6e7/notes/mslope_writeup.md`.
+2. **Calibrate the instrument before quoting it.** Magnitude-match the known-real and known-fake
+   controls (`mean_shift_control` / `variance_reduction_control`) on your own data; the
+   selection-noise band is instrument-dependent and must never be imported from another
+   competition.
+3. **Fit the decision layer honestly, per arm.** When challenger and stock are two *different*
+   feature matrices their posteriors are calibrated differently, and freezing one arm's weights
+   across both flips signs. Fit on one half, score on the other, both directions.
+4. **Do not fit an exponent (or any slope) on three points.** s6e7 published a `+0.475` from a
+   3-point fit and had to correct it to `-0.158` at six.
+5. **A step-function objective needs a grid, not a simplex.** `balanced_accuracy(argmax(p·w))`
+   is piecewise constant; Nelder-Mead cannot converge on it and burns its full budget every
+   call. `decision.tune_decision_weights_grid` is ~30× faster *and* found a better optimum.
+6. **OOF cannot rank below its noise floor.** Under covariate shift (`shift.adversarial_validation`
+   AUC ≥ 0.6) absolute CV↔LB calibration can stay excellent while the *ordering* of
+   sub-0.001 candidates is noise. Trust OOF for coarse decisions only.
+
+**Where a lever has to pay**
+
+7. **A strong combiner absorbs leg-level gains — added legs *and* improved legs.** An LR stack
+   over multi-seed breadths is itself an averaging operator, so it already extracts anything
+   that works by averaging or by a small mean shift: s6e7 measured a leg improved by +0.00045
+   solo delivering +0.00001 to the stack. Only a leg that differs *in kind* moves a stack.
+   Price every lever at the deliverable, never at the leg.
+
+**Data**
+
+8. **Check the missingness *mechanism*, not the missing rate.** s6e7's train masks were
+   deterministic trigger rules and its test masks were uniform *at identical marginal rates* —
+   invisible to every rate-level check, and worth real score. `shift.mask_mechanism_report`
+   compares per-column MAR AUCs across splits; `shift.unseen_mask_patterns` counts test rows
+   whose pattern is impossible in train.
+9. **Surfaces do not mix.** If you repair a train/test discrepancy by altering the train matrix,
+   every OOF array produced that way lives on a different surface, reads systematically lower,
+   and may only be compared with — or stacked against — arrays from the same surface.
+
+**Process**
+
+10. **Pre-register the bar before the number lands, and do not move it afterwards.** Write the
+    arm, the instrument, the prior, and the pass/fail threshold into the competition CLAUDE.md
+    *before* running. State what the honest expected outcome is; a clean negative against an
+    unmoved bar is a successful experiment.
+11. **Verify inherited facts at their source.** An unsourced deadline propagated through 22 days
+    of s6e7 planning and was wrong by two days — which silently deleted the "select finals ≥48 h
+    early" margin the whole endgame protocol assumed.
+12. **A cache key must encode every dimension that varies.** A key of `{tag}_s{seed}_f{fold}`
+    that omits, say, which driver is being imputed will silently serve a stale block for the
+    second one.
+13. **Flat closes an experiment, not an avenue.** Do not report a plateau as a ceiling; say what
+    was measured and what class of lever remains untested.
 
 ## Architecture Conventions
 

@@ -12,9 +12,23 @@ expressiveness:
 
 :func:`cascade_combine` recombines nested-binary cascade stages (a diversity
 lever: factor a k-class problem into sequential binaries).
+
+**Which per-class weight fitter to use.** ``argmax(proba * w)`` scored by
+balanced accuracy is a *piecewise-constant* objective, and Nelder-Mead cannot
+reach a tight tolerance on a step function — it burns its whole iteration
+budget on every call (s6e7 measured ~45k objective evaluations per call, which
+turned a 5-minute probe into a multi-hour one). :func:`tune_decision_weights_grid`
+runs a coarse-to-fine grid instead: ~30x faster *and* it found a strictly
+better optimum (+0.000077 balanced accuracy on a deployed 8-seed ensemble).
+Prefer it for new work and inside any loop;
+:func:`data_science_stuff.kaggle_utils.tune_decision_weights` (Nelder-Mead)
+stays the default of :func:`optimize_thresholds` so previously scored
+artifacts remain reproducible.
 """
 
 from __future__ import annotations
+
+from collections.abc import Callable
 
 import numpy as np
 from numpy.typing import NDArray
@@ -22,6 +36,12 @@ from scipy.optimize import minimize
 from sklearn.metrics import balanced_accuracy_score
 
 from data_science_stuff.kaggle_utils import tune_decision_weights, weighted_predict
+
+# Fits per-class weights from ``(y, proba)``; both weight fitters match it.
+WeightFitter = Callable[[NDArray[np.int64], NDArray[np.float64]], NDArray[np.float64]]
+
+# Class count with a dedicated log-ratio fast path in the grid weight fitter.
+FAST_PATH_CLASSES = 3
 
 
 def optimize_thresholds(
@@ -53,6 +73,205 @@ def optimize_thresholds(
     weights = tune_decision_weights(y, oof_proba, seed=seed, n_restarts=n_restarts)
     score = float(balanced_accuracy_score(y, weighted_predict(oof_proba, weights)))
     return weights, score
+
+
+def balanced_accuracy_fast(
+    y: NDArray[np.int64],
+    pred: NDArray[np.int64],
+    *,
+    n_classes: int | None = None,
+) -> float:
+    """Balanced accuracy (mean per-class recall) via two ``bincount`` calls.
+
+    Equivalent to :func:`sklearn.metrics.balanced_accuracy_score` (classes
+    absent from ``y`` are skipped, as sklearn does) but without building a
+    confusion matrix — worth having in any loop that scores millions of rows
+    thousands of times, such as :mod:`data_science_stuff.kaggle.screening`.
+
+    >>> import numpy as np
+    >>> y = np.array([0, 0, 1, 1])
+    >>> balanced_accuracy_fast(y, np.array([0, 0, 1, 0]))
+    0.75
+    """
+    k = n_classes if n_classes is not None else int(y.max()) + 1
+    counts = np.bincount(y, minlength=k).astype(np.float64)
+    hits = np.bincount(y[pred == y], minlength=len(counts)).astype(np.float64)
+    present = counts > 0
+    return float(np.mean(hits[present] / counts[present]))
+
+
+def _grid_weights_3class(
+    y: NDArray[np.int64],
+    proba: NDArray[np.float64],
+    grid: int,
+    rounds: int,
+    span: float,
+) -> NDArray[np.float64]:
+    """Exhaustive coarse-to-fine 2-D grid over the two free log-weights.
+
+    The decision depends only on the two log-ratios: with weights ``(1, a, b)``
+    and ``u = log p1 - log p0``, ``v = log p2 - log p0``, class 1 wins iff
+    ``u + log a > 0`` and ``u + log a >= v + log b``. Precomputing ``u, v``
+    makes each grid point two adds and three comparisons rather than an
+    ``(n, 3)`` multiply plus argmax.
+    """
+    counts = np.bincount(y, minlength=FAST_PATH_CLASSES).astype(np.float64)
+    log_p = np.log(np.clip(proba, 1e-12, None)).astype(np.float32)
+    u = log_p[:, 1] - log_p[:, 0]
+    v = log_p[:, 2] - log_p[:, 0]
+    is_0, is_1, is_2 = (y == c for c in range(FAST_PATH_CLASSES))
+
+    def score_at(log_a: float, log_b: float) -> float:
+        a, b = u + np.float32(log_a), v + np.float32(log_b)
+        one = (a > 0) & (a >= b)
+        two = (b > 0) & (b > a)
+        zero = ~(one | two)
+        return float(
+            (
+                np.count_nonzero(zero & is_0) / counts[0]
+                + np.count_nonzero(one & is_1) / counts[1]
+                + np.count_nonzero(two & is_2) / counts[2]
+            )
+            / 3.0,
+        )
+
+    center = np.zeros(2)
+    for _ in range(rounds):
+        axes = [np.linspace(c - span / 2, c + span / 2, grid) for c in center]
+        best, best_point = -1.0, center
+        for log_a in axes[0]:
+            for log_b in axes[1]:
+                value = score_at(float(log_a), float(log_b))
+                if value > best:
+                    best, best_point = value, np.array([log_a, log_b])
+        center, span = best_point, span / (grid / 3.0)
+    return np.concatenate([[0.0], center])
+
+
+def _grid_weights_general(
+    y: NDArray[np.int64],
+    proba: NDArray[np.float64],
+    grid: int,
+    rounds: int,
+    span: float,
+) -> NDArray[np.float64]:
+    """Coarse-to-fine *coordinate* grid over the K-1 free log-weights.
+
+    A full K-1 dimensional grid costs ``grid**(K-1)`` evaluations per round;
+    sweeping one coordinate at a time costs ``grid * (K - 1)`` and is adequate
+    here because the surface is nearly separable in the class weights (s6e7
+    measured weight vectors 0.2 apart scoring within 2e-5 of each other).
+    """
+    n_classes = proba.shape[1]
+    counts = np.bincount(y, minlength=n_classes).astype(np.float64)
+    log_p = np.log(np.clip(proba, 1e-12, None))
+    log_w = np.zeros(n_classes)
+
+    def score_at(candidate: NDArray[np.float64]) -> float:
+        pred = np.asarray(np.argmax(log_p + candidate, axis=1), dtype=np.int64)
+        hits = np.bincount(y[pred == y], minlength=n_classes).astype(np.float64)
+        present = counts > 0
+        return float(np.mean(hits[present] / counts[present]))
+
+    best = score_at(log_w)
+    for _ in range(rounds):
+        for j in range(1, n_classes):
+            axis = np.linspace(log_w[j] - span / 2, log_w[j] + span / 2, grid)
+            for value in axis:
+                candidate = log_w.copy()
+                candidate[j] = value
+                score = score_at(candidate)
+                if score > best:
+                    best, log_w = score, candidate
+        span /= grid / 3.0
+    return log_w
+
+
+def tune_decision_weights_grid(
+    y: NDArray[np.int64],
+    proba: NDArray[np.float64],
+    *,
+    grid: int = 17,
+    rounds: int = 3,
+    span: float = 2.4,
+    fit_n: int = 0,
+    seed: int = 42,
+) -> NDArray[np.float64]:
+    """Per-class decision weights by coarse-to-fine grid search (max-normalized).
+
+    A grid is the right tool for the piecewise-constant surface
+    ``balanced_accuracy(argmax(proba * w))``: it cannot be fooled by the flat
+    regions that make a simplex method exhaust its iteration budget without
+    converging. Drop-in alternative to
+    :func:`data_science_stuff.kaggle_utils.tune_decision_weights` — see the
+    module docstring for why it is both faster and (measurably) better.
+
+    Class 0 is pinned at weight 1 (the rule is scale-invariant, so there are
+    K-1 free parameters). With ``K == 3`` an exhaustive 2-D grid over the two
+    log-ratios is used; otherwise coordinate sweeps.
+
+    Args:
+        y: Encoded ground-truth labels.
+        proba: (n, n_classes) probabilities.
+        grid: Points per axis per round.
+        rounds: Coarse-to-fine refinement rounds (each shrinks the span).
+        span: Width of the initial log-weight window.
+        fit_n: If non-zero, subsample this many rows to *fit* the weights. The
+            weight vector has only K-1 free parameters, so a large fit sample
+            buys nothing; score on the full split via
+            :func:`data_science_stuff.kaggle_utils.weighted_predict`.
+        seed: RNG seed for the ``fit_n`` subsample.
+
+    Returns:
+        (n_classes,) weights normalized so the largest entry is 1.
+    """
+    if fit_n and len(y) > fit_n:
+        idx = np.random.default_rng(seed).choice(len(y), fit_n, replace=False)
+        y, proba = y[idx], proba[idx]
+    if proba.shape[1] == FAST_PATH_CLASSES:
+        log_w = _grid_weights_3class(y, proba, grid, rounds, span)
+    else:
+        log_w = _grid_weights_general(y, proba, grid, rounds, span)
+    weights = np.exp(log_w)
+    return np.asarray(weights / weights.max(), dtype=np.float64)
+
+
+def bagged_decision_weights(
+    y: NDArray[np.int64],
+    proba: NDArray[np.float64],
+    *,
+    n_bags: int = 8,
+    seed: int = 42,
+    fitter: WeightFitter | None = None,
+) -> NDArray[np.float64]:
+    """Bootstrap-bagged per-class weights, averaged in log space.
+
+    A single fit on the full OOF is unstable: s6e7 measured ~0.004 balanced
+    accuracy of spread depending on the slice the optimizer saw. Averaging the
+    log-weights over bootstrap resamples costs ``n_bags`` fits and removes that
+    dependence — cheap now that the default fitter is the grid rather than
+    Nelder-Mead.
+
+    Args:
+        y: Encoded ground-truth labels.
+        proba: (n, n_classes) out-of-fold probabilities.
+        n_bags: Number of bootstrap resamples.
+        seed: RNG seed for the resample indices.
+        fitter: Weight fitter, default :func:`tune_decision_weights_grid`. Pass
+            :func:`data_science_stuff.kaggle_utils.tune_decision_weights` to
+            reproduce Nelder-Mead-era artifacts.
+
+    Returns:
+        (n_classes,) weights normalized so the largest entry is 1.
+    """
+    fit = tune_decision_weights_grid if fitter is None else fitter
+    rng = np.random.default_rng(seed)
+    log_weights = []
+    for _ in range(n_bags):
+        idx = rng.integers(0, len(y), len(y))
+        log_weights.append(np.log(np.asarray(fit(y[idx], proba[idx]))))
+    weights = np.exp(np.mean(log_weights, axis=0))
+    return np.asarray(weights / weights.max(), dtype=np.float64)
 
 
 def _off_diagonal(n_classes: int) -> list[tuple[int, int]]:

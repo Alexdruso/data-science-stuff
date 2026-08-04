@@ -31,6 +31,15 @@ pick (0.97119) fell to the **worst** private transfer (0.97033), while the CV-ve
 
 ## Steps
 
+0. **Query the deadline at the source, before computing any margin.** Run
+   `kaggle competitions list -s <id>` and read the deadline column (that call reads no scores,
+   so it is compatible with an LB-blind protocol). Do **not** trust a date carried in
+   `CLAUDE.md`, a notes file, or memory unless it records where it came from — an unsourced
+   "~Aug 2" propagated through 22 days of s6e7 planning while the real deadline was Jul 31, and
+   the "select finals ≥48 h early" margin that the whole endgame was scheduled around never
+   existed. The Python API returns the same value with `tzinfo=None`, so the timezone is *not*
+   established by it; Kaggle's convention is UTC, and you should act on the earlier reading.
+   Correct every document that carries the wrong date, then plan backwards from the real one.
 1. **Assemble the candidate table** from `results/cv_scores.csv` + the competition `CLAUDE.md`
    experiments log + `kaggle competitions submissions -c <id>`: for each candidate, OOF CV,
    public LB, and the CV→LB gap. Threshold-weight and cost-matrix candidates (outputs of
@@ -41,7 +50,11 @@ pick (0.97119) fell to the **worst** private transfer (0.97033), while the CV-ve
 3. **Rank by OOF CV** among the non-flagged candidates; break near-ties (within CV noise,
    ~1 fold-std) by preferring (a) ensembles/stacks over singles, (b) structural diversity
    between the two picks.
-4. **Select on Kaggle only when the user confirms** the two picks.
+4. **Select on Kaggle only when the user confirms** the two picks. The selection is a manual
+   click in the Kaggle UI and it is the only action that decides the competition — say so
+   explicitly, with the real deadline from step 0, and confirm it has been done. With no
+   explicit selection Kaggle auto-selects the best *public* score, which is precisely the
+   public-overfit artifact this skill exists to avoid.
 5. **Record the decision** in the competition `CLAUDE.md` (which two, why, what was rejected and
    why) — after the private LB lands, write the CV→public→private table into the log so the
    next competition's selection has evidence.
