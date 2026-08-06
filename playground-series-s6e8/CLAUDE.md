@@ -380,6 +380,53 @@ bias a blend of three GBDTs cannot manufacture for itself.
 6. Standard model breadth once the surface is settled: XGBoost, CatBoost, an MLP leg
    (`train_mlp.py`, needs an imputing surface), then Nelder-Mead blending on prob/logit/rank.
 
+7. **Sweep CUT after `s2`/`s3` (2026-08-04 eve) — returning to the gate's prescribed action.**
+
+   The `s1` gate landed at +0.00055, whose pre-registered action was **"cut sweep"**. The
+   afternoon session ran the full sweep anyway and logged that honestly as a deviation. The
+   remaining arms (`s4`, `s5`, `s6` at 6 seeds each, plus `s0` seeds 48–53 for the null band)
+   are hereby **not run**. This is not a moved bar — it is finally obeying one.
+
+   Three independent reasons converge:
+   - `feedback_lb_blind_protocol`: discard candidates with expected effect <0.001. `s2` (the mask
+     control) measured **+0.00050 vs `s0`** — i.e. it reproduces `s1` and adds nothing of its
+     own: paired against **`s1`** over the two shared seeds it is **−0.0000355 / +0.0000355,
+     mean 0.0000000**. Masks are worth exactly nothing on top of the budget features, which is
+     what the marginal AUC ≈ 0.500 finding already predicted. The imputation arms are
+     pre-registered in this very file as *expected flat for GBDTs*.
+   - The 12-member null band's only consumer was screening the imputation arms. If those are
+     flat at +0.00001 there is nothing to screen, so the 6 calibration seeds buy nothing.
+   - For GBDT purposes **the surface is settled at `s1`**. The one open surface question — which
+     imputing surface the MLP eats — is answered by the MLP's own CV, not by an LGBM arm delta.
+
+   What this does *not* close: `s4`/`s5` as **MLP substrates**. They are still worth building if
+   the MLP-on-`s3` leg proves it can reach the blend; the veto is on scoring them as LGBM arms.
+
+8. **The two genuinely untouched levers, both with a better prior than any arm delta.**
+   Day 4 of 27 with a single model family is where breadth pays.
+   - **`tune_lgbm.py` has never run.** `LGBM_PARAMS` are hand-set (lr 0.05 / 127 leaves / 1000
+     trees, no search). Tune on **`s1`**, not the `--arm s0` default.
+   - **There is no second model family.** `train_xgboost.py`, `train_catboost.py`, `legs.py` and
+     `ensemble.py` are all written and all unrun.
+
+### `ensemble.py` — a conflation that would have stranded the neural leg
+
+Found and fixed 2026-08-04 eve, before the MLP was launched rather than after. `ensemble.py`
+required **every** leg to share one surface, so an MLP-on-`s3` blended with LGBM-on-`s1` would
+have raised. That would have made arms `s3`/`s4` unusable — while the stated justification for
+building them was precisely "an MLP cannot consume NaN".
+
+Two different invariants were being run together:
+
+| Operation | Actually requires |
+|---|---|
+| paired **arm-delta** read (`s1 − s0`) | the same surface — lesson #9: an altered train matrix reads systematically lower |
+| **blending** two model families | the same `y`, the same row order, comparable folds — *not* the same feature matrix |
+
+Cross-surface blending is now permitted via an explicit `--cross-surface s3,s4` and prints a
+loud banner; discovery still never crosses a surface on its own, because a surface mix has
+length `len(y)` either way and no downstream shape check can catch it.
+
 ---
 
 ## Experiments log
