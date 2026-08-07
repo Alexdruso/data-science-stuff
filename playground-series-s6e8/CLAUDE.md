@@ -486,6 +486,16 @@ arrays may be blended or stacked.** All arm runs are CPU, `n_jobs=12`, 5-fold, s
 | 2026-08-04 | `s0` | v1 surface re-measured on CPU for a same-device paired baseline. Seeds 42/43/44 = 0.96316 / 0.96330 / 0.96310 | **0.96319** |
 | 2026-08-04 | `s1` | **GATE arm** — budget-constraint features, no imputation (27 features). 6 seeds; paired Δ vs `s0` = **+0.000548 ± 0.000086** (sd), positive at every seed | **0.963713** |
 | 2026-08-04 | `screen_surface s1 vs s0` | M-slope, 6 members. **Decay table below.** Exponent **−0.063 ± 0.001**. Null-band calibration **FAILED** (null exponent +1.056 ± 0.750 → band (−0.443, +2.555), too wide to use) | — |
+| 2026-08-06 | `bag_s1x6` | The **null leg** for the Day-6 breadth pre-registration: the six `s1` seeds averaged into one leg. `submissions/bag_s1x6.csv` + `test_bag_s1x6.npy` written; **no OOF array saved** (`ensemble.py`'s single-leg branch writes only the test side — the OOF is recomputed on demand from the six `oof_s1_s4*.npy`). Not a candidate; it is the thing breadth must beat. | — |
+| 2026-08-06 | `cat_s1` seed 42 | First non-LGBM family. **Misses its own pre-registered prior (0.96373 ± 0.0005) by ~8×.** Unexplained on the day — the session died mid-run 87 s later. Diagnosed 08-07, see below. | **0.95953** |
+| 2026-08-06 | — | **⚡ HARD POWER CUT at 09:40:53**, mid-run. `journalctl -b -2` holds no shutdown records at all (last line: routine `smartd`, 09:25:37) while files were still being written until 09:40:53. XGBoost, the MLP and the tuning run produced nothing; work sat uncommitted for 30 h. Recovered 08-07 in `d4171aa`. | — |
+
+### Day 7 (2026-08-07)
+
+| Date | Run | Description | OOF AUC |
+|---|---|---|---|
+| 2026-08-07 | `tune_lgbm` hardening | `create_study` had no `storage`, so a search that runs for hours died whole on any crash. Now sqlite-backed + `load_if_exists`, so the identical command resumes. **Verified against a real restart**: "resuming study 'lgbm_s1' … 2 completed trials". A crash now costs one trial. | — |
+| 2026-08-07 | `smoke_impute` | `impute.py` had never executed end to end. Found `median_impute` (`s3`) violating the budget identity by **−5.23 h** — independent per-column medians let imputed parts exceed an *observed* `daily`, so `_recompute_derived` rebuilt `other_screen_hours` **negative**. `s3` is only in the sweep as the honest control for `s4`, so a broken `s3` would have let `s4` win partly by not being broken. Fixed with `s4`'s phase structure, naive median estimator kept. All four arms now PASS at `min(daily − sgw_lb) = −0.000000`. | — |
 
 ### M-slope screen: `s1` vs `s0` (6 members, 2026-08-04)
 
