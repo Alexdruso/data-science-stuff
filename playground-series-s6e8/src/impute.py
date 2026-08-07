@@ -119,6 +119,19 @@ def median_impute(
     The naive strategy, included as the honest control for `relational_impute`
     — if the smart imputer cannot beat this, its extra machinery is not the
     thing doing the work.
+
+    Naive in its *estimator* (a per-column median), but it still has to respect
+    the budget identity. Filling each column independently does not: the first
+    smoke test measured `min(daily - sgw_lb) = -5.23`, i.e. imputed parts
+    summing to five hours more than an observed total, on a constraint that
+    holds in 100.0000% of complete rows. `_recompute_derived` then rebuilds
+    `other_screen_hours = daily - social - gaming - work` as a *negative*
+    number, and hands an MLP a physically impossible feature.
+
+    That is a bug, not naivety, and it would also have made `s3` a dishonest
+    control — `s4` would have "won" partly by not being broken. So the same
+    phase structure as `relational_impute` is applied here; only the estimator
+    differs.
     """
     medians = {c: float(x_tr[c].median()) for c in RAW_NUMERIC_COLS}
     modes = {
@@ -127,6 +140,23 @@ def median_impute(
 
     def apply(x: pd.DataFrame) -> pd.DataFrame:
         out = _with_masks(x)
+        was_null = {c: out[c].isna().to_numpy() for c in IMPUTE_ORDER}
+
+        # Phase A — the three non-negative components.
+        for col in BUDGET_PARTS:
+            out[col] = out[col].fillna(medians[col])
+        # Phase B — enforce the budget from ABOVE, where `daily` is observed.
+        # Must run before `daily` is filled: the projection skips non-finite
+        # `daily`, which is exactly the "leave those rows to phase C" rule.
+        _project_parts_onto_budget(out, was_null)
+        # Phase C — the total, floored by its now-consistent parts.
+        daily_null = was_null["daily_screen_time_hours"]
+        if daily_null.any():
+            lower = out.loc[daily_null, BUDGET_PARTS].sum(axis=1).to_numpy()
+            out.loc[daily_null, "daily_screen_time_hours"] = np.maximum(
+                medians["daily_screen_time_hours"], lower
+            )
+        # Phase D — weekend, the never-impute group and the categoricals.
         for col, val in medians.items():
             out[col] = out[col].fillna(val)
         for col, mode in modes.items():
