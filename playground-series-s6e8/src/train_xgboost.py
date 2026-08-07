@@ -35,7 +35,10 @@ PARAMS: dict[str, object] = {
     "early_stopping_rounds": 100,
     "enable_categorical": True,
     "tree_method": "hist",
-    "n_jobs": 12,
+    # 10, not 12: this leg is run concurrently with the GPU CatBoost leg, which
+    # still needs CPU for data prep. Threads only affect wall clock, not the
+    # fitted model, so this does not touch any paired comparison.
+    "n_jobs": 10,
     "verbosity": 0,
 }
 

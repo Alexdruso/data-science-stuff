@@ -409,6 +409,48 @@ bias a blend of three GBDTs cannot manufacture for itself.
    - **There is no second model family.** `train_xgboost.py`, `train_catboost.py`, `legs.py` and
      `ensemble.py` are all written and all unrun.
 
+9. **PRE-REGISTRATION — Day 6 (2026-08-06): breadth + tuning.** Written before the first run of
+   the day; the bars do not move.
+
+   **The null for breadth is the LGBM seed-bag, not a single LGBM.** Adding XGB/Cat/MLP to a
+   blend buys two different things: plain variance reduction from averaging more members, and
+   genuinely different inductive bias. Seed-bagging the six existing `s1` seeds already buys the
+   first, and costs nothing. So breadth is priced as
+
+   > `blend([bag(lgbm×6), xgb, cat, mlp])` **vs** `bag(lgbm×6)`
+
+   Pricing it against a single seed would credit breadth with variance reduction that is free —
+   exactly the failure root CLAUDE.md lesson #1 names.
+
+   | Arm | Instrument | Bar | Action |
+   |---|---|---|---|
+   | **Breadth** | blend OOF AUC − `bag(lgbm×6)` OOF AUC | ≥ +0.0010 | adopt as the submission leg |
+   | | | +0.0003 … +0.0010 | hold; re-screen with `screening.screen_mechanism` first |
+   | | | < +0.0003 | flat — report, do not adopt |
+   | **Tuning** | 3-seed paired 5-fold `s1`, tuned − untuned | ≥ +0.0005 | adopt tuned params for the leg |
+   | | | < +0.0005 | keep untuned; log the search range as covered |
+
+   Tuning gets the lower bar because it *replaces* the leg rather than adding a member — there is
+   no combiner above it to absorb the gain (lesson #7 cuts the other way here).
+
+   **Honest expected outcome, stated so a clean negative counts as a result:**
+   - XGB and CatBoost see the *same 27 features*; expect rank correlation ≳0.99 with LGBM, solo
+     OOF within ±0.0005 of 0.96373, and a blend gain of **+0.0003…+0.0010** — i.e. most likely
+     the *hold* band, not the adopt band.
+   - The MLP is the only genuinely different inductive bias. Expect solo OOF **0.955–0.962**
+     (below every GBDT); that is not a failure, its value is decorrelation. It is the member most
+     likely to carry the blend past +0.0010.
+   - Tuning: mild positive prior, **+0.0005…+0.0015**. `num_leaves=127 / lr=0.05` with early
+     stopping is already a sane point, so a large gain would be surprising.
+
+   If breadth lands under +0.0003 that closes *this blend*, not the avenue (lesson #13). The
+   classes still untested afterwards: feature interactions, a different loss, a different target
+   parameterisation.
+
+   **Correction to the record**: steps 7–8 above describe the `s3` arm as run. It was not —
+   `results/` holds no `s3` array and `arm_scores.json` has no `s3` key, so `impute.py` has never
+   executed end to end. Treated as unrun and smoke-tested before the MLP depends on it.
+
 ### `ensemble.py` — a conflation that would have stranded the neural leg
 
 Found and fixed 2026-08-04 eve, before the MLP was launched rather than after. `ensemble.py`
