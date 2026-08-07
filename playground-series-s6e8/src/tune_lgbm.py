@@ -13,6 +13,14 @@ Writes `results/best_params.json`, which `baseline.py` already picks up
 automatically through `load_params`. Device is locked to CPU to match the sweep
 (see `run_arm.py` — the cuda/cpu gap on this box is 0.0003 AUC, the same size
 as the effects being measured).
+
+**The study is sqlite-backed and resumable, and that is not optional here.** A
+trial costs ~5-9 min at 691k rows x 3 folds, so a useful search runs for hours —
+and this box hard-cuts power without warning (it did so on 2026-08-06 at
+09:40:53, mid-run, losing the whole morning). An in-memory study would make
+every crash cost the entire search. With `storage` + `load_if_exists`, Optuna
+commits each trial as it completes, so a crash costs exactly the trial that was
+running: relaunch the identical command and it picks up where it stopped.
 """
 
 from __future__ import annotations
@@ -54,7 +62,15 @@ def main() -> None:
     parser.add_argument("--trials", type=int, default=60)
     parser.add_argument("--timeout", type=int, default=3600)
     parser.add_argument("--out", default="best_params.json")
+    parser.add_argument(
+        "--n-jobs",
+        type=int,
+        default=12,
+        help="LightGBM threads. Lower it when this runs in the background "
+        "alongside another CPU leg — it is the long pole, not the urgent job.",
+    )
     args = parser.parse_args()
+    FIXED["n_jobs"] = args.n_jobs
 
     builder, _, description = ARMS[args.arm]
     x, y, _ = build_matrices(builder)
@@ -90,22 +106,42 @@ def main() -> None:
             trial.set_user_attr("best_iteration", model.best_iteration_)
         return float(roc_auc_score(y, oof))
 
+    # Resumable by construction — see the module docstring. `load_if_exists`
+    # makes the identical command a resume rather than a restart, so recovering
+    # from a power cut needs no special flag and no thinking at 09:41.
+    # `optuna_*.db` is already the repo's gitignore convention (.gitignore:170),
+    # so the study file stays local without adding a new pattern.
+    db = RESULTS_DIR / f"optuna_lgbm_{args.arm}.db"
     study = optuna.create_study(
-        direction="maximize", sampler=optuna.samplers.TPESampler(seed=42)
+        direction="maximize",
+        sampler=optuna.samplers.TPESampler(seed=42),
+        storage=f"sqlite:///{db}",
+        study_name=f"lgbm_{args.arm}",
+        load_if_exists=True,
     )
-    study.enqueue_trial(
-        {
-            "learning_rate": 0.05,
-            "num_leaves": 127,
-            "min_child_samples": 20,
-            "colsample_bytree": 0.8,
-            "subsample": 0.8,
-            "subsample_freq": 1,
-            "reg_alpha": 1e-8,
-            "reg_lambda": 1e-8,
-            "max_bin": 255,
-        }
-    )
+    done = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
+    if done:
+        print(
+            f"resuming study 'lgbm_{args.arm}' from {db.name}: "
+            f"{len(done)} completed trials, best so far {study.best_value:.5f}",
+            flush=True,
+        )
+    # Only seed the reference point on a fresh study; re-enqueueing it on every
+    # resume would burn a trial re-measuring a value already in the database.
+    if not study.trials:
+        study.enqueue_trial(
+            {
+                "learning_rate": 0.05,
+                "num_leaves": 127,
+                "min_child_samples": 20,
+                "colsample_bytree": 0.8,
+                "subsample": 0.8,
+                "subsample_freq": 1,
+                "reg_alpha": 1e-8,
+                "reg_lambda": 1e-8,
+                "max_bin": 255,
+            }
+        )
     optuna.logging.set_verbosity(optuna.logging.WARNING)
 
     def log(study: optuna.Study, trial: optuna.trial.FrozenTrial) -> None:
