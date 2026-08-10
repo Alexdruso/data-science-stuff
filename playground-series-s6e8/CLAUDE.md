@@ -176,14 +176,33 @@ The sweep is locked to CPU in `run_arm.py`.
 
 ## Current best
 
-**LGBM `s1` OOF AUC: 0.96373** (2026-08-04, 3-seed mean, untuned) ← best measured
-**LGBM `s0` OOF AUC: 0.96319** (3-seed mean) ← same-device reference
+**Blend `0.22·bag(lgbm×6) + 0.78·bag(xgb×6)` on ranks — see the Day-10 log for the final number.**
+
+| Leg / blend | OOF AUC | Note |
+|---|---|---|
+| `s1` single seed | 0.96371 | the number this file used to call "current best" |
+| **`bag(lgbm×6)`** | **0.964346** | ← **the null** every breadth read is priced against |
+| `bag(xgb×6)` | see Day-10 log | strongest single family |
+| `bag(cat×3)` | 0.962516 | earns **weight 0.0** |
+| `mlp_s4` (1 seed) | 0.941983 | earns **weight 0.0**, harmful at every weight |
+
+**Quote the bag, not the single seed.** Seed-bagging six `s1` seeds is worth **+0.000635** over one
+seed — larger than the entire +0.0003 breadth bar. Pricing anything against 0.96371 credits it
+with variance reduction that is free (root CLAUDE.md lesson #1). Bagging is also *exhausted*:
+the increments halve cleanly (M=2 +0.000379, 3 +0.000127, 4 +0.000064, 5 +0.000039, 6 +0.000026),
+so M→∞ is ≈0.96444 and more LGBM seeds cannot reach +0.0003.
 
 | Surface | OOF AUC (3-seed mean) | Δ vs `s0` | Script |
 |---|---|---|---|
 | `s0` (v1, 21 feat) | 0.96319 | — | `run_arm.py --arm s0` |
 | `s1` (+budget features, 27 feat) | **0.96373** | **+0.00055 ± 0.00011** | `run_arm.py --arm s1` |
 | `lgbm_v1` (CUDA, superseded) | 0.96312 | — | `src/baseline.py` |
+
+**All OOF numbers here are mildly optimistic in the same direction**: every leg early-stops on the
+fold it then writes as its OOF prediction (LightGBM `early_stopping(50)`, XGBoost
+`early_stopping_rounds=100`). The bias is shared, so *orderings* are safe, but CV↔LB calibration
+should be expected to read high. XGBoost gets the longer leash of the two (3000 trees / patience
+100 vs 1000 / 50), so a sliver of its advantage over LightGBM is stopping-rule optimism.
 
 **Two different noise scales — do not confuse them:**
 
@@ -496,6 +515,63 @@ arrays may be blended or stacked.** All arm runs are CPU, `n_jobs=12`, 5-fold, s
 |---|---|---|---|
 | 2026-08-07 | `tune_lgbm` hardening | `create_study` had no `storage`, so a search that runs for hours died whole on any crash. Now sqlite-backed + `load_if_exists`, so the identical command resumes. **Verified against a real restart**: "resuming study 'lgbm_s1' … 2 completed trials". A crash now costs one trial. | — |
 | 2026-08-07 | `smoke_impute` | `impute.py` had never executed end to end. Found `median_impute` (`s3`) violating the budget identity by **−5.23 h** — independent per-column medians let imputed parts exceed an *observed* `daily`, so `_recompute_derived` rebuilt `other_screen_hours` **negative**. `s3` is only in the sweep as the honest control for `s4`, so a broken `s3` would have let `s4` win partly by not being broken. Fixed with `s4`'s phase structure, naive median estimator kept. All four arms now PASS at `min(daily − sgw_lb) = −0.000000`. | — |
+
+### Day 10 (2026-08-10) — the Day-6 breadth pre-registration, executed and closed
+
+Bars quoted from item 9 and **not moved**. The null is `bag(lgbm×6)` = **0.964346**, so the bands
+in absolute terms are: flat < 0.964646 | hold 0.964646–0.965346 | adopt ≥ 0.965346.
+
+| Date | Run | Description | OOF AUC |
+|---|---|---|---|
+| 2026-08-10 | `diag_catboost` | **H1 CONFIRMED.** CatBoost defaults `border_count` to 254 on CPU but **128 on GPU**; the shipped recipe took the GPU default. Fold 1: A border=128 **0.95863** (105.4 s) vs B border=254 **0.96148** (82.3 s) — recovers **+0.00285 of the −0.00422 gap (68%)** *and is faster*. H2 (early stopping) untested: configs C/D were cut, see deviations. | — |
+| 2026-08-10 | `cat_s1` ×3 (fixed) | `border_count=254` patched into `train_catboost.py`. Seeds 42/43/44 = 0.96225 / 0.96226 / 0.96226 — the 5-fold recovery **+0.00272** matches the fold-1 prediction (+0.00285) almost exactly. Bagged `cat_s1x3` = **0.962516**, rank corr 0.9880 vs the null. | **0.96226** |
+| 2026-08-10 | `xgb_s1` ×6 | First XGBoost leg. Seeds 42–47 land in **0.96449–0.96454** (sd ≈0.000015 — far tighter than LightGBM's 0.000043). **A single XGB seed beats the entire 6-seed LightGBM bag.** Misses its own pre-registered prior (0.96373 ± 0.0005) on the *high* side. | **0.96452** (s42) |
+| 2026-08-10 | `mlp_s4` seed 42 | The pre-registration named this "the member most likely to carry the blend past +0.0010". It came in at **0.94198**, −0.013 below its 0.955–0.962 prior, and per-fold 0.9410–0.9429 — stably weak, not unstable. **Harmful at every weight** against both the LGBM bag alone and the bag+xgb blend (monotone decreasing from w=0). Seeds 43/44 cut. | **0.94198** |
+| 2026-08-10 | **breadth blend** | Nelder-Mead on ranks over `bag(lgbm×6)`, `bag(xgb)`, `bag(cat×3)`, `mlp_s4`. **CatBoost and the MLP both receive weight exactly 0.0.** Breadth here means XGBoost and nothing else. | see below |
+| 2026-08-10 | `screen_breadth` | Hold-band action. Fixed-weight M-slope, M=1..4: +0.000926 / +0.000825 / +0.000777 / +0.000731, **b = −0.167**. At M=4 the observed delta is **3.2×** what 1/M variance reduction predicts and **1.6×** what M^−0.5 selection noise predicts; retention 79%. **Mechanism = information.** | — |
+
+**Verdict against the unmoved bar.** The delta sits in the **hold** band on magnitude and *passes*
+the mechanism screen. Those are two separate facts and neither promotes the other: the
+pre-registration's adopt threshold is +0.0010 and it was not reached. No promotion rule was
+invented after the fact. What this closes is *this blend*; the classes still untested are feature
+interactions, a different loss, a different target parameterisation, and a *better* neural leg
+(not merely more seeds of this one).
+
+**Three of four pre-registered expectations were wrong, and the misses are the informative part:**
+
+- **XGB was predicted redundant** (rank corr ≳0.99, solo within ±0.0005). Corr was 0.9952 as
+  predicted, but it is the *strongest* leg and takes ~0.78 of the blend weight. Correlation
+  predicted redundancy; it did not deliver it.
+- **The MLP was predicted to be the decisive member.** It is the most decorrelated leg by a wide
+  margin (0.9713) and is still worthless — decorrelation is necessary, not sufficient. A leg
+  0.022 below the null cannot buy its way in on diversity.
+- **CatBoost's gap was predicted to be a recipe artifact.** It was, exactly. And repairing it moved
+  the deliverable by **0.000000** — root CLAUDE.md lesson #7 (a strong combiner absorbs leg-level
+  gains) demonstrated on a leg whose repair was worth +0.00272 solo.
+
+**Deviations from the day's plan, recorded plainly:**
+
+1. **Optuna killed** ~17 min in, having completed **0 trials** while starving the breadth runs
+   (load average 32 on 12 cores; `nice -n 19` does not help when the contention is memory
+   bandwidth). Sqlite-resumable, so nothing was lost. The study still stands at 6 trials with
+   **trial 0 — the enqueued untuned reference, 0.96336 — as the best**; trials 1–5 all lost to it.
+2. **`diag_catboost` cut after config A**, then re-run for config B only with `--reference`
+   supplied rather than refit. H2 (early stopping / iteration count) is therefore **untested**.
+   Justification: the diagnosis only mattered if CatBoost could become non-harmful, and once the
+   fixed leg still scored weight 0.0 the remaining configs could not change a decision.
+3. **MLP cut to 1 seed** rather than 3, once it measured harmful at every weight.
+4. **The GPU collision was self-inflicted**: starting the MLP while `diag_catboost` held
+   `gpu_ram_part=0.8` left it 142 MiB and OOM-killed it. `gpu_ram_part` is now env-overridable.
+
+**Two bugs fixed today, both pre-existing:**
+
+- `data_science_stuff.kaggle.models.mlp.fit_mlp_fold` forwarded the **entire** val and test
+  splits through the net in one pass (~600 MB of activation per layer at 296k rows × width 512),
+  which OOMs a 6 GB card. Now batched via `_predict_batched`; peak inference memory is independent
+  of split size. This affects **every** competition using this scaffold, not just s6e8.
+- `legs.run_leg` printed nothing until all five folds finished, so a silent log was
+  indistinguishable from a hung or dead run — which is how the 08-06/08-07 sessions lost work.
+  Now reports per fold via `run_cv`'s `after_fold` hook.
 
 ### M-slope screen: `s1` vs `s0` (6 members, 2026-08-04)
 

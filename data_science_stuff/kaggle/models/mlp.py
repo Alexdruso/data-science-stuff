@@ -118,6 +118,24 @@ def _default_score(y_val: NDArray[Any], proba: NDArray[np.float64]) -> float:
     return float(balanced_accuracy_score(y_val, np.argmax(proba, axis=1)))
 
 
+def _predict_batched(
+    model: nn.Module, x: torch.Tensor, batch_size: int
+) -> NDArray[np.float64]:
+    """Softmax probabilities for ``x``, forwarded in batches.
+
+    Inference allocates activations for the whole input at once, so a full-split
+    forward pass costs ``rows x width x 4`` bytes *per layer* — on a 300k-row
+    test split at width 512 that is ~600 MB a layer, which OOMs a small card
+    even though the same rows train fine in ``batch_size`` chunks. Batching here
+    makes peak inference memory independent of split size.
+    """
+    outputs = []
+    with torch.no_grad():
+        for i in range(0, len(x), batch_size):
+            outputs.append(torch.softmax(model(x[i : i + batch_size]), dim=1).cpu())
+    return torch.cat(outputs).numpy().astype(np.float64)
+
+
 def fit_mlp_fold(
     X_tr: NDArray[np.float32],
     y_tr: NDArray[np.int64],
@@ -250,14 +268,12 @@ def fit_mlp_fold(
         scheduler.step()
 
         model.eval()
-        with torch.no_grad():
-            val_proba = torch.softmax(model(x_va_t), dim=1).cpu().numpy()
+        val_proba = _predict_batched(model, x_va_t, batch_size)
         epoch_score = float(score(y_va, val_proba))
         if epoch_score > best_score:
             best_score = epoch_score
             best_val_pred = val_proba
-            with torch.no_grad():
-                best_test_pred = torch.softmax(model(x_test_t), dim=1).cpu().numpy()
+            best_test_pred = _predict_batched(model, x_test_t, batch_size)
             patience_counter = 0
         else:
             patience_counter += 1

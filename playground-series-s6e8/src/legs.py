@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -53,6 +54,19 @@ def run_leg(name: str, arm: str, seed: int, fit_model: FitModel) -> float:
             x_tr, x_va, x_te = transform(x_tr, y_tr, x_va, x_te)
         return fit_model(x_tr, y_tr, x_va, y_va, x_te, fold)
 
+    # A 5-fold leg here runs for tens of minutes and `run_leg` only printed once
+    # it was completely done, so a silent log was indistinguishable from a hung
+    # or dead run — which is exactly how the 08-06/08-07 sessions lost work.
+    started = time.time()
+
+    def report(fold: int) -> None:
+        # run_cv enumerates folds from 1, so `fold` is already 1-based.
+        print(
+            f"    {name}_{arm}_s{seed} fold {fold}/{N_FOLDS} done "
+            f"({time.time() - started:.0f}s elapsed)",
+            flush=True,
+        )
+
     oof, test_pred, fold_scores = run_cv(
         x,
         y,
@@ -62,6 +76,7 @@ def run_leg(name: str, arm: str, seed: int, fit_model: FitModel) -> float:
         seed=seed,
         n_outputs=1,
         score_fn=lambda yv, p: float(roc_auc_score(yv, p)),
+        after_fold=report,
     )
     auc = float(roc_auc_score(y, oof))
     tag = f"{name}_{arm}_s{seed}"

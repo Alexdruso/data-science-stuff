@@ -31,6 +31,7 @@ Reference point printed alongside: LightGBM `s1` on the same fold.
 
 from __future__ import annotations
 
+import argparse
 import sys
 import time
 from pathlib import Path
@@ -82,6 +83,24 @@ def prepare(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def main() -> None:
+    # The reference fit is the expensive part (~17 min under load), and it is a
+    # constant for a fixed fold — so a re-run that only needs the CatBoost side
+    # can pass the known value instead of paying for it twice.
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--configs",
+        default="",
+        help="comma-separated config letters to run, e.g. 'B,D' (default: all)",
+    )
+    parser.add_argument(
+        "--reference",
+        type=float,
+        default=None,
+        help="skip the LightGBM reference fit and use this fold-1 AUC instead",
+    )
+    args = parser.parse_args()
+    wanted = {c.strip().upper() for c in args.configs.split(",") if c.strip()}
+
     x, y, _ = build_matrices(ARMS["s1"][0])
     tr_idx, va_idx = next(
         iter(StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=SEED).split(x, y))
@@ -92,25 +111,31 @@ def main() -> None:
 
     # Same-fold LightGBM reference, so the gap is read against this fold rather
     # than against a 5-fold OOF number computed on different rows.
-    from lightgbm import LGBMClassifier, early_stopping, log_evaluation  # noqa: PLC0415
+    if args.reference is not None:
+        ref = args.reference
+        print(f"  REFERENCE  lgbm s1        AUC {ref:.5f}  (supplied, not refit)\n", flush=True)
+    else:
+        from lightgbm import LGBMClassifier, early_stopping, log_evaluation  # noqa: PLC0415
 
-    t0 = time.time()
-    lgbm = LGBMClassifier(**{**LGBM_PARAMS, "random_state": SEED})
-    lgbm.fit(
-        x.iloc[tr_idx],
-        y_tr,
-        eval_set=[(x.iloc[va_idx], y_va)],
-        callbacks=[early_stopping(50, verbose=False), log_evaluation(0)],
-    )
-    ref = roc_auc_score(y_va, lgbm.predict_proba(x.iloc[va_idx])[:, 1])
-    print(
-        f"  REFERENCE  lgbm s1        AUC {ref:.5f}  "
-        f"{time.time() - t0:6.1f}s  best_iter={lgbm.best_iteration_}\n",
-        flush=True,
-    )
+        t0 = time.time()
+        lgbm = LGBMClassifier(**{**LGBM_PARAMS, "random_state": SEED})
+        lgbm.fit(
+            x.iloc[tr_idx],
+            y_tr,
+            eval_set=[(x.iloc[va_idx], y_va)],
+            callbacks=[early_stopping(50, verbose=False), log_evaluation(0)],
+        )
+        ref = roc_auc_score(y_va, lgbm.predict_proba(x.iloc[va_idx])[:, 1])
+        print(
+            f"  REFERENCE  lgbm s1        AUC {ref:.5f}  "
+            f"{time.time() - t0:6.1f}s  best_iter={lgbm.best_iteration_}\n",
+            flush=True,
+        )
 
     results: list[tuple[str, float, float]] = []
     for label, overrides, use_eval in CONFIGS:
+        if wanted and label[0] not in wanted:
+            continue
         params = {**BASE, **overrides}
         t0 = time.time()
         try:

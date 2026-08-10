@@ -30,6 +30,7 @@ from legs import run_leg
 from run_arm import ARMS
 
 DEVICE = os.environ.get("S6E8_CATBOOST_DEVICE", "GPU").upper()
+GPU_RAM_PART = float(os.environ.get("S6E8_CATBOOST_GPU_RAM_PART", "0.8"))
 
 PARAMS: dict[str, object] = {
     "iterations": 2000,
@@ -39,6 +40,14 @@ PARAMS: dict[str, object] = {
     "loss_function": "Logloss",
     "eval_metric": "AUC",
     "max_ctr_complexity": 1,
+    # CatBoost defaults to border_count=254 on CPU but **128 on GPU**, and the
+    # GPU default silently cost 68% of this leg's gap to LightGBM: measured on
+    # fold 1 by `diag_catboost.py`, 128 -> 0.95863 and 254 -> 0.96148 (+0.00285
+    # of a -0.00422 gap), and 254 is also *faster* (82.3s vs 105.4s). All of this
+    # dataset's signal sits in fine-grained continuous columns (single-feature
+    # AUC: daily 0.889, weekend 0.880, social 0.858), so halving the split
+    # resolution lands squarely on the columns that carry it.
+    "border_count": 254,
     "verbose": 0,
     "allow_writing_files": False,
 }
@@ -63,7 +72,10 @@ def make_fit(seed: int):  # noqa: ANN201 - closure over the seed
         x_tr, x_va, x_te = _prepare(x_tr), _prepare(x_va), _prepare(x_te)
         params = dict(PARAMS, random_seed=seed, task_type=DEVICE)
         if DEVICE == "GPU":
-            params["gpu_ram_part"] = 0.8
+            # Overridable because this 6GB card is shared: CatBoost grabbing 0.8
+            # left the MLP 142 MiB and OOM-killed it mid-fold on 08-10. Lower it
+            # when a torch job is resident, leave it at 0.8 when CatBoost is alone.
+            params["gpu_ram_part"] = GPU_RAM_PART
         model = CatBoostClassifier(**params)
         # No eval_set on purpose — see the module docstring.
         model.fit(x_tr, y_tr, cat_features=RAW_CATEGORICAL_COLS)
