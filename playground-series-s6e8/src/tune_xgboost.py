@@ -54,6 +54,14 @@ from data_science_stuff.kaggle.io import competition_dirs
 _, RESULTS_DIR, _ = competition_dirs(__file__)
 
 TUNE_FOLDS = 3
+
+#: Bumped whenever the search space changes, so a widened/narrowed space starts a
+#: NEW study rather than feeding TPE a history sampled from different bounds.
+#: The old study stays on disk as the record of what was covered.
+#: v1 -> v2 (2026-08-10): raised the reg_alpha/reg_lambda/gamma floors off 1e-8
+#: and dropped max_bin=128. **This changes the search space, not the bar** — the
+#: pre-registered adoption threshold is still +0.0005 on a 3-seed paired 5-fold.
+SPACE_VERSION = "v2"
 FIXED: dict[str, Any] = {
     "objective": "binary:logistic",
     "eval_metric": "auc",
@@ -73,8 +81,14 @@ REFERENCE = {
     "subsample": 0.8,
     "colsample_bytree": 0.8,
     "reg_lambda": 1.0,
-    "reg_alpha": 1e-8,
-    "gamma": 1e-8,
+    # The shipped leg sets neither, so XGBoost defaults both to 0. 1e-3 is the
+    # v2 floor and is the nearest in-range stand-in — numerically a no-op for a
+    # min-split-loss and an L1 term at this scale. Enqueueing the literal 1e-8
+    # made Optuna warn that the fixed value was out of range. This only affects
+    # the reference point *inside the search*; adoption is decided by a 5-fold
+    # paired refit against the real shipped PARAMS, not against this trial.
+    "reg_alpha": 1e-3,
+    "gamma": 1e-3,
     "max_bin": 256,
 }
 
@@ -100,15 +114,24 @@ def main() -> None:
     def objective(trial: optuna.Trial) -> float:
         params = {
             **FIXED,
-            "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.15, log=True),
-            "max_depth": trial.suggest_int("max_depth", 4, 12),
-            "min_child_weight": trial.suggest_float("min_child_weight", 0.5, 50.0, log=True),
-            "subsample": trial.suggest_float("subsample", 0.5, 1.0),
+            "learning_rate": trial.suggest_float("learning_rate", 0.015, 0.08, log=True),
+            "max_depth": trial.suggest_int("max_depth", 6, 12),
+            "min_child_weight": trial.suggest_float("min_child_weight", 1.0, 30.0, log=True),
+            "subsample": trial.suggest_float("subsample", 0.6, 1.0),
             "colsample_bytree": trial.suggest_float("colsample_bytree", 0.4, 1.0),
-            "reg_lambda": trial.suggest_float("reg_lambda", 1e-8, 20.0, log=True),
-            "reg_alpha": trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
-            "gamma": trial.suggest_float("gamma", 1e-8, 5.0, log=True),
-            "max_bin": trial.suggest_categorical("max_bin", [128, 256, 512]),
+            # Floors raised off 1e-8. A log-uniform [1e-8, 20] puts ~85% of its
+            # mass below 0.01, where these are effectively OFF — so v1 sampled
+            # "no regularisation" almost every trial while the incumbent's only
+            # distinguishing setting was reg_lambda=1.0. Measured over v1's 9
+            # trials: best had lambda 1.000, every other had <=0.002.
+            "reg_lambda": trial.suggest_float("reg_lambda", 0.05, 20.0, log=True),
+            "reg_alpha": trial.suggest_float("reg_alpha", 1e-3, 10.0, log=True),
+            "gamma": trial.suggest_float("gamma", 1e-3, 5.0, log=True),
+            # 128 dropped: all three v1 trials that drew it landed among the four
+            # worst. Independently consistent with today's CatBoost finding that
+            # border_count=128 costs real score here — this dataset's signal is
+            # in fine-grained continuous columns, so coarse binning hurts.
+            "max_bin": trial.suggest_categorical("max_bin", [256, 512]),
         }
         oof = np.zeros(len(y))
         for tr_idx, va_idx in folds:
@@ -137,7 +160,7 @@ def main() -> None:
     n_done = 0
     if db.exists():
         probe = optuna.create_study(
-            storage=f"sqlite:///{db}", study_name=f"xgb_{args.arm}", load_if_exists=True
+            storage=f"sqlite:///{db}", study_name=f"xgb_{args.arm}_{SPACE_VERSION}", load_if_exists=True
         )
         n_done = len([t for t in probe.trials if t.state == optuna.trial.TrialState.COMPLETE])
 
@@ -145,7 +168,7 @@ def main() -> None:
         direction="maximize",
         sampler=optuna.samplers.TPESampler(seed=42 + n_done),
         storage=f"sqlite:///{db}",
-        study_name=f"xgb_{args.arm}",
+        study_name=f"xgb_{args.arm}_{SPACE_VERSION}",
         load_if_exists=True,
     )
     done = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
