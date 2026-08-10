@@ -125,9 +125,25 @@ def main() -> None:
         return float(roc_auc_score(y, oof))
 
     db = RESULTS_DIR / f"optuna_xgb_{args.arm}.db"
+
+    # The sampler seed must ADVANCE with the study, not be pinned. TPE samples
+    # its first `n_startup_trials` (default 10) at random, and the sampler is
+    # rebuilt on every launch — so a fixed seed makes each resume replay the same
+    # random draws instead of continuing the search. Observed live on 08-10:
+    # after a restart, trials 6 and 7 reproduced trials 2 and 3 to the digit
+    # (0.96385, 0.95985), burning ~4 min each to re-learn nothing.
+    # Offsetting by the completed-trial count keeps a from-scratch run exactly
+    # reproducible while making a resume continue rather than repeat.
+    n_done = 0
+    if db.exists():
+        probe = optuna.create_study(
+            storage=f"sqlite:///{db}", study_name=f"xgb_{args.arm}", load_if_exists=True
+        )
+        n_done = len([t for t in probe.trials if t.state == optuna.trial.TrialState.COMPLETE])
+
     study = optuna.create_study(
         direction="maximize",
-        sampler=optuna.samplers.TPESampler(seed=42),
+        sampler=optuna.samplers.TPESampler(seed=42 + n_done),
         storage=f"sqlite:///{db}",
         study_name=f"xgb_{args.arm}",
         load_if_exists=True,
