@@ -150,6 +150,13 @@ def main() -> None:
         best["n_estimators"] = 3000
         out.write_text(json.dumps(best, indent=2, sort_keys=True))
 
+    # Write immediately on resume, not only on improvement. Otherwise a resumed
+    # study whose incumbent is never beaten — the likely case when the enqueued
+    # reference is strong — keeps its best params in sqlite and never puts them
+    # on disk, which is the exact failure the incremental write exists to avoid.
+    if done:
+        write_best(study)
+
     def log(study: optuna.Study, trial: optuna.trial.FrozenTrial) -> None:
         # Write on every improvement, not once at the end. `study.optimize` only
         # returns when trials/timeout are exhausted, so a search that is killed
