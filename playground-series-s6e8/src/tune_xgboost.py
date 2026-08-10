@@ -61,7 +61,7 @@ TUNE_FOLDS = 3
 #: v1 -> v2 (2026-08-10): raised the reg_alpha/reg_lambda/gamma floors off 1e-8
 #: and dropped max_bin=128. **This changes the search space, not the bar** — the
 #: pre-registered adoption threshold is still +0.0005 on a 3-seed paired 5-fold.
-SPACE_VERSION = "v2"
+SPACE_VERSION = "v3"
 FIXED: dict[str, Any] = {
     "objective": "binary:logistic",
     "eval_metric": "auc",
@@ -91,6 +91,24 @@ REFERENCE = {
     "gamma": 1e-3,
     "max_bin": 256,
 }
+
+#: Known-good points carried across a SPACE_VERSION bump so their information is
+#: not thrown away with the old study. The first is the only point measured so far
+#: that beats the reference: 0.96463 vs 0.96409 at 3 folds, found in the
+#: direction-broken v2 study before it was discarded.
+SEED_POINTS: list[dict[str, object]] = [
+    {
+        "learning_rate": 0.028078987855609694,
+        "max_depth": 12,
+        "min_child_weight": 12.057126287443763,
+        "subsample": 0.8394633936788146,
+        "colsample_bytree": 0.4936111842654619,
+        "reg_lambda": 0.12731427596811182,
+        "reg_alpha": 0.0017073967431528124,
+        "gamma": 1.599409170128044,
+        "max_bin": 512,
+    },
+]
 
 
 def main() -> None:
@@ -157,12 +175,33 @@ def main() -> None:
     # (0.96385, 0.95985), burning ~4 min each to re-learn nothing.
     # Offsetting by the completed-trial count keeps a from-scratch run exactly
     # reproducible while making a resume continue rather than repeat.
+    # `load_study`, never `create_study`, for the probe. `create_study` without an
+    # explicit `direction` creates a **minimize** study, and a later
+    # `create_study(direction="maximize", load_if_exists=True)` silently returns
+    # that existing mis-directed study rather than correcting it. That happened on
+    # 2026-08-10: study `xgb_s1_v2` minimised AUC, so a trial scoring 0.96463 lost
+    # to one scoring 0.96409 and TPE would have optimised toward worse params all
+    # evening. `load_study` raises instead of creating, so the direction is set in
+    # exactly one place.
     n_done = 0
     if db.exists():
-        probe = optuna.create_study(
-            storage=f"sqlite:///{db}", study_name=f"xgb_{args.arm}_{SPACE_VERSION}", load_if_exists=True
-        )
-        n_done = len([t for t in probe.trials if t.state == optuna.trial.TrialState.COMPLETE])
+        try:
+            probe = optuna.load_study(
+                storage=f"sqlite:///{db}", study_name=f"xgb_{args.arm}_{SPACE_VERSION}"
+            )
+        except KeyError:
+            probe = None
+        if probe is not None:
+            n_done = len(
+                [t for t in probe.trials if t.state == optuna.trial.TrialState.COMPLETE]
+            )
+            if probe.direction is not optuna.study.StudyDirection.MAXIMIZE:
+                msg = (
+                    f"study 'xgb_{args.arm}_{SPACE_VERSION}' is "
+                    f"{probe.direction.name}, not MAXIMIZE — refusing to resume it. "
+                    "Bump SPACE_VERSION or delete the study."
+                )
+                raise RuntimeError(msg)
 
     study = optuna.create_study(
         direction="maximize",
@@ -180,6 +219,8 @@ def main() -> None:
         )
     if not study.trials:
         study.enqueue_trial(dict(REFERENCE))
+        for extra in SEED_POINTS:
+            study.enqueue_trial(dict(extra))
     optuna.logging.set_verbosity(optuna.logging.WARNING)
 
     out = RESULTS_DIR / args.out
