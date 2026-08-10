@@ -604,6 +604,33 @@ does not apply to it.
   indistinguishable from a hung or dead run — which is how the 08-06/08-07 sessions lost work.
   Now reports per fold via `run_cv`'s `after_fold` hook.
 
+### PRE-REGISTRATION — XGBoost tuning (written 2026-08-10 16:25, before any trial but the reference)
+
+The Day-6 tuning bar was written for LightGBM. It is hereby applied **unchanged** to XGBoost,
+which is the leg that now carries ~0.85 of the blend weight. Recorded before the numbers exist.
+
+| Instrument | Bar | Action |
+|---|---|---|
+| 3-seed paired **5-fold** `s1`, `xgbt` − `xgb` | ≥ +0.0005 | adopt tuned params for the leg |
+| | < +0.0005 | keep untuned; log the search range as covered |
+
+**The Optuna number is for ranking only and is NOT the instrument.** The search runs 3 folds
+(reference trial 0 = **0.96409**, vs the same params' 5-fold OOF of 0.96452 — 3 folds read ~0.0004
+lower because each model sees less data). Adoption is decided on a 5-fold paired refit, which is
+why `train_xgboost.py --tuned` writes `xgbt_` arrays rather than overwriting `xgb_`: the paired
+read needs both arms to coexist.
+
+**Honest expected outcome:** mild positive, **+0.0003…+0.0010**. `lr 0.03 / depth 8 / 3000 trees`
+with early stopping is already a sane point, and the sibling LightGBM study is the cautionary
+case — after 6 trials its enqueued untuned reference is *still* the best, so a well-chosen hand
+setting is a real possibility here too. A clean negative against this bar is a result, and the
+falsifier is explicit: if the tuned 5-fold paired delta lands under +0.0005, the hand-set params
+stay and the range is logged as covered.
+
+Tuning is the one lever lesson #7 does not blunt: it **replaces** the leg rather than adding a
+member, so there is no combiner above it to absorb the gain — unlike today's CatBoost repair,
+which was worth +0.00272 solo and +0.000000 to the blend.
+
 ### M-slope screen: `s1` vs `s0` (6 members, 2026-08-04)
 
 | M | 1 | 2 | 3 | 4 | 5 | 6 |

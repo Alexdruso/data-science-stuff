@@ -143,7 +143,21 @@ def main() -> None:
         study.enqueue_trial(dict(REFERENCE))
     optuna.logging.set_verbosity(optuna.logging.WARNING)
 
+    out = RESULTS_DIR / args.out
+
+    def write_best(study: optuna.Study) -> None:
+        best = {**FIXED, **study.best_params}
+        best["n_estimators"] = 3000
+        out.write_text(json.dumps(best, indent=2, sort_keys=True))
+
     def log(study: optuna.Study, trial: optuna.trial.FrozenTrial) -> None:
+        # Write on every improvement, not once at the end. `study.optimize` only
+        # returns when trials/timeout are exhausted, so a search that is killed
+        # early — or cut by this box's habit of losing power mid-run — would
+        # otherwise leave a database full of results and no usable params file.
+        # Same reasoning as the sqlite storage: a crash should cost one trial.
+        if trial.value is not None and trial.value >= study.best_value:
+            write_best(study)
         print(
             f"  trial {trial.number:>3}  {trial.value:.5f}   best {study.best_value:.5f}",
             flush=True,
@@ -151,10 +165,7 @@ def main() -> None:
 
     study.optimize(objective, n_trials=args.trials, timeout=args.timeout, callbacks=[log])
 
-    best = {**FIXED, **study.best_params}
-    best["n_estimators"] = 3000
-    out = RESULTS_DIR / args.out
-    out.write_text(json.dumps(best, indent=2, sort_keys=True))
+    write_best(study)
     print(f"\nbest {TUNE_FOLDS}-fold OOF AUC: {study.best_value:.5f}")
     print(f"best params -> {out}")
     print(json.dumps(study.best_params, indent=2, sort_keys=True))

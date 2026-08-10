@@ -22,6 +22,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 from legs import run_leg
 from run_arm import ARMS
 
+from data_science_stuff.kaggle.io import competition_dirs, load_params
+
+_, RESULTS_DIR, _ = competition_dirs(__file__)
+
 PARAMS: dict[str, object] = {
     "n_estimators": 3000,
     "learning_rate": 0.03,
@@ -43,7 +47,7 @@ PARAMS: dict[str, object] = {
 }
 
 
-def make_fit(seed: int):  # noqa: ANN201 - closure over the seed
+def make_fit(seed: int, params: dict[str, object]):  # noqa: ANN201 - closure
     def fit_model(
         x_tr: pd.DataFrame,
         y_tr: np.ndarray,
@@ -52,7 +56,7 @@ def make_fit(seed: int):  # noqa: ANN201 - closure over the seed
         x_te: pd.DataFrame,
         _fold: int,
     ) -> tuple[np.ndarray, np.ndarray]:
-        model = XGBClassifier(**PARAMS, random_state=seed)
+        model = XGBClassifier(**{**params, "random_state": seed})
         model.fit(x_tr, y_tr, eval_set=[(x_va, y_va)], verbose=False)
         return (
             model.predict_proba(x_va)[:, 1],
@@ -66,10 +70,25 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--arm", default="s1", choices=sorted(ARMS))
     parser.add_argument("--seeds", default="42")
+    parser.add_argument(
+        "--tuned",
+        action="store_true",
+        help="load results/best_params_xgboost.json instead of the hand-set PARAMS, "
+        "and tag the arrays `xgbt_` so tuned and untuned legs never collide",
+    )
     args = parser.parse_args()
-    print(f"xgb on arm {args.arm}: {ARMS[args.arm][2]}", flush=True)
+
+    # A distinct tag matters more than it looks: the tuning bar is a *paired*
+    # tuned-vs-untuned read, so both sets of arrays have to coexist. Reusing the
+    # `xgb_` tag would overwrite the very baseline the comparison needs.
+    params, name = dict(PARAMS), "xgb"
+    if args.tuned:
+        params = dict(load_params(RESULTS_DIR, PARAMS, "best_params_xgboost.json"))
+        params.setdefault("early_stopping_rounds", 100)
+        name = "xgbt"
+    print(f"{name} on arm {args.arm}: {ARMS[args.arm][2]}", flush=True)
     for seed in (int(s) for s in args.seeds.split(",")):
-        run_leg("xgb", args.arm, seed, make_fit(seed))
+        run_leg(name, args.arm, seed, make_fit(seed, params))
 
 
 if __name__ == "__main__":
