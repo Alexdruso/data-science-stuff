@@ -75,6 +75,25 @@ SPACES = {
     "rank": to_rank,
 }
 
+#: Map each blend space back to something that belongs in a submission file.
+#:
+#: A blend is fitted in its own space, so the winning blend comes out in that
+#: space and must be mapped back before it is written — otherwise the file is
+#: clipped into nonsense. `clipped_logit` is **misnamed**: it returns `log(p)`,
+#: not `log(p/(1-p))` (see its docstring), so a "logit" blend is a weighted sum
+#: of logs, i.e. all-negative, and `np.clip(., 0, 1)` collapsed every row to 0.0.
+#: That produced a constant submission on 2026-08-10, caught by
+#: `verify_submission.py` — the first multi-leg blend this competition ever ran,
+#: which is why it had never fired before.
+#:
+#: `exp` is the exact inverse of that forward transform, so ranks — the only
+#: thing AUC reads — are preserved bit for bit.
+INVERSE = {
+    "prob": lambda p: p,
+    "logit": np.exp,
+    "rank": to_rank,
+}
+
 
 def resolve_arm(tag: str) -> str | None:
     """The surface a tag was produced on, or None if the tag isn't a leg.
@@ -269,9 +288,14 @@ def main() -> None:
     print(f"best single leg  OOF AUC {best_leg:.5f}   combiner delta {auc - best_leg:+.5f}")
     name = args.name or f"blend_{args.arm}_{space}"
 
-    # Submit ranks as probabilities is fine for AUC, but keep the file in [0,1].
-    preds = to_rank(test_blend) if space == "rank" else test_blend
+    # Map the winning blend out of its own space before writing — see INVERSE.
+    # Submitting ranks as probabilities is fine for AUC, but the file must be in
+    # [0,1], and clipping is only safe once the values are back on a [0,1] scale.
+    preds = INVERSE.get(space, lambda p: p)(test_blend)
     preds = np.clip(preds, 0.0, 1.0)
+    if float(np.std(preds)) == 0.0:
+        msg = f"blend in space {space!r} collapsed to a constant — refusing to write"
+        raise ValueError(msg)
     np.save(RESULTS_DIR / f"test_{name}.npy", preds)
     out = write_submission(SUBMISSIONS_DIR, f"{name}.csv", test_ids, TARGET, preds)
     print(f"submission -> {out}")

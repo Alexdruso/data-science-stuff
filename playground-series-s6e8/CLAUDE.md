@@ -527,15 +527,37 @@ in absolute terms are: flat < 0.964646 | hold 0.964646–0.965346 | adopt ≥ 0.
 | 2026-08-10 | `cat_s1` ×3 (fixed) | `border_count=254` patched into `train_catboost.py`. Seeds 42/43/44 = 0.96225 / 0.96226 / 0.96226 — the 5-fold recovery **+0.00272** matches the fold-1 prediction (+0.00285) almost exactly. Bagged `cat_s1x3` = **0.962516**, rank corr 0.9880 vs the null. | **0.96226** |
 | 2026-08-10 | `xgb_s1` ×6 | First XGBoost leg. Seeds 42–47 land in **0.96449–0.96454** (sd ≈0.000015 — far tighter than LightGBM's 0.000043). **A single XGB seed beats the entire 6-seed LightGBM bag.** Misses its own pre-registered prior (0.96373 ± 0.0005) on the *high* side. | **0.96452** (s42) |
 | 2026-08-10 | `mlp_s4` seed 42 | The pre-registration named this "the member most likely to carry the blend past +0.0010". It came in at **0.94198**, −0.013 below its 0.955–0.962 prior, and per-fold 0.9410–0.9429 — stably weak, not unstable. **Harmful at every weight** against both the LGBM bag alone and the bag+xgb blend (monotone decreasing from w=0). Seeds 43/44 cut. | **0.94198** |
-| 2026-08-10 | **breadth blend** | Nelder-Mead on ranks over `bag(lgbm×6)`, `bag(xgb)`, `bag(cat×3)`, `mlp_s4`. **CatBoost and the MLP both receive weight exactly 0.0.** Breadth here means XGBoost and nothing else. | see below |
+| 2026-08-10 | **breadth blend** | Nelder-Mead over `bag(lgbm×6)` 0.964346, `bag(xgb×6)` **0.965066**, `bag(cat×3)` 0.962600, `mlp_s4` 0.941983. All three spaces tie at 0.96509; weights `xgb 0.851 / lgbm 0.149 / cat 0.0 / mlp 0.0`. LR-on-logits stack **0.96479 — worse than the blend and worse than xgb alone**. `submissions/blend_breadth.csv`, all verify checks PASS. | **0.965090** |
 | 2026-08-10 | `screen_breadth` | Hold-band action. Fixed-weight M-slope, M=1..4: +0.000926 / +0.000825 / +0.000777 / +0.000731, **b = −0.167**. At M=4 the observed delta is **3.2×** what 1/M variance reduction predicts and **1.6×** what M^−0.5 selection noise predicts; retention 79%. **Mechanism = information.** | — |
 
-**Verdict against the unmoved bar.** The delta sits in the **hold** band on magnitude and *passes*
-the mechanism screen. Those are two separate facts and neither promotes the other: the
-pre-registration's adopt threshold is +0.0010 and it was not reached. No promotion rule was
-invented after the fact. What this closes is *this blend*; the classes still untested are feature
-interactions, a different loss, a different target parameterisation, and a *better* neural leg
-(not merely more seeds of this one).
+**Verdict against the unmoved bar.**
+
+| Quantity | Value |
+|---|---|
+| null `bag(lgbm×6)` | 0.964346 |
+| `bag(xgb×6)` | 0.965066 (**+0.000720** vs null) |
+| best blend (logit) | 0.965090 (**+0.000744** vs null) ← the pre-registered instrument |
+| blend − `bag(xgb×6)` | **+0.000024** ← what *combining* actually contributes |
+
+**HOLD** (+0.0003…+0.0010). The adopt threshold is +0.0010 and it was not reached. The delta also
+*passes* the mechanism screen (information, not variance reduction) — two separate facts, and
+neither promotes the other. No promotion rule was invented after the number landed.
+
+**The headline is not "breadth pays" — it is "XGBoost is the better model here".** 97% of the
++0.000744 is `bag(xgb×6)` simply beating `bag(lgbm×6)`; the act of combining them adds
+**+0.000024**, which is a quarter of the +0.0001 OOF resolution and indistinguishable from zero.
+A four-family blend collapses to one family plus a rounding error. The LR stack is *worse* than
+its own best leg (0.96479 vs 0.965066), which is the same message stated more bluntly.
+
+Practical consequence: `bag(xgb×6)` alone is a legitimate submission — it is 0.000024 behind the
+blend, has no fitted weights to overfit, and is far simpler. Prefer it unless a later leg makes
+combining actually pay.
+
+What this closes is *this blend*; the classes still untested are feature interactions, a different
+loss, a different target parameterisation, and a *better* neural leg (not merely more seeds of
+this one). **Tuning XGBoost is the armed next lever** — `src/tune_xgboost.py`, written 08-10 —
+because tuning replaces the leg rather than adding a member, so lesson #7's combiner absorption
+does not apply to it.
 
 **Three of four pre-registered expectations were wrong, and the misses are the informative part:**
 
@@ -563,7 +585,16 @@ interactions, a different loss, a different target parameterisation, and a *bett
 4. **The GPU collision was self-inflicted**: starting the MLP while `diag_catboost` held
    `gpu_ram_part=0.8` left it 142 MiB and OOM-killed it. `gpu_ram_part` is now env-overridable.
 
-**Two bugs fixed today, both pre-existing:**
+**Three bugs fixed today, all pre-existing:**
+
+- **`ensemble.py` wrote a constant-zero submission.** `clipped_logit` is **misnamed** — it returns
+  `log(p)`, not `log(p/(1−p))` (its own docstring says so). So the winning `logit` blend came out
+  all-negative and `np.clip(., 0, 1)` collapsed every one of the 296,302 rows to 0.0. Caught by
+  `verify_submission.py`; it had never fired before because **this was the first multi-leg blend
+  the competition ever ran** (the single-leg `bag_s1x6` branch writes `tests[0]` untransformed and
+  is unaffected). Fixed with an explicit `INVERSE` map per space plus a constant-output guard that
+  raises rather than writes. `clipped_logit` itself was **not** changed — s6e6/s6e7 stacking
+  depends on its current behaviour, and renaming it is a separate job.
 
 - `data_science_stuff.kaggle.models.mlp.fit_mlp_fold` forwarded the **entire** val and test
   splits through the net in one pass (~600 MB of activation per layer at 296k rows × width 512),
