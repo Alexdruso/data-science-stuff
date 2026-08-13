@@ -31,7 +31,7 @@ import torch
 import torch.nn.functional as F  # noqa: N812 — torch convention
 from numpy.typing import NDArray
 from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.metrics import balanced_accuracy_score
+from sklearn.metrics import balanced_accuracy_score, roc_auc_score
 from sklearn.utils.class_weight import compute_class_weight
 from torch import nn
 
@@ -561,6 +561,15 @@ class RealMLP_TD_Classifier(BaseEstimator):
         best_score, best_epoch = -np.inf, 0
         best_val_probs: NDArray[Any] | None = None
         epoch_select = str(p.get("epoch_select", "bacc"))
+        if epoch_select not in {"bacc", "bll", "auc"}:
+            msg = f"epoch_select must be 'bacc', 'bll' or 'auc', got {epoch_select!r}"
+            raise ValueError(msg)
+        if epoch_select == "auc" and n_classes != 2:
+            msg = (
+                "epoch_select='auc' is binary-only; "
+                f"got {n_classes} classes. Use 'bll' for multiclass."
+            )
+            raise ValueError(msg)
         snapshot_k = int(p.get("snapshot_k", 0))
         # (score, val_probs, cpu_state) per epoch when snapshot averaging is on
         snaps: list[tuple[float, NDArray[Any], dict[str, torch.Tensor]]] = []
@@ -702,7 +711,13 @@ class RealMLP_TD_Classifier(BaseEstimator):
             if live_state is not None:
                 self.model_.load_state_dict(live_state, strict=True)
 
-            if epoch_select == "bll":
+            if epoch_select == "auc":
+                # Binary ROC AUC on the positive-class probability. `bacc`
+                # thresholds at argmax and `bll` optimises calibration; on an
+                # AUC competition both select the wrong epoch, because AUC is
+                # invariant to any monotone rescaling they are paying for.
+                epoch_score = float(roc_auc_score(y_v, val_probs[:, 1]))
+            elif epoch_select == "bll":
                 # balanced logloss: mean over classes of the class's mean NLL —
                 # smoother selection signal than the argmax-thresholded bacc
                 # (field-verified: bacc as a selection metric is noise-prone)
@@ -803,7 +818,8 @@ class RealMLP_TD_Classifier(BaseEstimator):
 
 
 REALMLP_TD_CONFIG: dict[str, Any] = {
-    "epoch_select": "bacc",  # "bll" = balanced logloss (smoother selection signal)
+    # "bll" = balanced logloss (smoother selection signal); "auc" = binary ROC AUC
+    "epoch_select": "bacc",
     "snapshot_k": 0,  # >0: average val/test softmax over the top-k epochs
     "n_ens": 8,
     "embed_dim": 7,

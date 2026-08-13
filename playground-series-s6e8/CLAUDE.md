@@ -176,13 +176,15 @@ The sweep is locked to CPU in `run_arm.py`.
 
 ## Current best
 
-**Blend `0.22·bag(lgbm×6) + 0.78·bag(xgb×6)` on ranks — see the Day-10 log for the final number.**
+**`xgbt` — tuned XGBoost on `s1`. Adopted 2026-08-13 at +0.001139 paired over untuned.**
 
 | Leg / blend | OOF AUC | Note |
 |---|---|---|
 | `s1` single seed | 0.96371 | the number this file used to call "current best" |
 | **`bag(lgbm×6)`** | **0.964346** | ← **the null** every breadth read is priced against |
-| `bag(xgb×6)` | see Day-10 log | strongest single family |
+| `bag(xgb×6)` | 0.965066 | untuned; strongest family before tuning |
+| Day-10 four-family blend | 0.965090 | sixteen models, Nelder-Mead |
+| **`xgbt_s1` (1 tuned seed)** | **0.965668** | **beats the whole blend by +0.000578** |
 | `bag(cat×3)` | 0.962516 | earns **weight 0.0** |
 | `mlp_s4` (1 seed) | 0.941983 | earns **weight 0.0**, harmful at every weight |
 
@@ -470,6 +472,62 @@ bias a blend of three GBDTs cannot manufacture for itself.
    `results/` holds no `s3` array and `arm_scores.json` has no `s3` key, so `impute.py` has never
    executed end to end. Treated as unrun and smoke-tested before the MLP depends on it.
 
+10. **PRE-REGISTRATION — Day 10 (2026-08-10): quantile-bin target encoding of crosses.**
+    Written before the screen runs; the bar does not move. Raised by the user, who correctly
+    noted that "the three categoricals carry no marginal signal" is *not* an argument against
+    TE of quantile-binned **continuous** features — a different mechanism entirely.
+
+    **What is already dead, and why — single-feature quantile TE.** `E[y | qbin_q(x)]` is
+    exactly the function a depth-1 tree on `x` outputs, and the boosters fit hundreds of those.
+    It is a strict *coarsening* of information the model already has (it discards within-bin
+    ordering). `social_share` alone, `gaming_share` alone, any single column alone: no route to
+    a gain, and none will be built.
+
+    **What is untested — crosses.** A k-way cell mean needs tree depth ≥ k *and* the interaction
+    to survive regularisation. That is the one thing a GBDT genuinely under-fits, and step 4
+    already established that the 0.9277 → 0.96312 gap "is genuine interaction structure".
+    Candidate cells (all fold-safe via `kaggle.encoding.add_quantile_bin_features` →
+    `add_fold_safe_target_encoding`, edges and means fit on the fold train split only):
+
+    | cross | mechanism it targets |
+    |---|---|
+    | `social_share × daily` | fixed social hours mean different things at different totals |
+    | `n_obs_sgw × sgw_lb` | how *tight* the bound is × where it sits — missingness × value |
+    | `screen_block_nulls × sgw_lb` | the mask × value interaction step 3 left explicitly open |
+    | `screen_share_of_awake × sleep_hours` | screen time displacing sleep |
+    | `gaming_share × social_share` | composition mix at a fixed total |
+    | `stress_ord × daily` | the only ordered categorical |
+
+    **Instrument — held-out residual correction, not a retrained arm.** Building six TE arms at
+    5-fold each costs hours; the question "is there uncaptured structure in these cells at all?"
+    is answerable in seconds and strictly precedes it. Split train rows by `id % 2`. On half A
+    estimate the count-shrunk mean residual `E[y − oof | cell]`; add it to `oof` on half B and
+    measure the AUC change on B. Symmetrise (fit B, score A) and report the mean. `oof` is
+    `bag(xgb×6)`, the current best leg. The cell means see A's labels only, so B is honest.
+
+    **Bar: ≥ +0.0010 mean held-out delta → build the real TE arm. < +0.0010 → do not build.**
+    Justified as follows: a deployed TE arm must clear the standing +0.0010 deployability
+    threshold, and this screen fits the correction *directly on labels* with no model having to
+    learn it — the most favourable possible reading of the same structure. A cross that cannot
+    clear the bar under direct label fitting will not clear it after a retrain.
+
+    **Instrument calibration (lesson #2) — both controls run on our own data, not imported.**
+    - *Positive control*: cells = the exact-integer-`daily` indicator found 08-10, which has a
+      measured OOF residual of −0.07…−0.20. The instrument must register this as positive, or it
+      cannot detect real residual structure.
+    - *Negative control*: random cell assignment with the cell-size distribution matched to each
+      candidate. Must read ≈0. Anything a candidate scores inside the negative band is noise.
+
+    **Honest expected outcome:** ≈0 for the pure-value crosses — at 691k rows and depth 6+, two-way
+    interactions among present values are cheap for a booster to find, and step 4's interaction
+    gap is most likely already being harvested. The missingness × value crosses
+    (`n_obs_sgw × sgw_lb`, `screen_block_nulls × sgw_lb`) are the only ones with a real prior,
+    because that class is flagged untested in step 3 and the integer-`daily` probe showed the
+    model does leave residual structure on tree-hostile cells. **Prior: ~20% that any candidate
+    clears +0.0010; most likely outcome is a clean negative.** A negative closes *these six
+    crosses under this instrument*, not TE as a class (lesson #13) — higher-order crosses and
+    crosses built on the residual itself would remain untested.
+
 ### `ensemble.py` — a conflation that would have stranded the neural leg
 
 Found and fixed 2026-08-04 eve, before the MLP was launched rather than after. `ensemble.py`
@@ -529,6 +587,11 @@ in absolute terms are: flat < 0.964646 | hold 0.964646–0.965346 | adopt ≥ 0.
 | 2026-08-10 | `mlp_s4` seed 42 | The pre-registration named this "the member most likely to carry the blend past +0.0010". It came in at **0.94198**, −0.013 below its 0.955–0.962 prior, and per-fold 0.9410–0.9429 — stably weak, not unstable. **Harmful at every weight** against both the LGBM bag alone and the bag+xgb blend (monotone decreasing from w=0). Seeds 43/44 cut. | **0.94198** |
 | 2026-08-10 | **breadth blend** | Nelder-Mead over `bag(lgbm×6)` 0.964346, `bag(xgb×6)` **0.965066**, `bag(cat×3)` 0.962600, `mlp_s4` 0.941983. All three spaces tie at 0.96509; weights `xgb 0.851 / lgbm 0.149 / cat 0.0 / mlp 0.0`. LR-on-logits stack **0.96479 — worse than the blend and worse than xgb alone**. `submissions/blend_breadth.csv`, all verify checks PASS. | **0.965090** |
 | 2026-08-10 | `screen_breadth` | Hold-band action. Fixed-weight M-slope, M=1..4: +0.000926 / +0.000825 / +0.000777 / +0.000731, **b = −0.167**. At M=4 the observed delta is **3.2×** what 1/M variance reduction predicts and **1.6×** what M^−0.5 selection noise predicts; retention 79%. **Mechanism = information.** | — |
+| 2026-08-10 | `probe` — generative-rule hypothesis (forum) | Applied the "hard rule" `D>8 or S>4 → 1`, `D≤6 and S≤4 → 0` to all 691k train rows. The **"certain-0" region is 32.5% positive** and the "pure-noise" band scores AUC 0.924 under our model. Rule-as-predictor **0.8322**; forcing both deterministic regions to be called perfectly **lowers** AUC to 0.9245. A 0.1-wide scan of `D` 5.5→8.5 at `S≤4` is a monotone ramp with no step at 6 or 8. **Independently re-confirms step 4** (noisy sigmoid of a latent index, not a hard rule). No lever. | — |
+| 2026-08-10 | `probe` — exact-value artifact | New finding, not previously in the log: exact-integer `daily_screen_time_hours` rows run *below* their immediate neighbours — `D=7.00` y=0.192 vs 0.639 at `D∈(7.00,7.03]`, survives conditioning on `S≤4`, OOF residual −0.17 (~21σ). Trees cannot build an exact-value indicator, so it is the right *class*. But it is 0.54% of rows: oracle pricing gives **−0.000121** (group rate) and **+0.000392** (those rows labelled *perfectly*). Widening to all round-valued rows in 6 columns (4.37%) with perfect labels: +0.003320. **Closed — the attainable version is far under the +0.0010 bar.** | — |
+| 2026-08-10 | **arms `s7`/`s8` — TE, direct read** | The deliverable, not a proxy. XGB seed 42, CPU, same folds/params as `xgb_s1` s42 = **0.964524**. `s7` (`s1` + TE of the 6 crosses, 33 feats) = **0.964371, Δ −0.000152**. `s8` (`s1` + TE of 8 single q=64 bins, 35 feats) = **0.964398, Δ −0.000125**. **Both lose on all 5 of 5 folds** — a consistent paired negative, not seed noise. TE **rejected on the direct read**, not merely on the screen. Verified not a no-op: OOF differs from `xgb_s1` (corr 0.9971, max\|diff\| 0.40). Method note: the residual screen below predicted −0.000057 and the direct read landed at −0.000152 — right sign, right order of magnitude, so the proxy was *directionally* sound, but treating it as decisive was wrong when the direct read costs 11 min/arm. **Lesson: price the experiment before substituting a proxy for it.** | −0.00015 |
+| 2026-08-10 | `legs.py` reporting bug | `run_leg` printed `features={x.shape[1]}` from the **pre**-transform matrix, so every arm with a transform (`s2`–`s5`, `s7`, `s8`) reported the bare `s1` count of 27 and was indistinguishable from a transform that silently no-op'd. Now reports post-transform width and **raises** if a transform adds no columns. Found because `s7` printed 27 where 33 was expected. | — |
+| 2026-08-10 | `screen_te_crosses` (item 10) | **Screen only — superseded by the direct read above.** Verdict agreed, but see that row: the screen measures an *additive* per-cell correction and structurally cannot see a TE column being split on and interacted with the other 27 features, so it was never entitled to close the question alone. **CLEAN NEGATIVE against the unmoved +0.0010 bar.** All six pre-registered crosses returned a *negative* held-out residual-correction delta; best was `n_obs_sgw × sgw_lb` at **−0.000057**, worst `gaming_share × social_share` at −0.000343. **First positive control was mis-designed** (integer-`daily` cells — structure already proven worthless in AUC terms, so its null reading was uninformative); replaced with a corruption-recovery control, which recovers **78% / 82% / 90%** of injected per-cell noise at sd 0.02/0.05/0.10 and registers **+0.001145** against damage of only −0.001471 — sensitivity at the bar's own scale. Negative-control band −0.000368…−0.000124; 5 of 6 candidates sit *above* their matched control, so a trace of real cell structure exists at ~+0.0002 — an order of magnitude under bar. Closes **these six crosses under this instrument**, not TE as a class. | — |
 
 **Verdict against the unmoved bar.**
 
@@ -630,6 +693,100 @@ stay and the range is logged as covered.
 Tuning is the one lever lesson #7 does not blunt: it **replaces** the leg rather than adding a
 member, so there is no combiner above it to absorb the gain — unlike today's CatBoost repair,
 which was worth +0.00272 solo and +0.000000 to the blend.
+
+### PRE-REGISTRATION — Day 11 (2026-08-11): pairwise objective + RealMLP
+
+Written 09:30, **before any run of the day**, including before the RealMLP fold-1 smoke. The
+bars below do not move. The Day-10 XGBoost tuning bar above is carried forward **unchanged** and
+is executed today, not re-derived.
+
+**Framing that sets both bars.** Day 10 measured combining four families at **+0.000024** over
+`bag(xgb×6)` alone. So in this competition an *added member* has almost no route to the
+deliverable, while a *leg replacement* does (lesson #7). That is why the pairwise objective is
+priced on both routes, and why the neural leg is priced at the blend rather than solo.
+
+| Arm | Instrument | Bar | Action |
+|---|---|---|---|
+| `xgbp` **as replacement** | 3-seed paired 5-fold `s1`, `xgbp` − `xgb` solo OOF | ≥ +0.0005 | adopt as the leg |
+| `xgbp` **as member** | `blend([bag(xgb×6), xgbp]) − bag(xgb×6)` | ≥ +0.0005 | adopt as a member |
+| `realmlp` | `blend([bag(lgbm×6), bag(xgb×6), realmlp]) − blend([bag(lgbm×6), bag(xgb×6)])` | ≥ +0.0005 | adopt as a member |
+
+**Honest expected outcomes, so a clean negative counts as a result:**
+
+- **`xgbp` as a replacement: flat to slightly negative.** `binary:logistic` is a proper scoring
+  rule and already a strong AUC surrogate at 691k rows. Pairwise objectives win where the metric
+  is *top-heavy* (NDCG@k), and AUC weights every pair equally — which is also why
+  `lambdarank_pair_method` must be `"mean"`, not the `"topk"` default.
+- **`xgbp` as a member: the better of its two priors**, because a pairwise-trained ensemble
+  should make different errors in the tails. **~25% that either route clears.**
+- **`realmlp`: solo 0.950–0.960, blend delta +0.0000…+0.0002 — most likely weight 0.0.** The
+  governing datum is not `mlp_s4`'s 0.942 but `bag(cat×3)`'s **0.962516**, which is a mere 0.0018
+  below the null and *still* earned weight exactly 0.0. Decorrelation is not the argument: the
+  MLP was the most decorrelated leg (0.9713) and was harmful at every weight.
+
+**Stop-loss for the neural track (a routing rule, not a bar):** if `realmlp` seed 42 lands under
+**0.955** solo OOF, seeds 43/44 are not run. A leg 0.010 below the null cannot buy in when one
+0.0018 below it could not.
+
+**Ideas priced and dropped before spending anything on them** (user-raised, judged 09:30):
+
+- **Yeo-Johnson / power transform on inputs — dropped, no measurement taken.** It is already
+  applied where it can matter: `fit_mlp_fold` fits `PowerTransformer(yeo-johnson, standardize=True)`
+  on the fold-train split. And it is *inert* where it isn't: for any strictly monotone φ, the split
+  `φ(x) < φ(t)` selects the identical row set, so no per-feature monotone transform can change an
+  LGBM/XGB tree. Not a low prior — a no-op.
+- **Power transform on the output — dropped, structurally impossible.** The target is binary 0/1
+  (there is no continuous output), and ROC AUC is invariant under any monotone transform of the
+  predictions. This file already contains the demonstration: the prob/logit/rank blends **tied**
+  at 0.96509 on Day 10.
+- The live reading of "a different target parameterisation" is therefore not a transform of the
+  output at all — it is a different training *objective*, which is `xgbp`.
+
+### Day 13 (2026-08-13) — the XGBoost tuning bar, executed and CLEARED
+
+**Two days were lost to a hard reboot.** The 08-11 session died at ~11:00 mid-`xgbt` (fold 4/5 of
+seed 42, `logs/xgbt_s1.log`), and the box was not brought back up until 08-13 09:19. This is the
+second unplanned power event of the campaign (cf. the 08-06 cut) and the same box the
+`~/sysmon` flight recorder was installed for. Nothing was lost this time beyond wall clock —
+the Day-11 pre-registration above was already written to disk before the run started, which is
+exactly what made today's read honest rather than post-hoc. It was, however, sitting
+**uncommitted for two days**; committed first thing today before any new run.
+
+**The Day-10 tuning bar is quoted from above and was not moved:** 3-seed paired 5-fold `s1`,
+`xgbt` − `xgb`, **≥ +0.0005 → adopt**.
+
+| Date | Run | Description | OOF AUC |
+|---|---|---|---|
+| 2026-08-13 | `xgbt_s1` ×3 | The pre-registered read, seeds 42/43/44 = 0.965668 / 0.965703 / 0.965622 against the untuned 0.964524 / 0.964545 / 0.964506. Paired Δ = **+0.001144 / +0.001158 / +0.001116**, mean **+0.001139 ± 0.000021**, positive on every seed. **≥ +0.0005 → ADOPT the tuned params for the leg.** | **0.965664** (3-seed mean) |
+
+**This is the largest single lever the campaign has found, and it beats the whole Day-10 blend.**
+
+| Quantity | Value | vs null `bag(lgbm×6)` 0.964346 |
+|---|---|---|
+| `bag(xgb×6)` (untuned) | 0.965066 | +0.000720 |
+| Day-10 four-family blend | 0.965090 | +0.000744 |
+| **one tuned seed `xgbt_s1_s42`** | **0.965668** | **+0.001322** |
+
+A *single tuned XGBoost seed* is **+0.000578** ahead of a four-family Nelder-Mead blend of
+sixteen models. That is the cleanest possible statement of root CLAUDE.md lesson #7: the
+combiner absorbed everything breadth had to offer (+0.000024 for the act of combining), and a
+lever that **replaces** the leg walked straight past it.
+
+**The pre-registered expectation was too pessimistic, and the reason is on the record.** The
+prior said "+0.0003…+0.0010, mild positive" and cited the sibling LightGBM study — where the
+enqueued untuned reference *still* beats 11 tuned trials — as the cautionary case. The XGB search
+landed at 2.3× the top of that range. The two studies differ in one identified way: the LightGBM
+space was never recentred after its trials lost, while the XGB space was recentred once (`v2`,
+commit `9a67ae3`) and again at `v3`, and only the `v3` study found anything (trial 8, 3-fold
+0.96530 vs the reference's 0.96409). **A search space that never beats its own enqueued reference
+is a mis-centred space, not evidence that tuning is dead** — the LightGBM study should be read
+that way rather than as a null.
+
+**Method note kept for the next competition:** the 3-fold Optuna number (0.96530) and the 5-fold
+paired read (0.965664) differ by +0.00036, in the direction and roughly the magnitude the
+pre-registration predicted ("3 folds read ~0.0004 lower because each model sees less data"). The
+ranking proxy was sound *and* was not treated as the instrument — the adopt decision was taken on
+the 5-fold refit, as written.
 
 ### M-slope screen: `s1` vs `s0` (6 members, 2026-08-04)
 

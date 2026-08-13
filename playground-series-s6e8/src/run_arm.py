@@ -30,6 +30,7 @@ from sklearn.metrics import roc_auc_score
 
 sys.path.insert(0, str(Path(__file__).parent))
 import impute
+import te_cross
 from cv_results import save_cv_result
 from features import EXCLUDE_COLS, TARGET, build_features
 from features_signal import build_features_signal
@@ -78,6 +79,16 @@ ARMS: dict[str, tuple[Builder, Transform | None, str]] = {
         build_features_signal,
         None,
         "s1 minus the 7 noise columns and their derivatives (15 features)",
+    ),
+    "s7": (
+        build_features_v2,
+        te_cross.add_te_crosses,
+        "s1 + fold-safe TE of 6 two-way quantile-bin crosses",
+    ),
+    "s8": (
+        build_features_v2,
+        te_cross.add_te_singles,
+        "s1 + fold-safe TE of 8 single quantile-binned columns (q=64)",
     ),
 }
 

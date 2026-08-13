@@ -85,6 +85,12 @@ def main() -> None:
     if args.tuned:
         params = dict(load_params(RESULTS_DIR, PARAMS, "best_params_xgboost.json"))
         params.setdefault("early_stopping_rounds", 100)
+        # The tuning study wrote n_jobs=12 into the file. Pin it back to the
+        # leg's own value so the paired read runs at the same thread count as
+        # the untuned reference and leaves cores for a concurrent GPU leg.
+        # Threads are wall clock only (see PARAMS above), so this is not a
+        # change to either arm of the comparison.
+        params["n_jobs"] = PARAMS["n_jobs"]
         name = "xgbt"
     print(f"{name} on arm {args.arm}: {ARMS[args.arm][2]}", flush=True)
     for seed in (int(s) for s in args.seeds.split(",")):

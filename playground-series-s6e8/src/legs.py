@@ -41,6 +41,12 @@ def run_leg(name: str, arm: str, seed: int, fit_model: FitModel) -> float:
     x, y, x_test = build_matrices(builder)
     assert_budget_constraint(x)
 
+    # Width AFTER the transform, captured from the first fold. Reporting the
+    # pre-transform width (as this did until 08-10) cannot distinguish "the
+    # transform ran" from "the transform silently no-op'd" — every arm with a
+    # transform printed the bare `s1` count of 27 and looked identical to `s1`.
+    fitted_width: list[int] = []
+
     def fit_fold(
         x_tr: pd.DataFrame,
         y_tr: np.ndarray,
@@ -52,6 +58,13 @@ def run_leg(name: str, arm: str, seed: int, fit_model: FitModel) -> float:
         if transform is not None:
             # Fold-aware: every statistic is fit on the training split only.
             x_tr, x_va, x_te = transform(x_tr, y_tr, x_va, x_te)
+            if x_tr.shape[1] == x.shape[1]:
+                raise RuntimeError(
+                    f"arm {arm}: transform added no columns "
+                    f"({x_tr.shape[1]} == {x.shape[1]}) — it is a silent no-op"
+                )
+        if not fitted_width:
+            fitted_width.append(x_tr.shape[1])
         return fit_model(x_tr, y_tr, x_va, y_va, x_te, fold)
 
     # A 5-fold leg here runs for tens of minutes and `run_leg` only printed once
@@ -90,5 +103,9 @@ def run_leg(name: str, arm: str, seed: int, fit_model: FitModel) -> float:
     scores.setdefault(f"{name}_{arm}", {})[str(seed)] = auc
     SCORES_PATH.write_text(json.dumps(scores, indent=2, sort_keys=True))
 
-    print(f"  {tag}: features={x.shape[1]:>3}  OOF AUC {auc:.5f}", flush=True)
+    width = fitted_width[0] if fitted_width else x.shape[1]
+    print(
+        f"  {tag}: features={width:>3} (surface {x.shape[1]})  OOF AUC {auc:.5f}",
+        flush=True,
+    )
     return auc
