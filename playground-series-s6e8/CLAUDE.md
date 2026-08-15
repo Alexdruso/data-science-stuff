@@ -917,6 +917,46 @@ the diagnostic has moved the estimate to the bottom of that range and made it mu
 one thing the fold-1 bound cannot settle is whether the other four folds behave differently,
 which is the entire reason the instrument is a 5-fold 3-seed paired read and not this diagnostic.
 
+### Day 15 — stage 2 result: CLEAN NEGATIVE against the unmoved bar
+
+`python src/train_xgboost.py --arm s1 --seeds 42,43,44 --params best_params_xgboost_capacity.json
+--tag xgbc`. The capacity arm differs from the adopted point in **`n_estimators` alone**
+(3000 → 10000), verified by diffing the two params files with that key removed.
+
+| seed | `xgbt` (cap 3000) | `xgbc` (cap 10000) | paired Δ |
+|---|---|---|---|
+| 42 | 0.9656678 | 0.9657269 | +0.0000592 |
+| 43 | 0.9657027 | 0.9657712 | +0.0000685 |
+| 44 | 0.9656224 | 0.9657062 | +0.0000838 |
+
+**Mean +0.0000705 ± 0.0000124 over 3 seeds. Bar +0.0005. This is 0.14× the bar → KEEP the cap
+at 3000.** The capacity axis is logged as covered.
+
+**The shape of this negative is the lesson, and it is root CLAUDE.md lesson #1 in miniature.**
+The delta is **positive on every seed**, with a standard deviation of 0.0000124 — about 1/6 of
+the effect. By any per-seed significance test it is a rock-solid, highly significant positive.
+It is also **worthless**: seven times too small to deploy. "Positive at every seed with a tiny
+standard error" is exactly what a dead lever looks like, and this arm is now the campaign's own
+in-house demonstration of it — no borrowed example needed.
+
+**The guard never had to fire, and that is worth recording.** The pre-registration required a
+no-early-stopping refit before adopting, because lengthening the leash from 3000 to 10000 rounds
+amplifies the stopping-rule optimism this file already flags. Since the arm failed the bar, the
+guard was moot — but note the direction: the +0.00007 that *was* measured is the reading most
+flattered by that bias, so the honest effect is **≤ +0.00007**, not centred on it.
+
+**The fold-1 bound held.** `diag_capacity` predicted ≈+0.0001 from a single fold's tail spread;
+the 5-fold 3-seed read landed at +0.00007. The cheap instrument was quantitatively right, which
+retroactively justifies gating on the tail *magnitude* rather than on `best_iteration` — see the
+method error recorded in stage 1.
+
+**What this closes and what it does not.** It closes **`n_estimators` at the adopted learning
+rate**: at lr 0.0287 the model is converged by ~3800 trees and more trees are dead. It does
+**not** close the other two boundaries the Day-15 analysis identified — `max_bin` (512 selected at
+the ceiling of `{256, 512}`) and `learning_rate` (floor 0.015 never breached) — and it says
+nothing about them, because a lower learning rate is a question about step size, not about
+capacity at a fixed step size. Flat closes an experiment, not an avenue (lesson #13).
+
 ### M-slope screen: `s1` vs `s0` (6 members, 2026-08-04)
 
 | M | 1 | 2 | 3 | 4 | 5 | 6 |
