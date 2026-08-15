@@ -957,6 +957,13 @@ the ceiling of `{256, 512}`) and `learning_rate` (floor 0.015 never breached) �
 nothing about them, because a lower learning rate is a question about step size, not about
 capacity at a fixed step size. Flat closes an experiment, not an avenue (lesson #13).
 
+**⚠️ `xgbc_s1_s4{2,3,4}` arrays are on disk and are a REJECTED arm.** They resolve to surface
+`s1`, so `ensemble.py`'s auto-discovery will happily pull them into any future blend as their own
+"family" — near-duplicates of `xgbt` at rank corr ≈0.999, spending optimizer budget on a collinear
+direction and inviting weight overfit. They are kept as evidence, not as legs. **Pass `--legs`
+explicitly on any future `--arm s1` blend**, or delete them first. Same hazard class as the
+surface mix: every array has length `len(y)`, so nothing downstream can catch it.
+
 ### M-slope screen: `s1` vs `s0` (6 members, 2026-08-04)
 
 | M | 1 | 2 | 3 | 4 | 5 | 6 |
