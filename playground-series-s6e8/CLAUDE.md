@@ -1025,6 +1025,51 @@ evidence for a neural leg; mildly against.** One idea worth keeping: at weight 1
 only act as a **rank tie-breaker** on coarsely-rounded submission probabilities — a real technique
 if a candidate submission has many ties, and unrelated to neural networks.
 
+### Day 15 evening — two cheap closes, both clean negatives
+
+**1. The blend now collapses completely onto the tuned leg.** Re-fitted with `xgbt` present
+(Day-10's blend predated it), four bagged families on surface `s1`, `xgbc` excluded by explicit
+`--legs`:
+
+| leg | solo OOF | blend weight |
+|---|---|---|
+| **`xgbt_s1x6`** | **0.96609** | **1.000** |
+| `xgb_s1x6` | 0.96507 | 0.000 |
+| `s1x6` (lgbm) | 0.96435 | 0.000 |
+| `cat_s1x3` | 0.96260 | 0.000 |
+
+All three spaces (prob/logit/rank) agree, mean off-diagonal rank corr 0.9929, and the **combiner
+delta is +0.00000** — the blend output is *bit-identical* to `bag(xgbt×6)`, verified, so the
+duplicate submission was deleted rather than kept.
+
+Day 10 measured combining at +0.000024 and called it "a quarter of the OOF resolution and
+indistinguishable from zero". With a stronger leg it is no longer indistinguishable from zero;
+**it is zero, and every other family is excluded outright.** Breadth on this surface is closed as
+hard as a measurement can close it. The only remaining route to the deliverable is a better single
+leg — which is what the v4 search is for.
+
+**2. Tie-breaking: oracle-priced at +0.0000000. Dead.** Raised by the public notebook reviewed
+today, whose neural net at weight `1e-6` can only function as a rank tie-breaker. Worth checking
+because our own submission genuinely has ties — 18,362 of 296,302 test rows (6.2%), and 173,217
+of 691,369 OOF rows (25.05%) in 34,264 groups, largest group 91 rows at p=0.999998.
+
+| tie-break | OOF AUC | gain |
+|---|---|---|
+| none — `bag(xgbt×6)` | 0.9660902 | — |
+| **ORACLE** (true labels, upper bound) | 0.9660902 | **+0.0000000** |
+| by `bag(lgbm×6)` ranks | 0.9660902 | −0.0000000 |
+| by `bag(cat×3)` ranks | 0.9660902 | −0.0000000 |
+
+**The reason is the whole finding: the label rate inside tied groups is 0.9987, against 0.7094
+overall.** Ties form where the boosted probability saturates near 1.0, and that region is almost
+purely positive. ROC AUC counts only positive–negative pairs, so reordering an all-positive group
+changes nothing — of ~9.85e10 total pairs, the ones a tie-break could touch number in the
+thousands. The oracle is the upper bound over *every possible* tie-breaker, so no model, however
+good, can extract anything here. Closed without needing to build one.
+
+Generalisable: before building a tie-breaker, check the **label composition inside the ties**, not
+the tie count. A large tie count in a saturated region is worth exactly nothing.
+
 ### M-slope screen: `s1` vs `s0` (6 members, 2026-08-04)
 
 | M | 1 | 2 | 3 | 4 | 5 | 6 |
