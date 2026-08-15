@@ -176,17 +176,27 @@ The sweep is locked to CPU in `run_arm.py`.
 
 ## Current best
 
-**`xgbt` — tuned XGBoost on `s1`. Adopted 2026-08-13 at +0.001139 paired over untuned.**
+**`bag(xgbt×6)` = 0.96609 — tuned XGBoost on `s1`, six seeds bagged. Built 2026-08-15.**
+Params adopted 2026-08-13 at +0.001139 paired over untuned.
 
 | Leg / blend | OOF AUC | Note |
 |---|---|---|
 | `s1` single seed | 0.96371 | the number this file used to call "current best" |
-| **`bag(lgbm×6)`** | **0.964346** | ← **the null** every breadth read is priced against |
+| **`bag(lgbm×6)`** | **0.964346** | ← the null the Day-6/Day-10 breadth reads were priced against |
 | `bag(xgb×6)` | 0.965066 | untuned; strongest family before tuning |
 | Day-10 four-family blend | 0.965090 | sixteen models, Nelder-Mead |
-| **`xgbt_s1` (1 tuned seed)** | **0.965668** | **beats the whole blend by +0.000578** |
+| `xgbt_s1` (1 tuned seed) | 0.965668 | beats the whole blend by +0.000578 |
+| `xgbt_s1` (6-seed mean) | 0.9656518 | seeds 42–47, sd ≈ 0.00003 |
+| **`bag(xgbt×6)`** | **0.96609** | ← **the current best and the new null.** `submissions/bag_xgbt_s1x6.csv` |
 | `bag(cat×3)` | 0.962516 | earns **weight 0.0** |
 | `mlp_s4` (1 seed) | 0.941983 | earns **weight 0.0**, harmful at every weight |
+
+**The null for every future read is `bag(xgbt×6)` = 0.96609, not `bag(lgbm×6)` = 0.964346.**
+Anything priced against the old null is credited with +0.001744 it did not earn.
+
+Bagging the tuned leg was worth **+0.000438** over the 6-seed mean (0.9656518 → 0.96609) — much
+less than LGBM's +0.000635, as expected: `xgbt`'s seed-to-seed sd is ≈0.00003 against LGBM's
+≈0.000043, so there is less seed variance available to average away.
 
 **Quote the bag, not the single seed.** Seed-bagging six `s1` seeds is worth **+0.000635** over one
 seed — larger than the entire +0.0003 breadth bar. Pricing anything against 0.96371 credits it
@@ -787,6 +797,89 @@ paired read (0.965664) differ by +0.00036, in the direction and roughly the magn
 pre-registration predicted ("3 folds read ~0.0004 lower because each model sees less data"). The
 ranking proxy was sound *and* was not treated as the instrument — the adopt decision was taken on
 the 5-fold refit, as written.
+
+### Day 15 (2026-08-15) — backfill, the bag, and the capacity pre-registration
+
+**Backfill of what happened after commit `4fcd464` and was never written down.** The 08-13
+session continued past the commit and then stopped; 08-14 was a no-work day.
+
+| Date | Run | Description | OOF AUC |
+|---|---|---|---|
+| 2026-08-13 | `xgbt_s1` seeds 45/46/47 | Ran 16:50–17:13, never logged. 0.9656252 / 0.9656604 / 0.9656322. With 42/43/44 that is a full six-seed set; 6-seed mean **0.9656518**, sd ≈ 0.00003 (LGBM's is 0.000043). | 0.9656518 |
+| 2026-08-13 | `tune_xgboost` v3 resume | Trials 11/12/13 = 0.96375 / 0.96506 / 0.96475 at 3 folds. **None beat trial 8's 0.96530.** Study now 14 of its 60-trial budget; trial 14 was started 17:41:36 and abandoned mid-flight (stale RUNNING row). `best_params_xgboost_v3b.json` is byte-identical to the adopted file but for `n_jobs`, because nothing beat the incumbent. | — |
+| 2026-08-13 | `realmlp_s4` s42 | **Interrupted, incomplete.** Fold 1 = 0.95621 (24-epoch run, peak at epoch 10, then monotone decay to 0.95000 — clean overfit, so `epoch_select="auc"` is load-bearing). The 5-fold run got through fold 1 in 616 s and died; `results/realmlp_ckpt/s42_f{1,2}.pth` exist, no OOF array. Against the Day-11 stop-loss (<0.955 → cut seeds 43/44) the fold-1 read **clears**, so the arm is live but unclosed. | — |
+| 2026-08-15 | **`bag(xgbt×6)`** | The tuned leg had never been bagged or submitted. Six seeds averaged → **0.96609**, `submissions/bag_xgbt_s1x6.csv`, all eight `verify_submission` checks PASS (296,302 rows, ids elementwise-identical, sd 0.368, mean 0.7096). **+0.001744 over the old null and +0.001 over the Day-10 blend.** | **0.96609** |
+
+**The finding that motivates today's lever: the adopted config never early-stopped.**
+
+Queried read-only from `results/optuna_xgb_s1.db`, study `xgb_s1_v3`, per-trial `best_iteration`:
+
+| trial | 3-fold AUC | `best_iteration` |
+|---|---|---|
+| 0 (reference) | 0.96405 | 1929 |
+| 7 | 0.96465 | 766 |
+| **8 — adopted** | **0.96530** | **2999** |
+| 10 | 0.96447 | 2999 |
+| 6 | 0.96414 | 2998 |
+| 12 | 0.96506 | 778 |
+
+Trial 8 used **2999 of `n_estimators = 3000`**. Early stopping at patience 100 never fired — the
+adopted point was **cut off, not converged**. Two more of its parameters were likewise selected at
+the edge of the box they were searched in: `max_bin = 512` is the **top** of the searched set
+`{256, 512}`, and the `learning_rate` floor of 0.015 was never breached by any trial. The search
+found the best point it could *reach* and then hit the wall of its own bounds.
+
+### PRE-REGISTRATION — Day 15 (2026-08-15): the capacity ceiling
+
+Written **before `diag_capacity.py` was run** and before any number from it exists. The bar does
+not move.
+
+**Why this lever and not another.** Day 13 measured the combiner contributing **+0.000024** while
+a leg *replacement* paid **+0.001139**. Raising a capacity ceiling replaces the leg, so lesson #7
+cannot absorb it. This is the same class as the lever that just paid.
+
+**One factor at a time.** `max_bin` 512→1024 is a *different* mechanism (binning resolution, with
+independent corroboration: the CatBoost `border_count` 128→254 repair was worth +0.00285 solo, and
+`max_bin=128` was dropped from the XGB space for landing among the worst trials). Running it in
+the same arm as `n_estimators` would make a negative uninterpretable. Capacity leads; `max_bin` is
+queued behind it as its own read.
+
+**Stage 1 — diagnostic, mechanistic not score-based.** `src/diag_capacity.py`, fold 1 of the
+`legs.py` 5-fold split, seed 42, arm `s1`. Config A = adopted params exactly. Config B =
+`n_estimators` 3000 → 10000, nothing else changed. One fold cannot resolve +0.0005 (fold sd ≈
+0.0005) and is **not** being asked to; it is asked only "is there headroom at all?", which is a
+question about where ES fires and which one fold answers definitively.
+
+**Gate: promote to stage 2 only if `best_iteration ≥ 3500`.** If it stops near 3100 the config was
+converged all along, the lever is dead, and the cost was 15 minutes.
+
+**Stage 2 — the read.**
+
+| Instrument | Bar | Action |
+|---|---|---|
+| 3-seed paired 5-fold `s1`, `xgbc` − `xgbt` | ≥ +0.0005 | adopt the raised cap for the leg |
+| | < +0.0005 | keep the cap at 3000; log the capacity axis as covered |
+
+The bar is the **standing tuning bar carried forward unchanged** — same instrument and same class
+of lever as the 08-13 read. It is not re-derived and it is not relaxed.
+
+**Honest expected outcome: +0.0000…+0.0004, most likely UNDER the bar. ~30% it clears.**
+*For*: ES genuinely never fired, and the best point the search found is the one that ran out of
+rope. *Against*: patience-100 not firing means "no degradation for 100 rounds", not "still
+climbing", and the XGB AUC tail at 691k rows and lr 0.029 is very flat. A clean negative against
+the unmoved bar is a successful experiment, not a wasted afternoon.
+
+**Confound named before the number, not after: this is the lever most exposed to stopping-rule
+optimism.** This file already records that every leg early-stops on the fold it then writes as its
+OOF, and that XGB's longer leash makes it the worse offender of the two. Extending that leash from
+3000 to 10000 **amplifies exactly that bias** — more rounds is more opportunity to select a
+stopping point that flatters the very fold being scored.
+
+**Guard, pre-registered so it cannot be quietly dropped if the number is nice:** if `xgbc` clears
++0.0005 it is **not adopted on that read alone**. Re-verify with a fixed-round refit at the
+discovered `N*` with **early stopping OFF**, so the val fold is never used for selection. If the
+gain survives, it is capacity. If it evaporates, it was stopping-rule optimism and the cap stays
+at 3000.
 
 ### M-slope screen: `s1` vs `s0` (6 members, 2026-08-04)
 
