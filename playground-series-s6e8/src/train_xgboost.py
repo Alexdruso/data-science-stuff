@@ -76,14 +76,45 @@ def main() -> None:
         help="load results/best_params_xgboost.json instead of the hand-set PARAMS, "
         "and tag the arrays `xgbt_` so tuned and untuned legs never collide",
     )
+    parser.add_argument(
+        "--params",
+        default="",
+        help="params JSON to load instead of the --tuned default, e.g. "
+        "best_params_xgboost_capacity.json. Implies --tuned's load path.",
+    )
+    parser.add_argument(
+        "--tag",
+        default="",
+        help="array tag override. Every hyperparameter arm needs its own, or the "
+        "paired read overwrites the very baseline it is measured against.",
+    )
+    parser.add_argument(
+        "--no-resume",
+        action="store_true",
+        help="ignore per-fold checkpoints and refit every fold from scratch",
+    )
     args = parser.parse_args()
 
     # A distinct tag matters more than it looks: the tuning bar is a *paired*
     # tuned-vs-untuned read, so both sets of arrays have to coexist. Reusing the
     # `xgb_` tag would overwrite the very baseline the comparison needs.
     params, name = dict(PARAMS), "xgb"
-    if args.tuned:
-        params = dict(load_params(RESULTS_DIR, PARAMS, "best_params_xgboost.json"))
+    if args.tuned or args.params:
+        filename = args.params or "best_params_xgboost.json"
+        # `load_params` returns the DEFAULTS unchanged when the file is missing,
+        # which is right for "train before any tuning has happened" and utterly
+        # wrong here: a typo'd --params would silently train the untuned hand-set
+        # config, tag it as the tuned arm, and produce a paired read that looks
+        # perfectly plausible and is meaningless. Caught live on 08-15 when a
+        # smoke-test params file was never actually written and the run happily
+        # reproduced the untuned leg under a new tag.
+        if not (RESULTS_DIR / filename).exists():
+            msg = (
+                f"{filename} does not exist in {RESULTS_DIR} — refusing to fall back "
+                f"to the untuned PARAMS under the tag {args.tag or 'xgbt'!r}"
+            )
+            raise FileNotFoundError(msg)
+        params = dict(load_params(RESULTS_DIR, PARAMS, filename))
         params.setdefault("early_stopping_rounds", 100)
         # The tuning study wrote n_jobs=12 into the file. Pin it back to the
         # leg's own value so the paired read runs at the same thread count as
@@ -92,9 +123,21 @@ def main() -> None:
         # change to either arm of the comparison.
         params["n_jobs"] = PARAMS["n_jobs"]
         name = "xgbt"
+    name = args.tag or name
     print(f"{name} on arm {args.arm}: {ARMS[args.arm][2]}", flush=True)
+    print(f"  n_estimators={params['n_estimators']} max_bin={params.get('max_bin')} "
+          f"lr={params['learning_rate']} es={params.get('early_stopping_rounds')}", flush=True)
     for seed in (int(s) for s in args.seeds.split(",")):
-        run_leg(name, args.arm, seed, make_fit(seed, params))
+        # `params` is the config the checkpoint key is hashed over: two arms that
+        # differ only in n_estimators must not share a cached fold.
+        run_leg(
+            name,
+            args.arm,
+            seed,
+            make_fit(seed, params),
+            config=params,
+            resume=not args.no_resume,
+        )
 
 
 if __name__ == "__main__":
