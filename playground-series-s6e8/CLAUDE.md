@@ -881,6 +881,42 @@ discovered `N*` with **early stopping OFF**, so the val fold is never used for s
 gain survives, it is capacity. If it evaporates, it was stopping-rule optimism and the cap stays
 at 3000.
 
+### Day 15 — stage 1 result: the gate clears on its letter and fails on its substance
+
+`python src/diag_capacity.py --cap 10000`, arm `s1`, fold 1, seed 42, adopted params, one fit.
+
+| Quantity | Value |
+|---|---|
+| trees grown | 3868 |
+| **ES `best_iteration`** | **3767** |
+| A — shipped, best within the 3000 cap | 0.96493 at round 2997 |
+| B — raised cap 10000 | 0.96503 at round 3767 |
+| **fold delta B − A** | **+0.00010** |
+| tail beyond round 3000 | 868 rounds, spread **0.00010** |
+
+The validation curve: 0.95737 (500) → 0.96231 (1000) → 0.96384 (1500) → 0.96449 (2000) →
+0.96477 (2500) → 0.96492 (2999) → 0.96503 (3767). Gains of +0.00015 over rounds 2500–3000 and
++0.00010 over 3000–3767. It is asymptoting, plainly.
+
+**The pre-registered gate was `best_iteration ≥ 3500`. It read 3767, so it CLEARS, and the
+3-seed paired read runs.** The gate is not re-interpreted after the fact: a gate that only
+counts when the downstream number looks promising was never a gate.
+
+**But the gate criterion was mis-specified, and this is the transferable lesson.**
+`best_iteration ≥ 3500` tests *"did early stopping fire later than the cap"* — necessary for
+headroom, nowhere near sufficient for **useful** headroom. The same diagnostic produced the
+quantity I should have gated on, for free: `max(curve[3000:]) − max(curve[:3000])` is a **bound**
+on what any raised cap can buy on this fold, not a noisy point estimate, and it is **+0.00010**
+against a +0.0005 bar. The right gate would have been on that magnitude. Recorded as a method
+error rather than quietly fixed, because the bar-setting discipline in root CLAUDE.md lesson #10
+is worth nothing if the *gate* can be reverse-engineered from the result.
+
+**Revised honest expectation for stage 2, stated before it lands:** a clean negative, ≈+0.0001,
+roughly a fifth of the bar. The pre-registration's original +0.0000…+0.0004 already covered this;
+the diagnostic has moved the estimate to the bottom of that range and made it much sharper. The
+one thing the fold-1 bound cannot settle is whether the other four folds behave differently,
+which is the entire reason the instrument is a 5-fold 3-seed paired read and not this diagnostic.
+
 ### M-slope screen: `s1` vs `s0` (6 members, 2026-08-04)
 
 | M | 1 | 2 | 3 | 4 | 5 | 6 |

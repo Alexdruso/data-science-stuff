@@ -1,0 +1,20 @@
+{
+  "colsample_bytree": 0.5685607058124285,
+  "early_stopping_rounds": 100,
+  "enable_categorical": true,
+  "eval_metric": "auc",
+  "gamma": 0.9274757630456326,
+  "learning_rate": 0.028751410425172524,
+  "max_bin": 512,
+  "max_depth": 7,
+  "min_child_weight": 16.755052359850303,
+  "n_estimators": 10000,
+  "n_jobs": 12,
+  "objective": "binary:logistic",
+  "random_state": 42,
+  "reg_alpha": 0.0036618192203924276,
+  "reg_lambda": 1.2915099897772668,
+  "subsample": 0.7427013306774357,
+  "tree_method": "hist",
+  "verbosity": 0
+}
