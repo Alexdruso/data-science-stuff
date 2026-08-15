@@ -964,6 +964,67 @@ direction and inviting weight overfit. They are kept as evidence, not as legs. *
 explicitly on any future `--arm s1` blend**, or delete them first. Same hazard class as the
 surface mix: every array has length `len(y)`, so nothing downstream can catch it.
 
+### PRE-REGISTRATION — Day 15 evening: the v4 search space + closing the RealMLP arm
+
+Written before the v4 study is created and before RealMLP seed 42 finishes. Bars unmoved.
+
+**Arm 1 — `tune_xgboost` space v4.** The capacity read closed `n_estimators` *at the adopted
+learning rate*. It did not touch the other two edges the adopted point sits on, and v4 opens
+exactly those, no more:
+
+| parameter | v3 | v4 | why |
+|---|---|---|---|
+| `max_bin` | `{256, 512}`, **512 chosen at the top** | `{256, 512, 1024}` | CatBoost `border_count` 128→254 was +0.00285 solo here; every v1 trial drawing 128 landed among the worst; signal lives in fine-grained continuous columns |
+| `learning_rate` | `[0.015, 0.08]`, **floor never breached** | `[0.005, 0.08]` | no v3 trial went below 0.015, so the region was never sampled — not sampled and rejected |
+| `n_estimators` | 3000 (fixed) | 6000 (fixed) | **enabler, not an arm**: at lr 0.005 a 3000 cap re-creates the very truncation v4 exists to remove. Priced at +0.00007 on its own by the capacity read |
+
+Seeded with three points so a wider box cannot lose ground v3 already holds: trial 8 (the adopted
+optimum), **the same point with `max_bin=1024` and nothing else changed**, and the v2 deep/low-reg
+point. The second of those *is* the one-factor `max_bin` read — trials 1 and 2 differ in that
+parameter alone at identical folds, so the comparison is exact and costs nothing extra.
+
+| Instrument | Bar | Action |
+|---|---|---|
+| 3-seed paired 5-fold `s1`, v4 best − `xgbt` | ≥ +0.0005 | adopt the new params for the leg |
+| | < +0.0005 | keep the 08-13 params; log both boundaries as covered |
+
+Same bar as 08-13 and as the capacity read. The 3-fold Optuna number ranks only; it is not the
+instrument.
+
+**Honest expected outcome: ~25% that v4 clears.** *For*: the only two reasons v3's optimum could
+be artificially constrained are now removed, and recentring the space is the *one* thing that
+distinguishes the XGB study (which paid +0.001139) from the LightGBM study (whose enqueued
+reference still beats every tuned trial). *Against*: `max_bin` 512→1024 is a far smaller relative
+jump than CatBoost's 128→254, and it halves the bin width on columns already binned finely enough
+that 256→512 bought little; lower learning rates usually trade wall clock for a gain that
+early-stopping ensembles largely already capture. **Most likely outcome: `max_bin=1024` reads
+within noise of 512, and the lr floor buys +0.0001…+0.0003 — real, and under bar.**
+
+**Watch for the cap binding again.** `best_iteration` is now stored as the **max across folds**
+rather than the last fold's (it was the latter until today, which is precisely how the adopted
+point came to sit at 2999/3000 unnoticed). If v4's best trial reports `best_iteration` at or near
+6000, the same truncation has recurred at the new lr and the number must not be read as converged.
+
+**Arm 2 — `realmlp` seed 42, closing the Day-11 arm.** Bar carried forward unchanged:
+`blend([bag(lgbm×6), bag(xgb×6), realmlp]) − blend([bag(lgbm×6), bag(xgb×6)]) ≥ +0.0005` → adopt
+as a member. Running at `--epochs 24`, matching the config that produced the 08-13 fold-1 read of
+0.95621; the default of 6 epochs scores 0.95329 on the same fold and is the wrong arm.
+
+**Honest expected outcome: weight 0.0, near-certain.** `bag(cat×3)` at 0.962516 — a mere 0.0018
+below the *old* null — earned exactly 0.0, and RealMLP will land ~0.0095 below the *current* null
+of 0.96609. Day 13 also showed a member contributes +0.000024 while a replacement pays +0.001139.
+This is run to close a pre-registered arm honestly, not because it is expected to pay.
+
+**A public notebook was reviewed today and is not a lever.** A shared solution blends two external
+"vault" submission CSVs at weights 2.9 / 0.1 and a residual-MLP at weight **1e-6** — i.e. 0.00003%
+of the blend, contributing nothing. The net's own score is **0.938985** on a single 10% holdout
+with the epoch chosen by max on that same split, which is *below* our already-rejected `mlp_s4`
+(0.941983, 5-fold OOF, weight 0.0, harmful at every weight) and 0.027 below the current leg. Its
+features are raw columns + median-impute + one-hot, without the budget-identity structure. **No
+evidence for a neural leg; mildly against.** One idea worth keeping: at weight 1e-6 the net can
+only act as a **rank tie-breaker** on coarsely-rounded submission probabilities — a real technique
+if a candidate submission has many ties, and unrelated to neural networks.
+
 ### M-slope screen: `s1` vs `s0` (6 members, 2026-08-04)
 
 | M | 1 | 2 | 3 | 4 | 5 | 6 |

@@ -61,11 +61,28 @@ TUNE_FOLDS = 3
 #: v1 -> v2 (2026-08-10): raised the reg_alpha/reg_lambda/gamma floors off 1e-8
 #: and dropped max_bin=128. **This changes the search space, not the bar** — the
 #: pre-registered adoption threshold is still +0.0005 on a 3-seed paired 5-fold.
-SPACE_VERSION = "v3"
+#: v3 -> v4 (2026-08-15): the adopted point sat ON two of its own bounds, so the
+#: search was truncated there rather than converged. Both are opened:
+#:   * `max_bin` 512 was the TOP of {256, 512} -> {256, 512, 1024}. Two independent
+#:     findings say fine binning pays on this data (CatBoost border_count 128->254
+#:     was +0.00285 solo; every v1 trial drawing max_bin=128 landed among the worst),
+#:     and the signal lives in fine-grained continuous columns.
+#:   * `learning_rate` floor 0.015 was never breached -> 0.005. A lower lr is a
+#:     question about STEP SIZE, which the 08-15 capacity read (n_estimators, clean
+#:     negative at +0.00007) explicitly does not answer.
+#: `n_estimators` is raised to 6000 as an ENABLER, not an arm: at lr 0.005 the
+#: 3000 cap would truncate the search all over again, and the capacity read showed
+#: a longer leash is worth ~0 on its own at a fixed lr.
+#: **The bar does not move: +0.0005 on a 3-seed paired 5-fold, same as 08-13.**
+SPACE_VERSION = "v4"
 FIXED: dict[str, Any] = {
     "objective": "binary:logistic",
     "eval_metric": "auc",
-    "n_estimators": 3000,
+    # Raised from 3000 with the v4 space: at the new lr floor of 0.005 a 3000 cap
+    # binds long before convergence, which is the exact truncation v4 exists to
+    # remove. Early stopping still decides the real count, and the 08-15 capacity
+    # read established that a longer leash alone buys ~0 (+0.00007, 0.14x the bar).
+    "n_estimators": 6000,
     "early_stopping_rounds": 100,
     "enable_categorical": True,
     "tree_method": "hist",
@@ -97,6 +114,40 @@ REFERENCE = {
 #: that beats the reference: 0.96463 vs 0.96409 at 3 folds, found in the
 #: direction-broken v2 study before it was discarded.
 SEED_POINTS: list[dict[str, object]] = [
+    # v3 trial 8 — the ADOPTED point, 3-fold 0.96530, and the one that cleared the
+    # +0.0005 bar at +0.001139 on the 5-fold paired read. Enqueued first so a wider
+    # v4 box cannot lose ground v3 already holds: TPE starts from a known optimum
+    # instead of rediscovering it. Note it will re-evaluate at n_estimators=6000
+    # rather than 3000, which the capacity read priced at +0.00007 — so its v4 value
+    # should land within noise of 0.96530 and is directly comparable.
+    {
+        "learning_rate": 0.028751410425172524,
+        "max_depth": 7,
+        "min_child_weight": 16.755052359850303,
+        "subsample": 0.7427013306774357,
+        "colsample_bytree": 0.5685607058124285,
+        "reg_lambda": 1.2915099897772668,
+        "reg_alpha": 0.0036618192203924276,
+        "gamma": 0.9274757630456326,
+        "max_bin": 512,
+    },
+    # The same point with max_bin pushed to the new 1024 option and nothing else
+    # changed — the one-factor `max_bin` read, evaluated as trial 2 instead of as a
+    # separate hand-run arm. If finer binning pays, this is where it shows first.
+    {
+        "learning_rate": 0.028751410425172524,
+        "max_depth": 7,
+        "min_child_weight": 16.755052359850303,
+        "subsample": 0.7427013306774357,
+        "colsample_bytree": 0.5685607058124285,
+        "reg_lambda": 1.2915099897772668,
+        "reg_alpha": 0.0036618192203924276,
+        "gamma": 0.9274757630456326,
+        "max_bin": 1024,
+    },
+    # The v2 point that first beat the reference (0.96463 vs 0.96409 at 3 folds),
+    # carried forward across every space bump. A deep/low-regularisation optimum,
+    # structurally different from trial 8's shallow/heavily-regularised one.
     {
         "learning_rate": 0.028078987855609694,
         "max_depth": 12,
@@ -132,7 +183,9 @@ def main() -> None:
     def objective(trial: optuna.Trial) -> float:
         params = {
             **FIXED,
-            "learning_rate": trial.suggest_float("learning_rate", 0.015, 0.08, log=True),
+            # Floor 0.015 -> 0.005 for v4: no v3 trial ever went below 0.015, so the
+            # region was never sampled rather than sampled and rejected.
+            "learning_rate": trial.suggest_float("learning_rate", 0.005, 0.08, log=True),
             "max_depth": trial.suggest_int("max_depth", 6, 12),
             "min_child_weight": trial.suggest_float("min_child_weight", 1.0, 30.0, log=True),
             "subsample": trial.suggest_float("subsample", 0.6, 1.0),
@@ -146,12 +199,15 @@ def main() -> None:
             "reg_alpha": trial.suggest_float("reg_alpha", 1e-3, 10.0, log=True),
             "gamma": trial.suggest_float("gamma", 1e-3, 5.0, log=True),
             # 128 dropped: all three v1 trials that drew it landed among the four
-            # worst. Independently consistent with today's CatBoost finding that
+            # worst. Independently consistent with the CatBoost finding that
             # border_count=128 costs real score here — this dataset's signal is
             # in fine-grained continuous columns, so coarse binning hurts.
-            "max_bin": trial.suggest_categorical("max_bin", [256, 512]),
+            # 1024 added in v4: the adopted point chose 512, the TOP of the old set,
+            # so "finer is better" was still improving when the options ran out.
+            "max_bin": trial.suggest_categorical("max_bin", [256, 512, 1024]),
         }
         oof = np.zeros(len(y))
+        best_iters: list[int] = []
         for tr_idx, va_idx in folds:
             model = XGBClassifier(**params)
             model.fit(
@@ -161,8 +217,15 @@ def main() -> None:
                 verbose=False,
             )
             oof[va_idx] = model.predict_proba(x.iloc[va_idx])[:, 1]
-            trial.set_user_attr("best_iteration", model.best_iteration)
+            best_iters.append(int(model.best_iteration))
             del model
+        # The MAX across folds, not the last fold's. Overwriting per fold (as this
+        # did until 08-15) discards the only signal that says whether n_estimators
+        # is binding — which is exactly how the adopted v3 point came to sit at
+        # best_iteration 2999/3000 without anyone noticing until Day 15. At v4's
+        # lr floor of 0.005 the 6000 cap is the one to watch.
+        trial.set_user_attr("best_iteration", max(best_iters))
+        trial.set_user_attr("best_iteration_per_fold", best_iters)
         return float(roc_auc_score(y, oof))
 
     db = RESULTS_DIR / f"optuna_xgb_{args.arm}.db"

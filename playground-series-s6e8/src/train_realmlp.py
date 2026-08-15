@@ -198,7 +198,12 @@ def main() -> None:
         if args.fold1:
             smoke_fold1(args.arm, seed, cfg)
         else:
-            run_leg("realmlp", args.arm, seed, make_fit(seed, cfg))
+            # `cfg` is the checkpoint key's config component. This leg is the slowest
+            # in the competition (~10 min/fold) and the 08-13 run died at fold 2, so
+            # fold-level restore matters more here than anywhere else. Distinct from
+            # the per-fold `ckpt_path` above, which is RealMLP's own within-fit best
+            # -epoch snapshot and does not survive the fold ending.
+            run_leg("realmlp", args.arm, seed, make_fit(seed, cfg), config=cfg)
 
 
 if __name__ == "__main__":
