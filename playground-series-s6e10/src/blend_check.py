@@ -2,6 +2,7 @@
 
     python src/blend_check.py realmlp_v1
     python src/blend_check.py realmlp_e8 --base lgbm_pr5_tuned --vs realmlp_v1   # PR-7
+    python src/blend_check.py tabm_v1 --control-blend   # PR-8: vs the submitted blend
 
 control   = equal rank-average of CONTROL legs
 candidate = (1 - w) * control + w * rank(leg), w on a 0.05 grid
@@ -29,6 +30,8 @@ from data_science_stuff.kaggle.io import competition_dirs
 DATA_DIR, RESULTS_DIR, _ = competition_dirs(__file__)
 
 CONTROL = ["lgbm_pr1_base", "xgb_v1", "catboost_v1"]
+# The submitted blend (2026-10-05): 0.65·rank(tuned LGBM) + 0.35·rank(RealMLP).
+SUBMITTED_BLEND = {"lgbm_pr5_tuned": 0.65, "realmlp_v1": 0.35}
 GRID = np.round(np.arange(0.0, 1.0001, 0.05), 2)
 BAR = 0.0005
 
@@ -73,7 +76,10 @@ def main() -> None:
     leg = sys.argv[1]
     # Row-order invariant: y comes through build_features.
     y = build_features(pl.read_csv(DATA_DIR / "train.csv"))[TARGET].to_numpy()
-    control = np.mean([_rank(np.load(RESULTS_DIR / f"oof_{n}.npy")) for n in CONTROL], axis=0)
+    if "--control-blend" in sys.argv:
+        control = sum(w * _rank(np.load(RESULTS_DIR / f"oof_{n}.npy")) for n, w in SUBMITTED_BLEND.items())
+    else:
+        control = np.mean([_rank(np.load(RESULTS_DIR / f"oof_{n}.npy")) for n in CONTROL], axis=0)
     cand = _rank(np.load(RESULTS_DIR / f"oof_{leg}.npy"))
     assert len(cand) == len(y) == len(control)
 

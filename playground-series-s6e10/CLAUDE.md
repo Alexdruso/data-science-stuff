@@ -323,6 +323,10 @@ first because each one *bounds* the effect (gate on magnitude, not on "the struc
 - **Control**: the submitted blend (0.959169), scored on the same rows.
 - **Bar (ADOPT)**: stack OOF − control ≥ **+0.0005**. Prior **~10%**: lesson 7 — the combiner
   absorbs; with 0.997+ correlated legs an LR has almost nothing a rank-average lacks.
+- **RESULT (2026-10-05, 5 legs, before TabM): FAIL (null).** Stack OOF **0.959174** vs control
+  0.959169 → **+0.000004**. Final C = 0.01 (strongest shrinkage on the grid); standardised
+  coefs lgbm_pr5 0.54, lgbm_v1 0.45, xgb 0.27, cat 0.33, realmlp 1.36 — the LR rediscovers the
+  rank blend. Re-run with TabM once it lands (pre-registered).
 
 ## Next steps (remove each item when implemented)
 
