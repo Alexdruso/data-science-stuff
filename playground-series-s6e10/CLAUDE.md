@@ -202,6 +202,33 @@ Use the `select-finals` skill: rank by **OOF CV, not public LB**; two diverse fi
   learners on v1 features is nearly exhausted; the next lever has to change the *information*
   (features / original-as-lookup / target encoding), not the learner.
 
+### PR-3/4/5 — information levers, run in sequence (registered 2026-10-05, before any number)
+
+Common instrument: `src/run_lgbm_arm.py` (PR-3, PR-4) / `src/tune_lgbm.py` (PR-5) — the PR-1
+control's LGBM config (CPU, 8 threads, seed 42, same folds), paired per fold against
+`oof_lgbm_pr1_base.npy` (0.958768). An `--arm base` run must reproduce it first (instrument
+check). **Common bar (PASS)**: OOF delta ≥ **+0.0005** AND ≥ **4/5** folds positive. A PASS
+on the LGBM leg is then re-priced at the blend (lesson 7) before adoption.
+
+- **PR-3 — original as a feature source.** `orig_pred` (LGBM fit on the full original,
+  predicting synthetic rows) + `orig_rate_<col>` (original satisfaction rate per value of each
+  of the 4 categoricals and 13 ratings). Uses no synthetic labels → global, not fold-fitted
+  (rule 2). Prior **~20%**: PR-1 showed original rows carry nothing the synthetic rows lack, and
+  a model of the original is the same information compressed — but a compressed, near-separable
+  view could still be an easier split for the trees.
+- **PR-4a — fold-safe TE on the 78 rating pairs** (smoothed (r_i, r_j) target rate, nested
+  inner CV, fit per fold on train only; raw pair keys not fed). Prior **~15%**: 700k rows let
+  the trees learn pairwise interactions directly; TE mostly helps when combos are sparse.
+- **PR-4b — ratings as `category` dtype** (0 = N/A is not ordinal). Prior **~15%**: trees
+  already isolate 0 with one split.
+- **PR-5 — LGBM tuning.** Optuna TPE, 40 trials, objective = 3-fold AUC on a fixed 50% subsample
+  (seed 0) for speed; space lr [0.01, 0.1] log, num_leaves [15, 255], min_child_samples
+  [20, 1000] log, reg_lambda [1e-3, 30] log, colsample_bytree [0.3, 1], subsample [0.5, 1],
+  n_estimators 5000 + ES 100. Final: 5-fold with the best params, paired as above. Caveat: the
+  tuning rows overlap the evaluation rows, so the read carries a small selection optimism
+  (40 trials → ~1e-4 at most); the bar absorbs it. Prior **~40%**: the control early-stops at
+  ~200 trees with 127 leaves — the shape of an over-aggressive config on a noisy target.
+
 ## Next steps (remove each item when implemented)
 
 1. Original as a feature source (lookup target rates from the original; see PR-1 "still open").
