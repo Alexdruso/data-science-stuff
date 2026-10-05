@@ -1,6 +1,7 @@
 """Honest blend read for a candidate leg against the GBDT control blend (PR-2).
 
     python src/blend_check.py realmlp_v1
+    python src/blend_check.py realmlp_e8 --base lgbm_pr5_tuned --vs realmlp_v1   # PR-7
 
 control   = equal rank-average of CONTROL legs
 candidate = (1 - w) * control + w * rank(leg), w on a 0.05 grid
@@ -36,7 +37,39 @@ def _rank(a: np.ndarray) -> np.ndarray:
     return rankdata(a) / len(a)
 
 
+def honest_blend_score(
+    y: np.ndarray, base: np.ndarray, cand: np.ndarray, half: np.ndarray
+) -> tuple[float, list[float]]:
+    """Mean held-out AUC of (1-w)·base + w·cand, w fit on the other half."""
+    scores, ws = [], []
+    for fit_mask in (half, ~half):
+        score_mask = ~fit_mask
+        w = max(GRID, key=lambda g: roc_auc_score(
+            y[fit_mask], (1 - g) * base[fit_mask] + g * cand[fit_mask]))
+        ws.append(float(w))
+        scores.append(float(roc_auc_score(
+            y[score_mask], (1 - w) * base[score_mask] + w * cand[score_mask])))
+    return float(np.mean(scores)), ws
+
+
+def compare(base_leg: str, new_leg: str, old_leg: str) -> None:
+    """PR-7 read: honest blend(base, new) − honest blend(base, old), same halves."""
+    y = build_features(pl.read_csv(DATA_DIR / "train.csv"))[TARGET].to_numpy()
+    base, new, old = (_rank(np.load(RESULTS_DIR / f"oof_{n}.npy")) for n in (base_leg, new_leg, old_leg))
+    half = np.random.default_rng(0).permutation(len(y)) < len(y) // 2
+    s_new, w_new = honest_blend_score(y, base, new, half)
+    s_old, w_old = honest_blend_score(y, base, old, half)
+    print(f"solo: {new_leg} {roc_auc_score(y, new):.6f}  {old_leg} {roc_auc_score(y, old):.6f}")
+    print(f"honest blend with {new_leg}: {s_new:.6f} (w {w_new})")
+    print(f"honest blend with {old_leg}: {s_old:.6f} (w {w_old})")
+    d = s_new - s_old
+    print(f"DELTA {d:+.6f}  bar +{BAR}  → {'ADOPT' if d >= BAR else 'FAIL'}")
+
+
 def main() -> None:
+    if "--base" in sys.argv:
+        compare(sys.argv[sys.argv.index("--base") + 1], sys.argv[1], sys.argv[sys.argv.index("--vs") + 1])
+        return
     leg = sys.argv[1]
     # Row-order invariant: y comes through build_features.
     y = build_features(pl.read_csv(DATA_DIR / "train.csv"))[TARGET].to_numpy()

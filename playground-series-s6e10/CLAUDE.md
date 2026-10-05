@@ -283,16 +283,24 @@ first because each one *bounds* the effect (gate on magnitude, not on "the struc
 - **Prior ~15%**: tuning a leg raises its solo score, but s6e7/s6e8 both showed a combiner
   absorbs improved legs (lesson 7). For: the schedule is visibly mis-set (peak at epoch 4-5 of
   a 16-epoch cosine — the LR had not decayed when it peaked).
+- **RESULT (2026-10-05): FAIL at stage 1 — no config clears seed noise; stage 2 not run.**
+  Fold-1 AUC (v1 seed 42 = 0.95888): **seed-43 control 0.95875** (noise band ±0.00013);
+  e6 0.95874, e8 0.95885, e10 0.95886, e8·w256 0.95885, e8·w1024 0.95879, e8·lr0.005 0.95877,
+  e8·lr0.02 0.95890, e8·reg (dropout 0.15, wd 0.05) 0.95887. Spread of all 9 = 0.00016 ≈ the
+  seed gap. **The epoch-5 peak is not the schedule:** every config peaked at epoch 5 whatever
+  its length (6, 8, 10, 16) — 560k rows/fold overfit after ~5 passes. Only e8·reg peaked at its
+  *last* epoch (its boundary binds), but gate on magnitude: all of v1 bought +0.00017 at the
+  blend, so even a solo gain several times the observed spread cannot reach +0.0005 there.
+  **Closed: RealMLP hyperparameter tuning** (schedule, width, lr, regularisation).
 
 ## Next steps (remove each item when implemented)
 
 Closed so far: original as rows (PR-1) and as features (PR-3); pairwise rating TE (PR-4a);
-categorical ratings (PR-4b); duplicate/frequency structure (PR-6, by screen). Sub-bar but real: RealMLP (PR-2), LGBM tuning (PR-5).
+categorical ratings (PR-4b); duplicate/frequency structure (PR-6, by screen); RealMLP tuning (PR-7). Sub-bar but real: RealMLP (PR-2), LGBM tuning (PR-5).
 **Untested lever classes:**
-1. Tune RealMLP (epochs ~6 schedule, width, lr) — it is the leg that actually moves the blend.
-2. Tune XGB / CatBoost and an LR stack over all legs (lesson 7 says absorption is likely —
+1. Tune XGB / CatBoost and an LR stack over all legs (lesson 7 says absorption is likely —
    price at the blend).
-3. Different NN family (TabM) for a second in-kind leg.
+2. Different NN family (TabM) for a second in-kind leg.
 
 ---
 
@@ -311,4 +319,5 @@ categorical ratings (PR-4b); duplicate/frequency structure (PR-6, by screen). Su
 | 2026-10-05 | lgbm_arm_cat_ratings | PR-4b ratings as category — **FAIL** (−0.000049, 1/5) | 0.958719 |
 | 2026-10-05 | lgbm_pr5_tuned | PR-5 Optuna 40 trials — **FAIL** on magnitude (+0.000234, 5/5) | 0.959002 |
 | 2026-10-05 | blend (OOF only) | 0.65·lgbm_pr5_tuned + 0.35·realmlp_v1 (rank) | **0.959169** |
+| 2026-10-05 | PR-7 sweep | RealMLP fold-1 sweep, 8 configs + seed control — **FAIL**, all within seed noise (±0.00013) | (fold 1 only) |
 | 2026-10-05 | realmlp_v1 | PR-2 RealMLP-TD, 16 ep — **FAIL** vs bar, honest blend +0.000166 at w=0.35 | 0.95863 |

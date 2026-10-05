@@ -2,6 +2,7 @@
 
     python src/train_realmlp.py               # 5-fold, saves oof/test_realmlp_v1.npy
     python src/train_realmlp.py --epochs 24
+    python src/train_realmlp.py --fold1 --tag e8 --override '{"epochs": 8}'
 
 Wiring follows s6e8's `train_realmlp.py`, including its two package traps:
 
@@ -22,6 +23,7 @@ cleared inside every fold.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import time
 from pathlib import Path
@@ -30,6 +32,7 @@ import numpy as np
 import pandas as pd
 import torch
 from sklearn.metrics import roc_auc_score
+from sklearn.model_selection import StratifiedKFold
 
 sys.path.insert(0, str(Path(__file__).parent))
 from cv_results import save_cv_result
@@ -78,9 +81,18 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--epochs", type=int, default=None)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--override", default="{}", help="JSON dict of config overrides")
+    parser.add_argument("--tag", default="", help="run-name suffix; required with --override")
+    parser.add_argument(
+        "--fold1", action="store_true",
+        help="fit fold 1 only (same split as run_cv) and print its AUC; saves no arrays",
+    )
     args = parser.parse_args()
 
-    cfg = {**REALMLP_TD_CONFIG, **CFG}
+    overrides = json.loads(args.override)
+    if overrides and not args.tag:
+        raise SystemExit("--override needs --tag, or the arrays overwrite realmlp_v1")
+    cfg = {**REALMLP_TD_CONFIG, **CFG, **overrides}
     if args.epochs is not None:
         cfg["epochs"] = args.epochs
     m = build_matrices()
@@ -115,7 +127,7 @@ def main() -> None:
             y_va.astype(np.int64),
             cat_col_names=m.cat_cols,
             # Per fold, or the five folds overwrite each other's best checkpoint.
-            ckpt_path=CKPT_DIR / f"s{args.seed}_f{fold}.pth",
+            ckpt_path=CKPT_DIR / f"{args.tag or 'v1'}_s{args.seed}_f{fold}.pth",
             X_test=te,
         )
         val = np.asarray(model.best_val_probs_)[:, 1]
@@ -129,6 +141,17 @@ def main() -> None:
         torch.cuda.empty_cache()
         return val, test
 
+    if args.fold1:
+        # Same splitter and seed as run_cv, so this is fold 1 of a full run.
+        splitter = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+        tr_idx, va_idx = next(iter(splitter.split(X, m.y)))
+        val, _ = fit_fold(
+            X.iloc[tr_idx], m.y[tr_idx], X.iloc[va_idx], m.y[va_idx], X_test.iloc[:1000], 1
+        )
+        print(f"FOLD1 tag={args.tag or 'v1'} seed={args.seed} {overrides} "
+              f"AUC {roc_auc_score(m.y[va_idx], val):.5f}", flush=True)
+        return
+
     def fold_score(y_va: np.ndarray, val_pred: np.ndarray) -> float:
         return float(roc_auc_score(y_va, val_pred))
 
@@ -139,7 +162,7 @@ def main() -> None:
     oof_auc = float(roc_auc_score(m.y, oof))
     print(f"\nfolds {[round(s, 5) for s in fold_scores]}  OOF AUC: {oof_auc:.5f}")
 
-    run_name = "realmlp_v1" if args.seed == 42 else f"realmlp_v1_s{args.seed}"
+    run_name = f"realmlp_{args.tag or 'v1'}" + ("" if args.seed == 42 else f"_s{args.seed}")
     save_cv_result(RESULTS_DIR, run_name, fold_scores, oof_auc, metric_name="auc")
     np.save(RESULTS_DIR / f"oof_{run_name}.npy", oof)
     np.save(RESULTS_DIR / f"test_{run_name}.npy", test)
