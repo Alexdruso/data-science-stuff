@@ -99,15 +99,18 @@ Original target: bool, 43.4% positive (56,428 / 129,880).
 
 ## Current best
 
-**Equal rank-blend LGBM+XGB+CatBoost OOF AUC: 0.95894** (2026-10-05) ← current best
-(grid-optimal 0.55/0.25/0.20 reaches 0.95898 in-sample — not worth the fit). Best single:
-LGBM v1 0.95874. All untuned.
+**Rank-blend 0.65·tuned LGBM (`lgbm_pr5_tuned`) + 0.35·RealMLP OOF AUC: 0.959169**
+(2026-10-05) ← current best. `w=0.35` was fit (honest half-split) against the GBDT blend in
+PR-2 and carried over, not refit. Best single: tuned LGBM 0.959002. No lever has cleared the
++0.0005 bar; this is the sum of two sub-bar but consistent gains (PR-2 + PR-5).
+Previous: equal rank-blend LGBM+XGB+CatBoost 0.95894.
 
 | Model | OOF AUC | Script | Notes |
 |---|---|---|---|
 | LGBM v1 | 0.95874 (CUDA) / 0.95877 (CPU, `lgbm_pr1_base`) | `src/baseline.py` | best_iter only ~170-250 at lr 0.05 |
 | XGBoost v1 | 0.95862 | `src/train_xgboost.py` | GPU, ~1 min total; best_iter 550-820 |
 | CatBoost v1 | 0.95822 | `src/train_catboost.py` | GPU, fixed 2000 iters, no ES |
+| LGBM PR-5 tuned | 0.959002 | `src/tune_lgbm.py --evaluate` | CPU, lr 0.0135, ~700-1050 trees |
 | RealMLP v1 | 0.95863 | `src/train_realmlp.py` | GPU, 16 epochs (best at 4-5), ~3.5 min/fold; corr 0.972 with GBDTs; PR-2 sub-bar (+0.00017 honest) |
 
 OOF correlations: LGBM↔XGB 0.9987, LGBM↔Cat 0.9975, XGB↔Cat 0.9981 — the three GBDTs are
@@ -228,13 +231,39 @@ on the LGBM leg is then re-priced at the blend (lesson 7) before adoption.
   tuning rows overlap the evaluation rows, so the read carries a small selection optimism
   (40 trials → ~1e-4 at most); the bar absorbs it. Prior **~40%**: the control early-stops at
   ~200 trees with 127 leaves — the shape of an over-aggressive config on a noisy target.
+- **Instrument check (2026-10-05): PASS** — `--arm base` reproduced `lgbm_pr1_base` exactly
+  (per-fold delta 0.0, corr 1.0000), so CPU LGBM is deterministic here and the arms are paired.
+- **PR-3 RESULT: FAIL (null).** OOF 0.958809, delta **+0.000041**, per-fold
+  [−3, −2, −18, +36, +8]e-5 (2/5). Corr 0.9979. Together with PR-1: the original carries nothing
+  the synthetic rows lack, *in either form* (rows or compressed features). **Closed: the
+  original dataset as an information source** (weighted rows remain technically untested but
+  have no mechanism left).
+- **PR-4a RESULT: FAIL (harmful).** OOF 0.958427, delta **−0.000341**, 0/5 positive (every fold
+  −1.2e-4…−4.5e-4). 78 TE columns dilute the column sampling and add encoder noise; the trees
+  already resolve rating pairs from 560k rows/fold. **Closed: pairwise rating TE.**
+- **PR-4b RESULT: FAIL (null).** OOF 0.958719, delta **−0.000049**, 1/5. **Closed: ratings as
+  categoricals.**
+- **PR-5 RESULT: FAIL on magnitude — consistent but sub-bar.** Search: best 0.95774 vs control
+  trial 0.95746 on the 50% subsample (40 trials, ~2 h on CUDA LGBM — CPU would have been faster
+  on this narrow data). Best params → `results/best_params_lgbm_pr5.json`: lr 0.0135,
+  num_leaves 144, min_child_samples 176, reg_lambda 2.07, colsample 0.69, subsample 0.87.
+  5-fold paired: OOF **0.959002**, delta **+0.000234**, per-fold [+33, +13, +15, +33, +25]e-5
+  (**5/5**), best_iter 716-1046. Real (every fold) but half the bar.
+  **Blend pricing (lesson 7, bookkeeping):** swapping it into the 3-GBDT rank blend gives
+  0.958929 (−0.000007 — fully absorbed), but **tuned LGBM + 0.35·RealMLP = 0.959169** (w carried
+  from PR-2, not refit) — the best OOF so far, +0.00023 over the 0.95894 blend.
 
 ## Next steps (remove each item when implemented)
 
-1. Original as a feature source (lookup target rates from the original; see PR-1 "still open").
-2. Tune the strongest leg — s6e8 showed one tuned leg can beat a whole untuned blend.
-3. Treat ratings as categoricals (CatBoost native / TE on rating crosses) — the 0 = N/A
-   semantics make them non-ordinal at one end.
+Closed so far: original as rows (PR-1) and as features (PR-3); pairwise rating TE (PR-4a);
+categorical ratings (PR-4b). Sub-bar but real: RealMLP (PR-2), LGBM tuning (PR-5).
+**Untested lever classes:**
+1. Duplicate / frequency structure: count of identical feature vectors (full row, rating
+   vector) across train∪test — synthetic generators often emit near-copies whose labels agree.
+2. Tune RealMLP (epochs ~6 schedule, width, lr) — it is the leg that actually moves the blend.
+3. Tune XGB / CatBoost and an LR stack over all legs (lesson 7 says absorption is likely —
+   price at the blend).
+4. Different NN family (TabM) for a second in-kind leg.
 
 ---
 
@@ -248,4 +277,9 @@ on the LGBM leg is then re-priced at the blend (lesson 7) before adoption.
 | 2026-10-05 | xgb_v1 | XGBoost GPU, s6e8 hand-set params | 0.95862 |
 | 2026-10-05 | catboost_v1 | CatBoost GPU, 2000 iters, border 254, max_ctr 1 | 0.95822 |
 | 2026-10-05 | blend (OOF only) | equal rank-blend of the three | 0.95894 |
+| 2026-10-05 | lgbm_arm_orig | PR-3 original-derived features — **FAIL** (+0.000041, 2/5) | 0.958809 |
+| 2026-10-05 | lgbm_arm_te_pairs | PR-4a fold-safe TE on 78 rating pairs — **FAIL**, harmful (−0.000341, 0/5) | 0.958427 |
+| 2026-10-05 | lgbm_arm_cat_ratings | PR-4b ratings as category — **FAIL** (−0.000049, 1/5) | 0.958719 |
+| 2026-10-05 | lgbm_pr5_tuned | PR-5 Optuna 40 trials — **FAIL** on magnitude (+0.000234, 5/5) | 0.959002 |
+| 2026-10-05 | blend (OOF only) | 0.65·lgbm_pr5_tuned + 0.35·realmlp_v1 (rank) | **0.959169** |
 | 2026-10-05 | realmlp_v1 | PR-2 RealMLP-TD, 16 ep — **FAIL** vs bar, honest blend +0.000166 at w=0.35 | 0.95863 |
