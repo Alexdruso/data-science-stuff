@@ -99,11 +99,18 @@ Original target: bool, 43.4% positive (56,428 / 129,880).
 
 ## Current best
 
-**LGBM v1 OOF AUC: 0.95874** (2026-10-05) ← current best (untuned; folds 0.95778-0.95940)
+**Equal rank-blend LGBM+XGB+CatBoost OOF AUC: 0.95894** (2026-10-05) ← current best
+(grid-optimal 0.55/0.25/0.20 reaches 0.95898 in-sample — not worth the fit). Best single:
+LGBM v1 0.95874. All untuned.
 
-| Model | OOF AUC | Script |
-|---|---|---|
-| LGBM v1 | 0.95874 | `src/baseline.py` |
+| Model | OOF AUC | Script | Notes |
+|---|---|---|---|
+| LGBM v1 | 0.95874 (CUDA) / 0.95877 (CPU, `lgbm_pr1_base`) | `src/baseline.py` | best_iter only ~170-250 at lr 0.05 |
+| XGBoost v1 | 0.95862 | `src/train_xgboost.py` | GPU, ~1 min total; best_iter 550-820 |
+| CatBoost v1 | 0.95822 | `src/train_catboost.py` | GPU, fixed 2000 iters, no ES |
+
+OOF correlations: LGBM↔XGB 0.9987, LGBM↔Cat 0.9975, XGB↔Cat 0.9981 — the three GBDTs are
+near-copies; blending buys only +0.0002. Diversity has to come from a different *kind* of leg.
 
 ---
 
@@ -121,7 +128,11 @@ Original target: bool, 43.4% positive (56,428 / 129,880).
 - **CV**: `run_cv` (5-fold stratified, random_state=42). Scores logged to `results/cv_scores.csv`.
 - **OOF/test arrays store the positive-class probability** (1-D). AUC is rank-based: no
   threshold/decision layer.
-- **GPU**: LightGBM via `get_lgbm_device()` (CUDA probe, CPU fallback).
+- **GPU**: LightGBM via `get_lgbm_device()` (CUDA probe, CPU fallback). XGBoost `device=cuda`
+  (`S6E10_XGB_DEVICE`); CatBoost `task_type=GPU` (`S6E10_CATBOOST_DEVICE`,
+  `S6E10_CATBOOST_GPU_RAM_PART`, default 0.5) — runs at ~84% util / 4.5 GB with 0.8.
+- **Shared matrices**: every leg builds X / y / X_test via `src/matrices.py::build_matrices()`
+  (identical features + category codes; `is_original` column constant 0 unless augmenting).
 - **GPU memory rule (all PyTorch scripts)**: `del` model + optimizer + tensors before returning
   from each fold; `torch.cuda.empty_cache()` after each fold/trial.
 - **Categoricals**: pandas `category` with a shared train∪test level set for LGBM/XGB;
@@ -152,11 +163,23 @@ Use the `select-finals` skill: rank by **OOF CV, not public LB**; two diverse fi
 - **Prior**: ~40% PASS. For: classic Playground lever, original is near-separable so its
   labels are cleaner. Against: delays drifted ~12× (original rows are off-distribution) and
   700k synthetic rows already dwarf 130k originals.
+- **RESULT (2026-10-05): FAIL — a clean null.** base 0.958768 / aug 0.958764, OOF delta
+  **−0.000004**; per-fold deltas [+8, −7, −5, −5, +6]e-5 (2/5 positive). OOF correlation
+  base↔aug 0.9993. The control reproduced the CUDA `lgbm_v1` (0.95877 vs 0.95874), so the
+  instrument is sound. Reading: the original's clean labels don't transfer — whatever the
+  generator did to the label/feature relationship, 130k rows from the source distribution add no
+  information the 700k synthetic rows lack. **Closed: equal-weight, flag-only augmentation.**
+  **Still open** (cheaper levers first): original as a *feature source* (e.g. per-combo target
+  rate looked up from the original — no row mixing, so no surface mixing); down-weighted original
+  rows; original with delays dropped.
 
 ## Next steps (remove each item when implemented)
 
-1. Tune the strongest leg — s6e8 showed one tuned leg can beat a whole untuned blend.
-2. Treat ratings as categoricals (CatBoost native / TE on rating crosses) — the 0 = N/A
+1. A leg that differs in kind (NN — RealMLP / MLP via `kaggle.models`) — the GBDTs are
+   0.998-correlated, so another GBDT variant is not the lever.
+2. Original as a feature source (lookup target rates from the original; see PR-1 "still open").
+3. Tune the strongest leg — s6e8 showed one tuned leg can beat a whole untuned blend.
+4. Treat ratings as categoricals (CatBoost native / TE on rating crosses) — the 0 = N/A
    semantics make them non-ordinal at one end.
 
 ---
@@ -167,3 +190,7 @@ Use the `select-finals` skill: rank by **OOF CV, not public LB**; two diverse fi
 |---|---|---|---|
 | 2026-10-05 | scaffold | Seeded dir; pipeline smoke-tested on the original data (not the competition data) | (0.99491, original only) |
 | 2026-10-05 | lgbm_v1 | `baseline.py` on the competition data, v1 features, untuned defaults | 0.95874 |
+| 2026-10-05 | lgbm_pr1_base / _aug | PR-1 original augmentation, paired on CPU — **FAIL**, delta −0.000004 | 0.95877 / 0.95876 |
+| 2026-10-05 | xgb_v1 | XGBoost GPU, s6e8 hand-set params | 0.95862 |
+| 2026-10-05 | catboost_v1 | CatBoost GPU, 2000 iters, border 254, max_ctr 1 | 0.95822 |
+| 2026-10-05 | blend (OOF only) | equal rank-blend of the three | 0.95894 |
