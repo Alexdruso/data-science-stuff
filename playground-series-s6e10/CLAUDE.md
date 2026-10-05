@@ -108,6 +108,7 @@ LGBM v1 0.95874. All untuned.
 | LGBM v1 | 0.95874 (CUDA) / 0.95877 (CPU, `lgbm_pr1_base`) | `src/baseline.py` | best_iter only ~170-250 at lr 0.05 |
 | XGBoost v1 | 0.95862 | `src/train_xgboost.py` | GPU, ~1 min total; best_iter 550-820 |
 | CatBoost v1 | 0.95822 | `src/train_catboost.py` | GPU, fixed 2000 iters, no ES |
+| RealMLP v1 | 0.95863 | `src/train_realmlp.py` | GPU, 16 epochs (best at 4-5), ~3.5 min/fold; corr 0.972 with GBDTs; PR-2 sub-bar (+0.00017 honest) |
 
 OOF correlations: LGBM↔XGB 0.9987, LGBM↔Cat 0.9975, XGB↔Cat 0.9981 — the three GBDTs are
 near-copies; blending buys only +0.0002. Diversity has to come from a different *kind* of leg.
@@ -191,14 +192,21 @@ Use the `select-finals` skill: rank by **OOF CV, not public LB**; two diverse fi
 - **Prior**: ~25% ADOPT. Against: s6e8's NN legs earned weight 0.0. For: here the GBDTs are
   0.998-correlated and early-stop at ~200 trees (low-signal, noisy target), a regime where a
   smooth model can genuinely rank differently.
+- **RESULT (2026-10-05): FAIL — real but sub-bar.** Solo OOF **0.95863** (folds 0.95888 /
+  0.95768 / 0.95918 / 0.95853 / 0.95894 — level with XGB, ~3.5 min/fold on GPU; best epoch 4-5
+  of 16 every fold). Corr with the GBDT blend 0.9724 (vs 0.998 among the GBDTs). Honest blend:
+  `w = 0.35` in *both* halves, held-out deltas +0.000175 / +0.000157 → **+0.000166** vs the
+  +0.0005 bar. The gain is consistent, not noise — but a third of the bar. Not adopted as a
+  pre-registered member; the arrays are kept, and it is the natural first member of any later
+  stack. Reading: the most decorrelated leg available buys +0.00017, so diversity among
+  learners on v1 features is nearly exhausted; the next lever has to change the *information*
+  (features / original-as-lookup / target encoding), not the learner.
 
 ## Next steps (remove each item when implemented)
 
-1. A leg that differs in kind (NN — RealMLP / MLP via `kaggle.models`) — the GBDTs are
-   0.998-correlated, so another GBDT variant is not the lever.
-2. Original as a feature source (lookup target rates from the original; see PR-1 "still open").
-3. Tune the strongest leg — s6e8 showed one tuned leg can beat a whole untuned blend.
-4. Treat ratings as categoricals (CatBoost native / TE on rating crosses) — the 0 = N/A
+1. Original as a feature source (lookup target rates from the original; see PR-1 "still open").
+2. Tune the strongest leg — s6e8 showed one tuned leg can beat a whole untuned blend.
+3. Treat ratings as categoricals (CatBoost native / TE on rating crosses) — the 0 = N/A
    semantics make them non-ordinal at one end.
 
 ---
@@ -213,3 +221,4 @@ Use the `select-finals` skill: rank by **OOF CV, not public LB**; two diverse fi
 | 2026-10-05 | xgb_v1 | XGBoost GPU, s6e8 hand-set params | 0.95862 |
 | 2026-10-05 | catboost_v1 | CatBoost GPU, 2000 iters, border 254, max_ctr 1 | 0.95822 |
 | 2026-10-05 | blend (OOF only) | equal rank-blend of the three | 0.95894 |
+| 2026-10-05 | realmlp_v1 | PR-2 RealMLP-TD, 16 ep — **FAIL** vs bar, honest blend +0.000166 at w=0.35 | 0.95863 |
