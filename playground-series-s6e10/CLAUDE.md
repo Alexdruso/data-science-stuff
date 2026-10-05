@@ -270,6 +270,20 @@ first because each one *bounds* the effect (gate on magnitude, not on "the struc
   **+0.000047** — all hundreds of in-sample fitted cells, so optimistic, and still ≤ 1/6 of the bar.
 - **Closed: duplicate/twin labels and pattern-frequency features.**
 
+### PR-7 — RealMLP tuning (registered 2026-10-05, before any number)
+
+- **Stage 1 (screen, fold 1 only)**: configs vs `realmlp_v1` fold 1 (0.95888) — epochs 6 / 8 /
+  10; at 8 epochs: width 256 / 1024, lr 0.005 / 0.02, stronger regularisation (dropout 0.15,
+  wd 0.05). **Noise control**: the v1 config at seed 43 on fold 1 — a config must beat v1 by
+  more than |seed-43 − seed-42| to be called a winner. ≤ 2 winners go to stage 2.
+- **Stage 2**: full 5-fold of the winner(s).
+- **Bar (ADOPT, at the deliverable — lesson 7)**: `blend(lgbm_pr5_tuned, new) −
+  blend(lgbm_pr5_tuned, realmlp_v1)`, each with `w` fit by the honest half-split, ≥ **+0.0005**.
+  Solo delta reported but not the decision.
+- **Prior ~15%**: tuning a leg raises its solo score, but s6e7/s6e8 both showed a combiner
+  absorbs improved legs (lesson 7). For: the schedule is visibly mis-set (peak at epoch 4-5 of
+  a 16-epoch cosine — the LR had not decayed when it peaked).
+
 ## Next steps (remove each item when implemented)
 
 Closed so far: original as rows (PR-1) and as features (PR-3); pairwise rating TE (PR-4a);
