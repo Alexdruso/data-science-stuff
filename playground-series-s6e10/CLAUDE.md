@@ -135,13 +135,28 @@ Use the `select-finals` skill: rank by **OOF CV, not public LB**; two diverse fi
 
 ---
 
+## Pre-registrations
+
+### PR-1 — original-data augmentation (registered 2026-10-05, before any number)
+
+- **Arm**: append all 129,880 original rows to each fold's *training* split (never val/test),
+  with an `is_original` flag (1 on original, 0 on synthetic and test). Equal sample weight.
+- **Control**: the identical script with no original rows (`is_original` constant 0), same
+  params, same device (CPU), same folds — a paired read, not a comparison against the
+  CUDA-run `lgbm_v1` number.
+- **Instrument**: `src/train_lgbm_orig.py`, LGBM v1 params, 5-fold stratified seed 42, one
+  model seed. Paired per-fold AUC delta (aug − base).
+- **Bar (PASS)**: OOF delta ≥ **+0.0005** AND positive in **≥ 4/5 folds**. Anything else is a
+  FAIL for this arm (equal-weight, flag-only); a FAIL does not close weighted / delay-dropped
+  variants.
+- **Prior**: ~40% PASS. For: classic Playground lever, original is near-separable so its
+  labels are cleaner. Against: delays drifted ~12× (original rows are off-distribution) and
+  700k synthetic rows already dwarf 130k originals.
+
 ## Next steps (remove each item when implemented)
 
-1. Original-data augmentation (train-split only, with an `is_original` flag) — the classic
-   Playground lever; pre-register the bar before running.
-2. XGBoost / CatBoost legs (`add-model`), then tune the strongest leg — s6e8 showed one tuned
-   leg can beat a whole untuned blend.
-3. Treat ratings as categoricals (CatBoost native / TE on rating crosses) — the 0 = N/A
+1. Tune the strongest leg — s6e8 showed one tuned leg can beat a whole untuned blend.
+2. Treat ratings as categoricals (CatBoost native / TE on rating crosses) — the 0 = N/A
    semantics make them non-ordinal at one end.
 
 ---
