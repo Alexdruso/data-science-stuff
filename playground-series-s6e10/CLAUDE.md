@@ -173,6 +173,25 @@ Use the `select-finals` skill: rank by **OOF CV, not public LB**; two diverse fi
   rate looked up from the original — no row mixing, so no surface mixing); down-weighted original
   rows; original with delays dropped.
 
+### PR-2 — RealMLP-TD leg (registered 2026-10-05, before any number)
+
+- **Arm**: `src/train_realmlp.py` — `RealMLP_TD_Classifier` (package defaults + s6e8 overrides:
+  `epoch_select="auc"`, `loss_prior_power=0`, `train_bs=512`, AMP), **16 epochs**, seed 42,
+  same folds as the GBDTs, v1 features via `build_matrices()`.
+- **Control**: the GBDT blend = equal rank-average of `lgbm_pr1_base`, `xgb_v1`, `catboost_v1`
+  (0.95894).
+- **Instrument**: blend = `(1−w)·gbdt + w·realmlp` on ranks, `w` on a 0.05 grid. **Honest
+  fit**: `w` fit on a random half of train, scored on the other half, both directions; the
+  delta is the mean of the two held-out deltas (lesson 3). `src/blend_check.py`.
+- **Bar (ADOPT)**: honest blend delta ≥ **+0.0005**. Stop-loss (routing only): solo OOF
+  < 0.950 → don't spend seeds on it.
+- **Caveat**: RealMLP picks its epoch on the val fold it is scored on, so its solo OOF is
+  slightly optimistic. The blend delta inherits a small part of that; the bar is set high
+  enough to absorb it.
+- **Prior**: ~25% ADOPT. Against: s6e8's NN legs earned weight 0.0. For: here the GBDTs are
+  0.998-correlated and early-stop at ~200 trees (low-signal, noisy target), a regime where a
+  smooth model can genuinely rank differently.
+
 ## Next steps (remove each item when implemented)
 
 1. A leg that differs in kind (NN — RealMLP / MLP via `kaggle.models`) — the GBDTs are
