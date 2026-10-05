@@ -253,17 +253,32 @@ on the LGBM leg is then re-priced at the blend (lesson 7) before adoption.
   0.958929 (−0.000007 — fully absorbed), but **tuned LGBM + 0.35·RealMLP = 0.959169** (w carried
   from PR-2, not refit) — the best OOF so far, +0.00023 over the 0.95894 blend.
 
+### PR-6 — duplicate / frequency structure (2026-10-05) — CLOSED BY SCREEN, no full arm
+
+Common bar (+0.0005) carried over. Cheap screens against `oof_lgbm_pr5_tuned` (0.959002), run
+first because each one *bounds* the effect (gate on magnitude, not on "the structure exists"):
+- **Exact near-copies: none.** 0 duplicated full feature vectors in train∪test (999,479 unique
+  of 999,479). The "generator emits copies" mechanism does not exist here.
+- **Partial twins exist but carry no label information.** 53% of rows share their exact
+  ratings+categoricals vector (67% ratings-only). Leave-one-out *residual* of a row's twins
+  (y − oof, shrunk by group size) added to the OOF logit: best delta **≤ 0.000000** for every key
+  (ratings / +cats / +age) and shrinkage (k = 5, 20), even with the mixing weight picked
+  in-sample. The model already knows everything a twin's label could say.
+- **Pattern counts (unsupervised density) ≈ calibration noise.** OOF residual by count bin moves
+  ±0.001-0.002 in probability (≤ 2 se). In-sample upper bound from re-centring every count bin:
+  **+0.000028** (ratings) / **+0.000035** (ratings+cats); count × OOF-decile cells: **+0.000082** /
+  **+0.000047** — all hundreds of in-sample fitted cells, so optimistic, and still ≤ 1/6 of the bar.
+- **Closed: duplicate/twin labels and pattern-frequency features.**
+
 ## Next steps (remove each item when implemented)
 
 Closed so far: original as rows (PR-1) and as features (PR-3); pairwise rating TE (PR-4a);
-categorical ratings (PR-4b). Sub-bar but real: RealMLP (PR-2), LGBM tuning (PR-5).
+categorical ratings (PR-4b); duplicate/frequency structure (PR-6, by screen). Sub-bar but real: RealMLP (PR-2), LGBM tuning (PR-5).
 **Untested lever classes:**
-1. Duplicate / frequency structure: count of identical feature vectors (full row, rating
-   vector) across train∪test — synthetic generators often emit near-copies whose labels agree.
-2. Tune RealMLP (epochs ~6 schedule, width, lr) — it is the leg that actually moves the blend.
-3. Tune XGB / CatBoost and an LR stack over all legs (lesson 7 says absorption is likely —
+1. Tune RealMLP (epochs ~6 schedule, width, lr) — it is the leg that actually moves the blend.
+2. Tune XGB / CatBoost and an LR stack over all legs (lesson 7 says absorption is likely —
    price at the blend).
-4. Different NN family (TabM) for a second in-kind leg.
+3. Different NN family (TabM) for a second in-kind leg.
 
 ---
 
