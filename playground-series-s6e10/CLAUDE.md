@@ -293,6 +293,26 @@ first because each one *bounds* the effect (gate on magnitude, not on "the struc
   blend, so even a solo gain several times the observed spread cannot reach +0.0005 there.
   **Closed: RealMLP hyperparameter tuning** (schedule, width, lr, regularisation).
 
+### Submission log
+
+| Date | File | Recipe | OOF | Note |
+|---|---|---|---|---|
+| 2026-10-05 | `blend_lgbmt65_realmlp35.csv` | 0.65·rank(`test_lgbm_pr5_tuned`) + 0.35·rank(`test_realmlp_v1`) | 0.959169 | first submission; LB not checked (LB-blind) |
+
+### PR-8 — TabM leg (registered 2026-10-05, before any number)
+
+- **Arm**: `src/train_tabm.py` — pytabkit `TabM_D_Classifier` (defaults; `compile_model`,
+  `allow_amp`, batch 2048, lr 0.004 per s6e7), `val_metric_name="1-auc_ovr"` on pytabkit's own
+  internal split of the training fold (our val fold untouched), v1 features, seed 42.
+- **Control**: the submitted blend `0.65·rank(lgbm_pr5_tuned) + 0.35·rank(realmlp_v1)` (0.959169).
+- **Instrument**: `(1−w)·control + w·rank(tabm)`, `w` by the honest half-split
+  (`blend_check.py tabm_v1 --control-blend`).
+- **Bar (ADOPT)**: honest delta ≥ **+0.0005**. Timebox: fold 1 > 25 min → kill, record as
+  priced out.
+- **Prior ~10%**: RealMLP already supplies the "NN kind" and bought only +0.00017; TabM is the
+  same kind (an MLP ensemble), so it is likely correlated with RealMLP. For: its implicit
+  k-member ensemble and different numeric embeddings are the strongest remaining NN variant.
+
 ## Next steps (remove each item when implemented)
 
 Closed so far: original as rows (PR-1) and as features (PR-3); pairwise rating TE (PR-4a);
