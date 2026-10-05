@@ -107,6 +107,7 @@ Previous: equal rank-blend LGBM+XGB+CatBoost 0.95894.
 
 | Model | OOF AUC | Script | Notes |
 |---|---|---|---|
+| TabM v1 | 0.95815 | `src/train_tabm.py` | GPU, ~18 min/fold; PR-8 null (+0.000006 at the blend) |
 | LGBM v1 | 0.95874 (CUDA) / 0.95877 (CPU, `lgbm_pr1_base`) | `src/baseline.py` | best_iter only ~170-250 at lr 0.05 |
 | XGBoost v1 | 0.95862 | `src/train_xgboost.py` | GPU, ~1 min total; best_iter 550-820 |
 | CatBoost v1 | 0.95822 | `src/train_catboost.py` | GPU, fixed 2000 iters, no ES |
@@ -312,6 +313,10 @@ first because each one *bounds* the effect (gate on magnitude, not on "the struc
 - **Prior ~10%**: RealMLP already supplies the "NN kind" and bought only +0.00017; TabM is the
   same kind (an MLP ensemble), so it is likely correlated with RealMLP. For: its implicit
   k-member ensemble and different numeric embeddings are the strongest remaining NN variant.
+- **RESULT (2026-10-05): FAIL (null).** Solo OOF **0.95815** (folds 0.95829 / 0.95746 / 0.95878 /
+  0.95807 / 0.95837; ~17-19 min/fold, early-stops ~epoch 40) — the weakest leg. Corr with the
+  submitted blend 0.9718. Honest blend: w = 0.05 in both halves → **+0.000006**. RealMLP already
+  holds the NN channel. **Closed: a second MLP-family leg.**
 
 ### PR-9 — LR stack over all legs (registered 2026-10-05, before any number)
 
@@ -327,15 +332,22 @@ first because each one *bounds* the effect (gate on magnitude, not on "the struc
   0.959169 → **+0.000004**. Final C = 0.01 (strongest shrinkage on the grid); standardised
   coefs lgbm_pr5 0.54, lgbm_v1 0.45, xgb 0.27, cat 0.33, realmlp 1.36 — the LR rediscovers the
   rank blend. Re-run with TabM once it lands (pre-registered).
+- **Re-run with TabM (6 legs): FAIL (null).** Stack OOF **0.959172** vs 0.959169 → **+0.000002**
+  (C = 0.1). **Closed: LR stacking over these legs.**
 
 ## Next steps (remove each item when implemented)
 
 Closed so far: original as rows (PR-1) and as features (PR-3); pairwise rating TE (PR-4a);
-categorical ratings (PR-4b); duplicate/frequency structure (PR-6, by screen); RealMLP tuning (PR-7). Sub-bar but real: RealMLP (PR-2), LGBM tuning (PR-5).
+categorical ratings (PR-4b); duplicate/frequency structure (PR-6, by screen); RealMLP tuning (PR-7); TabM (PR-8); LR stack (PR-9). Sub-bar but real: RealMLP (PR-2), LGBM tuning (PR-5).
 **Untested lever classes:**
-1. Tune XGB / CatBoost and an LR stack over all legs (lesson 7 says absorption is likely —
-   price at the blend).
-2. Different NN family (TabM) for a second in-kind leg.
+1. Tune XGB / CatBoost — but PR-9 says the combiner gives the GBDTs little weight; price at the
+   blend before spending GPU hours.
+2. Information levers not yet tried: per-row rating-profile features (z-scores within row,
+   dispersion, rank of each rating within the row), class/travel-type × rating interactions,
+   kNN-distance features. PR-4 suggests trees already resolve pairwise structure, so screen
+   cheaply first.
+3. Multi-seed bagging of the two submitted legs — variance reduction; screen by the M-slope
+   (lesson 1) before trusting any per-seed gain.
 
 ---
 
