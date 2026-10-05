@@ -77,8 +77,8 @@ Original target: bool, 43.4% positive (56,428 / 129,880).
 - **Original:** a 0 rating means "not applicable", not "worst" — mean 0.15 zero-ratings per row.
   Kept raw (trees split on it) and counted as `n_zero_ratings`.
 - **Original is near-separable:** the v1 baseline scores **OOF AUC 0.99491** on a 100k/30k split
-  of the *original* data (pipeline smoke test, 2026-10-05). Expect the synthetic set to be noisier
-  and the plateau to arrive early — the game will be in the 4th decimal.
+  of the *original* data (pipeline smoke test, 2026-10-05) — not a guide to the synthetic
+  set (see next bullet).
 - **Synthetic ≠ original — much harder.** Same baseline: 0.99491 on original vs **0.95874** on
   synthetic. The generator destroyed most of the near-deterministic structure (~0.04 AUC of
   label noise / smoothing).
