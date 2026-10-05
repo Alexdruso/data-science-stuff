@@ -313,6 +313,17 @@ first because each one *bounds* the effect (gate on magnitude, not on "the struc
   same kind (an MLP ensemble), so it is likely correlated with RealMLP. For: its implicit
   k-member ensemble and different numeric embeddings are the strongest remaining NN variant.
 
+### PR-9 — LR stack over all legs (registered 2026-10-05, before any number)
+
+- **Arm**: `src/stack_lr.py` — logistic regression on the logits of every finished leg
+  (`lgbm_pr5_tuned`, `lgbm_pr1_base`, `xgb_v1`, `catboost_v1`, `realmlp_v1`, + `tabm_v1` if it
+  has finished), standardised, fit with an **outer 5-fold CV over the OOF matrix** (different
+  seed from the base folds) so the stacker's own OOF is honest. C on a small grid chosen inside
+  each outer fold.
+- **Control**: the submitted blend (0.959169), scored on the same rows.
+- **Bar (ADOPT)**: stack OOF − control ≥ **+0.0005**. Prior **~10%**: lesson 7 — the combiner
+  absorbs; with 0.997+ correlated legs an LR has almost nothing a rank-average lacks.
+
 ## Next steps (remove each item when implemented)
 
 Closed so far: original as rows (PR-1) and as features (PR-3); pairwise rating TE (PR-4a);
