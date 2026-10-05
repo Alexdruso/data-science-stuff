@@ -45,19 +45,19 @@ y = pl.read_csv(DATA_DIR / "train.csv")[TARGET].to_numpy()
 Synthetic, generated from the [Airline satisfaction dataset](https://www.kaggle.com/datasets/arseniyshutko/binary-aviation-satisfaction-129k)
 ("feature distributions close to, but not exactly the same as, the original").
 
-| Split | Rows | Columns | Size |
-|---|---|---|---|
-| train | ? (67 MB CSV) | ? | **not yet downloaded** |
-| test  | ? (27 MB CSV; first id 699635 ⇒ train ≈ 700k rows) | ? | **not yet downloaded** |
-| original | 129,880 | 22 (no id) | `data/original/data.csv` |
+| Split | Rows | Columns |
+|---|---|---|
+| train | 699,635 | 23 (id + 21 features + target) |
+| test  | 299,844 | 22 |
+| original | 129,880 | 22 (no id) — `data/original/data.csv` |
 
-**⚠️ Competition data download returns 403 until the rules are accepted on the Kaggle site.**
-Then: `kaggle competitions download -c playground-series-s6e10 -p data/ && cd data && unzip -q
-playground-series-s6e10.zip && rm playground-series-s6e10.zip`. The schema below is from the
-original dataset; **verify it against the synthetic headers and target encoding on first
-download** and update this section.
+Download: `kaggle competitions download -c playground-series-s6e10 -p data/ && cd data &&
+unzip -q playground-series-s6e10.zip && rm playground-series-s6e10.zip`. Synthetic headers are
+identical to the original's (different column order); target ships as `True`/`False` —
+**train positive rate 44.36%** (original 43.45%). Nulls: only `arrival_delay_in_minutes`
+(292 train / 130 test). `baggage_handling` has no 0 in train (range 1-5).
 
-### Raw features (original schema; snake_case after `build_features`)
+### Raw features (snake_case after `build_features`)
 
 - Categorical: `gender` (M/F), `customer_type` (Loyal / disloyal), `type_of_travel`
   (Business / Personal), `class` (Business / Eco / Eco Plus)
@@ -79,19 +79,31 @@ Original target: bool, 43.4% positive (56,428 / 129,880).
 - **Original is near-separable:** the v1 baseline scores **OOF AUC 0.99491** on a 100k/30k split
   of the *original* data (pipeline smoke test, 2026-10-05). Expect the synthetic set to be noisier
   and the plateau to arrive early — the game will be in the 4th decimal.
-- TODO on first download: adversarial validation (`kaggle.shift.adversarial_validation`),
-  missingness *mechanism* per column (`kaggle.shift.mask_mechanism_report` — s6e7 lesson 8),
-  category overlap, synthetic vs original marginals.
+- **Synthetic ≠ original — much harder.** Same baseline: 0.99491 on original vs **0.95874** on
+  synthetic. The generator destroyed most of the near-deterministic structure (~0.04 AUC of
+  label noise / smoothing).
+- **Delays collapsed ~12×:** mean departure delay 1.18 min (train) vs 14.7 (original);
+  `dep == 0` on 90.8% of train rows vs 56.5%; `arr == dep` on 86.9% vs 47.2%. Delay is a weak
+  signal here (sat rate 0.448 at dep=0 vs 0.400 at dep>0). Flight distance also drifted
+  (mean 1354 vs 1190); ratings are shifted up ~0.1 across the board. ⇒ original rows are
+  off-distribution on delays; augmentation must carry an `is_original` flag and be screened,
+  not assumed.
+- **No train/test shift:** adversarial validation AUC **0.4994** (raw columns, 5-fold LGBM).
+  Category marginals match to 3 decimals. OOF should rank candidates well, down to its noise floor.
+- Only 17 train rows exactly duplicate an original row — no lookup leak.
+- Zero ratings ("N/A"): 6.4% of train rows have ≥1 vs 7.9% in original.
+- TODO: missingness *mechanism* of `arrival_delay_in_minutes` (`kaggle.shift.mask_mechanism_report`
+  — s6e7 lesson 8) — only 292 rows, so low priority.
 
 ---
 
 ## Current best
 
-None yet — run `python src/baseline.py` once the data is downloaded.
+**LGBM v1 OOF AUC: 0.95874** (2026-10-05) ← current best (untuned; folds 0.95778-0.95940)
 
 | Model | OOF AUC | Script |
 |---|---|---|
-| LGBM v1 | — | `src/baseline.py` |
+| LGBM v1 | 0.95874 | `src/baseline.py` |
 
 ---
 
@@ -125,13 +137,11 @@ Use the `select-finals` skill: rank by **OOF CV, not public LB**; two diverse fi
 
 ## Next steps (remove each item when implemented)
 
-1. **Accept the rules on Kaggle**, download, verify schema/target encoding, run `baseline.py`.
-2. EDA: adversarial validation, mask mechanism, synthetic-vs-original drift.
-3. Original-data augmentation (train-split only, with an `is_original` flag) — the classic
+1. Original-data augmentation (train-split only, with an `is_original` flag) — the classic
    Playground lever; pre-register the bar before running.
-4. XGBoost / CatBoost legs (`add-model`), then tune the strongest leg — s6e8 showed one tuned
+2. XGBoost / CatBoost legs (`add-model`), then tune the strongest leg — s6e8 showed one tuned
    leg can beat a whole untuned blend.
-5. Treat ratings as categoricals (CatBoost native / TE on rating crosses) — the 0 = N/A
+3. Treat ratings as categoricals (CatBoost native / TE on rating crosses) — the 0 = N/A
    semantics make them non-ordinal at one end.
 
 ---
@@ -141,3 +151,4 @@ Use the `select-finals` skill: rank by **OOF CV, not public LB**; two diverse fi
 | Date | Run | Description | OOF AUC |
 |---|---|---|---|
 | 2026-10-05 | scaffold | Seeded dir; pipeline smoke-tested on the original data (not the competition data) | (0.99491, original only) |
+| 2026-10-05 | lgbm_v1 | `baseline.py` on the competition data, v1 features, untuned defaults | 0.95874 |
