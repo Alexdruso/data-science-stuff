@@ -99,6 +99,12 @@ Original target: bool, 43.4% positive (56,428 / 129,880).
 
 ## Current best
 
+**2026-10-07: rank-blend 0.475·`lgbm_pr12_route` + 0.525·`realmlp_route` — OOF 0.960932**
+(honest +0.00176 over the row below; PR-12). Legs: RealMLP+route 0.96065, tuned LGBM+route
+0.960522, XGB+route 0.96020. The table below predates PR-12.
+
+Previous:
+
 **Rank-blend 0.65·tuned LGBM (`lgbm_pr5_tuned`) + 0.35·RealMLP OOF AUC: 0.959169**
 (2026-10-05) ← current best. `w=0.35` was fit (honest half-split) against the GBDT blend in
 PR-2 and carried over, not refit. Best single: tuned LGBM 0.959002. No lever has cleared the
@@ -299,6 +305,7 @@ first because each one *bounds* the effect (gate on magnitude, not on "the struc
 | Date | File | Recipe | OOF | Note |
 |---|---|---|---|---|
 | 2026-10-05 | `blend_lgbmt65_realmlp35.csv` | 0.65·rank(`test_lgbm_pr5_tuned`) + 0.35·rank(`test_realmlp_v1`) | 0.959169 | first submission; LB not checked (LB-blind) |
+| 2026-10-07 | `blend_route_lgbm_realmlp_w52.csv` | 0.475·rank(`test_lgbm_pr12_route`) + 0.525·rank(`test_realmlp_route`) | 0.960932 | PR-12 route features in both legs; honest delta +0.001761 vs the 10-05 recipe (w 0.55/0.50 per half) |
 
 ### PR-8 — TabM leg (registered 2026-10-05, before any number)
 
@@ -399,6 +406,40 @@ PR-10 screens (base config, paired vs `lgbm_pr1_base`) found that `flight_distan
   **Tuned config (`tune_lgbm.py --evaluate --route` → `lgbm_pr12_route`): OOF 0.960522,
   +0.001520 vs `lgbm_pr5_tuned`, 5/5 → PASS.** `xgb_route` (GPU, v1 params) 0.96020
   (+0.00158 vs `xgb_v1`). Route features live in `src/route.py` (all legs take `--route`).
+
+- **PR-11 RESULT: FAIL (dead).** RealMLP v1 seeds 42/43/44 in the submitted blend: M=2
+  +0.0000085, M=3 +0.0000113 — RealMLP's internal n_ens=8 already averages. Seed 45 and the
+  LGBM seeds were not run. **Closed: seed bagging of RealMLP.**
+- **PR-13 — residual route encoding** (exploratory screen, then tuned): `route_residual()` in
+  `run_lgbm_arm.py` — inner 5-fold route-free LGBM gives p, per-fd shrunk mean of (y − p),
+  train rows encoded out-of-inner-fold. Base config, over `route`: +0.000145 (4/5); alone it
+  beats the whole route set (+0.000086). Finer residual keys (fd×class/travel/cust) +0.000092
+  (worse); original-data residual on top −0.000014 (null). **Tuned (`lgbm_pr13_resid`):
+  0.960613, +0.000092 vs `lgbm_pr12_route`, 5/5 — sub-bar, but NOT absorbed at the blend:**
+  honest blend with `realmlp_route` 0.961023 vs the submitted recipe 0.960932 (+0.00009).
+  XGB/Cat route legs get weight ≈ 0 (`xgb_route` 0.96020, `catboost_route` 0.95994).
+
+### PR-14 — LGBM re-tune on route+resid features (registered 2026-10-07, before any number)
+
+- **Arm**: `src/tune_lgbm_route.py` — 20 TPE trials (cut from 30 for time; best-so-far saved every trial), PR-5 protocol (3-fold, 50% subsample),
+  route TE + residual fit per search fold and cached; trial 0 = PR-5 params (incumbent).
+  Evaluate 5-fold → `lgbm_pr13_resid_pr14`.
+- **Bar (ADOPT)**: honest blend with `realmlp_route` ≥ +0.0005 over the same blend with
+  `lgbm_pr13_resid`. Bookkeeping swap allowed at any positive honest delta.
+- **Prior** ~5% for the bar (lesson 7, and PR-5 itself was +0.00023); ~50% for a positive
+  delta, because route features changed the problem the PR-5 params were found for.
+
+### PR-15 — RealMLP embeddings on top of route (2026-10-07)
+
+`--fdcat` (fd as an embedded category, levels with count ≥ 20) was run as a screen first:
+`realmlp_route_fdcat` **0.96092** (folds 0.96122/0.96005/0.96158/0.96107/0.96083; vs
+`realmlp_route` 0.96065, +0.0003 on every fold). Honest blend with `lgbm_pr13_resid`
+**0.961149** (w_mlp ≈ 0.59) vs submitted recipe 0.960932; 3-leg (+`realmlp_route`) 0.961168.
+Then registered before their numbers: `--fdcat --resid`, `--fdcat --agecat`,
+`--fdcat --ratingcat`. Bar (ADOPT as the NN leg): honest 2-leg blend with
+`lgbm_pr13_resid` ≥ +0.0002 over the fdcat leg's 0.961149 (a lower bar than +0.0005 because
+it is a leg *swap*, not an added lever, and costs nothing). Prior ~20% each: the embedding
+is already the NN's route channel.
 
 ## Next steps (remove each item when implemented)
 

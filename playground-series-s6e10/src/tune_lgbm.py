@@ -95,8 +95,10 @@ def search() -> None:
     print(f"\nbest {study.best_value:.5f} (control trial {study.trials[0].value:.5f}) → {PARAMS_FILE}")
 
 
-def evaluate(route: bool = False) -> None:
-    tuned = json.loads(PARAMS_FILE.read_text())
+def evaluate(route: bool = False, resid: bool = False) -> None:
+    import os
+    params_file = RESULTS_DIR / os.environ.get("S6E10_LGBM_PARAMS", PARAMS_FILE.name)
+    tuned = json.loads(params_file.read_text())
     params = {**CONTROL_PARAMS, **tuned}
     print(f"evaluate (CPU, paired): {tuned}", flush=True)
     m = build_matrices()
@@ -111,6 +113,9 @@ def evaluate(route: bool = False) -> None:
         if route:
             from route import route_te
             x_tr, x_va, x_te = route_te(x_tr, y_tr, [x_va, x_te])
+        if resid:
+            from run_lgbm_arm import route_residual
+            x_tr, x_va, x_te = route_residual(x_tr, y_tr, [x_va, x_te])
         model = LGBMClassifier(**params)
         model.fit(
             x_tr, y_tr, eval_set=[(x_va, y_va)],
@@ -125,7 +130,8 @@ def evaluate(route: bool = False) -> None:
         score_fn=lambda yv, pv: float(roc_auc_score(yv, pv)),
     )
     oof_auc = float(roc_auc_score(m.y, oof))
-    name = "lgbm_pr12_route" if route else "lgbm_pr5_tuned"
+    name = ("lgbm_pr13_resid" if resid else "lgbm_pr12_route") if route else "lgbm_pr5_tuned"
+    name += os.environ.get("S6E10_LGBM_SUFFIX", "")
     save_cv_result(RESULTS_DIR, name, fold_scores, oof_auc, metric_name="auc")
     np.save(RESULTS_DIR / f"oof_{name}.npy", oof)
     np.save(RESULTS_DIR / f"test_{name}.npy", test)
@@ -139,11 +145,11 @@ def evaluate(route: bool = False) -> None:
     print(f"\n{name}: OOF {oof_auc:.6f}  per-fold delta {np.round(deltas, 6).tolist()}")
     print(f"{name}: OOF delta {d_oof:+.6f}  positive folds {n_pos}/5  → {verdict}")
     if route:
-        tuned_oof = np.load(RESULTS_DIR / "oof_lgbm_pr5_tuned.npy")
+        tuned_oof = np.load(RESULTS_DIR / ("oof_lgbm_pr12_route.npy" if resid else "oof_lgbm_pr5_tuned.npy"))
         splits = StratifiedKFold(n_splits=5, shuffle=True, random_state=42).split(m.X, m.y)
         td = [roc_auc_score(m.y[va], oof[va]) - roc_auc_score(m.y[va], tuned_oof[va]) for _, va in splits]
         dt = oof_auc - float(roc_auc_score(m.y, tuned_oof))
-        print(f"vs lgbm_pr5_tuned: OOF delta {dt:+.6f}  per-fold {np.round(td, 6).tolist()}  "
+        print(f"vs {'lgbm_pr12_route' if resid else 'lgbm_pr5_tuned'}: OOF delta {dt:+.6f}  per-fold {np.round(td, 6).tolist()}  "
               f"→ {'PASS' if dt >= BAR and sum(d > 0 for d in td) >= 4 else 'FAIL'}")
 
 
@@ -152,11 +158,12 @@ def main() -> None:
     parser.add_argument("--search", action="store_true")
     parser.add_argument("--evaluate", action="store_true")
     parser.add_argument("--route", action="store_true", help="PR-12 route features")
+    parser.add_argument("--resid", action="store_true", help="PR-13 residual route encoding (with --route)")
     args = parser.parse_args()
     if args.search:
         search()
     if args.evaluate:
-        evaluate(route=args.route)
+        evaluate(route=args.route, resid=args.resid)
 
 
 if __name__ == "__main__":

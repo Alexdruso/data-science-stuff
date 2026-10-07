@@ -216,6 +216,26 @@ def add_orig_keys(m: Matrices) -> None:
             frame[f"orig_{name}_rate"] = (s_ + 5 * base) / (c_ + 5)
 
 
+def add_orig_resid(m: Matrices, k: float = 10.0) -> None:
+    """Original's route residual: original y minus a route-free original-only model's
+    5-fold OOF p, shrunk mean per fd. No synthetic labels (rule 2)."""
+    from sklearn.model_selection import StratifiedKFold as SKF
+
+    mo = build_matrices(with_original=True)
+    assert mo.X_orig is not None and mo.y_orig is not None
+    cols = [c for c in mo.feature_cols if c not in (ORIGINAL_FLAG, "flight_distance", "delay_per_mile")]
+    xo, yo = mo.X_orig, mo.y_orig
+    p = np.zeros(len(xo))
+    for itr, iva in SKF(n_splits=5, shuffle=True, random_state=7).split(xo, yo):
+        mdl = LGBMClassifier(n_estimators=400, learning_rate=0.05, num_leaves=63, verbose=-1,
+                             n_jobs=8, random_state=42).fit(xo.iloc[itr][cols], yo[itr])
+        p[iva] = mdl.predict_proba(xo.iloc[iva][cols])[:, 1]
+    g = pd.DataFrame({"fd": xo["flight_distance"].to_numpy(), "r": yo - p}).groupby("fd")["r"].agg(["sum", "count"])
+    enc = g["sum"] / (g["count"] + k)
+    for frame in (m.X, m.X_test):
+        frame["orig_route_resid"] = enc.reindex(frame["flight_distance"].to_numpy()).fillna(0).to_numpy()
+
+
 def add_route_agg(m: Matrices) -> None:
     """Route-level means of features over train+test (no labels), + row deviation."""
     both = pd.concat([m.X, m.X_test])
@@ -257,10 +277,68 @@ ARM_BUILDERS = {
     "route_plus": lambda m: add_route(m, plus=True),
     "route_origk": lambda m: (add_route(m), add_orig_keys(m)),
     "route_agg": lambda m: (add_route(m), add_route_agg(m)),
+    "route_resid": add_route,
+    "resid_only": lambda m: None,
+    "route_resid_fine": add_route,
+    "route_resid_ores": lambda m: (add_route(m), add_orig_resid(m)),
     "route_fdcat": lambda m: (add_route(m), add_numcat(m, cols=["flight_distance"], cnt=False)),
     "route_flight": lambda m: (add_route(m), add_flight_keys(m)),
     "route_fdage": lambda m: (add_route(m), add_flight_keys(m, age=True)),
 }
+
+
+RESID_KEYS: dict[str, list[str]] = {"route_resid": ["flight_distance"]}
+RESID_KEYS_FINE: dict[str, list[str]] = {
+    "route_resid": ["flight_distance"],
+    "resid_fd_class": ["flight_distance", "class"],
+    "resid_fd_travel": ["flight_distance", "type_of_travel"],
+    "resid_fd_cust": ["flight_distance", "customer_type"],
+}
+
+
+def _key(frame: pd.DataFrame, cols: list[str]) -> np.ndarray:
+    out = frame[cols[0]].astype(str)
+    for c in cols[1:]:
+        out = out + "|" + frame[c].astype(str)
+    return out.to_numpy()
+
+
+def route_residual(
+    x_tr: pd.DataFrame, y_tr: np.ndarray, others: list[pd.DataFrame], k: float = 20.0,
+    keys: dict[str, list[str]] | None = None,
+) -> tuple[pd.DataFrame, ...]:
+    """Fold-safe residual route encoding (PR-13).
+
+    A route-free LGBM gives inner-OOF p for the training rows (5 inner folds) and a
+    full-fit p for val/test. Per route: shrunk mean of (y - p) — the route's effect
+    *conditional on* everything else. Training rows are encoded from the other
+    inner folds only; val/test from the whole training split.
+    """
+    from sklearn.model_selection import StratifiedKFold as SKF
+
+    base_cols = [c for c in x_tr.columns if not c.startswith(("te_fd", "TE_", "orig_fd", "cnt_flight", "fd_cat")) and not c.endswith("_cat")]
+    params = {**PARAMS, "n_estimators": 200}
+    p_tr = np.zeros(len(x_tr))
+    resid_tr = np.zeros(len(x_tr))
+    fd_tr = x_tr["flight_distance"].to_numpy()
+    inner = list(SKF(n_splits=5, shuffle=True, random_state=7).split(x_tr, y_tr))
+    for itr, iva in inner:
+        mdl = LGBMClassifier(**params).fit(x_tr.iloc[itr][base_cols], y_tr[itr])
+        p_tr[iva] = mdl.predict_proba(x_tr.iloc[iva][base_cols])[:, 1]
+    r = y_tr - p_tr
+    out_tr = x_tr.copy()
+    outs_o = [f.copy() for f in others]
+    for name, cols in (keys or RESID_KEYS).items():
+        kt = _key(x_tr, cols)
+        for itr, iva in inner:
+            g = pd.DataFrame({"k": kt[itr], "r": r[itr]}).groupby("k")["r"].agg(["sum", "count"])
+            resid_tr[iva] = (g["sum"] / (g["count"] + k)).reindex(kt[iva]).fillna(0).to_numpy()
+        out_tr[name] = resid_tr.copy()
+        g = pd.DataFrame({"k": kt, "r": r}).groupby("k")["r"].agg(["sum", "count"])
+        enc_all = g["sum"] / (g["count"] + k)
+        for f in outs_o:
+            f[name] = enc_all.reindex(_key(f, cols)).fillna(0).to_numpy()
+    return (out_tr, *outs_o)
 
 
 def main() -> None:
@@ -298,6 +376,10 @@ def main() -> None:
                 smooth=TE_SMOOTH,
             )
             x_tr, x_va, x_te = (f.drop(columns=te_cols) for f in (x_tr, x_va, x_te))
+        if args.arm in ("route_resid", "resid_only", "route_resid_ores"):
+            x_tr, x_va, x_te = route_residual(x_tr, y_tr, [x_va, x_te])
+        if args.arm == "route_resid_fine":
+            x_tr, x_va, x_te = route_residual(x_tr, y_tr, [x_va, x_te], keys=RESID_KEYS_FINE)
         if args.arm == "te_pairs":
             x_tr, x_va, x_te = add_fold_safe_target_encoding(
                 x_tr, y_tr, [x_va, x_te], PAIR_COLS, {1: "sat"}

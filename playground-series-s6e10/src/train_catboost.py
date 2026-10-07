@@ -56,7 +56,11 @@ def _prepare(frame: pd.DataFrame, cat_cols: list[str]) -> pd.DataFrame:
 
 
 def main() -> None:
+    route = "--route" in sys.argv
     m = build_matrices()
+    if route:
+        from route import add_route_global
+        add_route_global(m)
     params = load_params(RESULTS_DIR, PARAMS, "best_params_catboost.json")
     tuned = (RESULTS_DIR / "best_params_catboost.json").exists()
     device_params: dict[str, object] = {"task_type": DEVICE}
@@ -77,6 +81,9 @@ def main() -> None:
         x_te: pd.DataFrame,
         fold: int,
     ) -> tuple[np.ndarray, np.ndarray]:
+        if route:
+            from route import route_te
+            x_tr, x_va, x_te = route_te(x_tr, y_tr, [x_va, x_te])
         model = CatBoostClassifier(
             **params, **device_params, cat_features=m.cat_cols
         )
@@ -95,7 +102,7 @@ def main() -> None:
     oof_auc = float(roc_auc_score(m.y, oof))
     print(f"\nOOF AUC: {oof_auc:.5f}")
 
-    run_name = "catboost_v1_tuned" if tuned else "catboost_v1"
+    run_name = "catboost_route" if route else ("catboost_v1_tuned" if tuned else "catboost_v1")
     save_cv_result(RESULTS_DIR, run_name, fold_scores, oof_auc, metric_name="auc")
     np.save(RESULTS_DIR / f"oof_{run_name}.npy", oof)
     np.save(RESULTS_DIR / f"test_{run_name}.npy", test)

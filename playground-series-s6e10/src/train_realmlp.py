@@ -83,6 +83,10 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--override", default="{}", help="JSON dict of config overrides")
     parser.add_argument("--route", action="store_true", help="PR-12 route features")
+    parser.add_argument("--fdcat", action="store_true", help="flight_distance as an embedded category")
+    parser.add_argument("--agecat", action="store_true", help="age as an embedded category")
+    parser.add_argument("--ratingcat", action="store_true", help="the 13 ratings as embedded categories")
+    parser.add_argument("--resid", action="store_true", help="PR-13 residual route encoding (with --route)")
     parser.add_argument("--tag", default="", help="run-name suffix; required with --override")
     parser.add_argument(
         "--fold1", action="store_true",
@@ -101,6 +105,31 @@ def main() -> None:
         from route import add_route_global
         add_route_global(m)
         args.tag = args.tag or "route"
+    cat_cols = list(m.cat_cols)
+    if args.fdcat:
+        both = pd.concat([m.X, m.X_test])
+        counts = both["flight_distance"].value_counts()
+        levels = counts.index[counts >= 20]
+        for frame in (m.X, m.X_test):
+            frame["fd_cat"] = pd.Categorical(
+                frame["flight_distance"].where(frame["flight_distance"].isin(levels)), categories=levels
+            )
+        cat_cols.append("fd_cat")
+        args.tag += "_fdcat"
+    if args.agecat:
+        for frame in (m.X, m.X_test):
+            frame["age_cat"] = pd.Categorical(frame["age"], categories=sorted(pd.concat([m.X, m.X_test])["age"].unique()))
+        cat_cols.append("age_cat")
+        args.tag += "_agecat"
+    if args.ratingcat:
+        from features import RATING_COLS
+        for frame in (m.X, m.X_test):
+            for col in RATING_COLS:
+                frame[f"{col}_cat"] = pd.Categorical(frame[col], categories=list(range(6)))
+        cat_cols += [f"{col}_cat" for col in RATING_COLS]
+        args.tag += "_ratingcat"
+    if args.resid:
+        args.tag += "_resid"
     # is_original is constant 0 here; RealMLP's robust scaler has nothing to scale.
     X = m.X.drop(columns=["is_original"])
     X_test = m.X_test.drop(columns=["is_original"])
@@ -126,14 +155,17 @@ def main() -> None:
         if args.route:
             from route import route_te
             x_tr, x_va, x_te = route_te(x_tr, y_tr, [x_va, x_te])
-        tr, va, te = to_frames((x_tr, x_va, x_te), m.cat_cols)
+        if args.resid:
+            from run_lgbm_arm import route_residual
+            x_tr, x_va, x_te = route_residual(x_tr, y_tr, [x_va, x_te])
+        tr, va, te = to_frames((x_tr, x_va, x_te), cat_cols)
         model = RealMLP_TD_Classifier(**{**cfg, "random_state": args.seed + fold})
         model.fit(
             tr,
             y_tr.astype(np.int64),
             va,
             y_va.astype(np.int64),
-            cat_col_names=m.cat_cols,
+            cat_col_names=cat_cols,
             # Per fold, or the five folds overwrite each other's best checkpoint.
             ckpt_path=CKPT_DIR / f"{args.tag or 'v1'}_s{args.seed}_f{fold}.pth",
             X_test=te,
