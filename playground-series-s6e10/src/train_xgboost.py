@@ -51,7 +51,11 @@ PARAMS: dict[str, object] = {
 
 
 def main() -> None:
+    route = "--route" in sys.argv
     m = build_matrices()
+    if route:
+        from route import add_route_global
+        add_route_global(m)
     params = load_params(RESULTS_DIR, PARAMS, "best_params_xgboost.json")
     tuned = (RESULTS_DIR / "best_params_xgboost.json").exists()
     print(f"XGBoost on {DEVICE}: train {m.X.shape}  test {m.X_test.shape}", flush=True)
@@ -64,6 +68,9 @@ def main() -> None:
         x_te: pd.DataFrame,
         fold: int,
     ) -> tuple[np.ndarray, np.ndarray]:
+        if route:
+            from route import route_te
+            x_tr, x_va, x_te = route_te(x_tr, y_tr, [x_va, x_te])
         model = XGBClassifier(**params)
         model.fit(x_tr, y_tr, eval_set=[(x_va, y_va)], verbose=False)
         print(f"  fold {fold} best_iter={model.best_iteration}", flush=True)
@@ -80,7 +87,7 @@ def main() -> None:
     oof_auc = float(roc_auc_score(m.y, oof))
     print(f"\nOOF AUC: {oof_auc:.5f}")
 
-    run_name = "xgb_v1_tuned" if tuned else "xgb_v1"
+    run_name = "xgb_route" if route else ("xgb_v1_tuned" if tuned else "xgb_v1")
     save_cv_result(RESULTS_DIR, run_name, fold_scores, oof_auc, metric_name="auc")
     np.save(RESULTS_DIR / f"oof_{run_name}.npy", oof)
     np.save(RESULTS_DIR / f"test_{run_name}.npy", test)

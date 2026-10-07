@@ -4,6 +4,9 @@
     python src/run_lgbm_arm.py --arm orig        # PR-3: original as a feature source
     python src/run_lgbm_arm.py --arm te_pairs    # PR-4a: fold-safe TE on rating pairs
     python src/run_lgbm_arm.py --arm cat_ratings # PR-4b: ratings as categoricals
+    python src/run_lgbm_arm.py --arm profile     # PR-10: per-row rating profile
+    python src/run_lgbm_arm.py --arm segment     # PR-10: deviation from segment means
+    python src/run_lgbm_arm.py --arm numcat      # PR-10: numerics as category + counts
 
 Every arm uses the PR-1 control's exact LGBM config (CPU, 8 threads, seed 42,
 same folds), so its per-fold AUC is paired against `oof_lgbm_pr1_base.npy`.
@@ -24,6 +27,7 @@ Arms:
 from __future__ import annotations
 
 import argparse
+import os
 import itertools
 import sys
 import time
@@ -46,6 +50,8 @@ from data_science_stuff.kaggle.io import competition_dirs
 
 _, RESULTS_DIR, _ = competition_dirs(__file__)
 CONTROL = "lgbm_pr1_base"
+ROUTE_CONTROL = "lgbm_arm_route"
+TE_SMOOTH: float | str = float(os.environ.get("S6E10_TE_SMOOTH", "20")) if os.environ.get("S6E10_TE_SMOOTH", "20") != "auto" else "auto"
 BAR = 0.0005
 
 RATING_PAIRS = list(itertools.combinations(RATING_COLS, 2))
@@ -79,9 +85,187 @@ def add_pair_keys(m: Matrices) -> None:
             frame[name] = frame[a].astype(np.int16) * 10 + frame[b].astype(np.int16)
 
 
+NUMCAT_COLS = ["age", "flight_distance", "departure_delay_in_minutes", "arrival_delay_in_minutes"]
+
+
+def add_profile(m: Matrices) -> None:
+    """PR-10 profile: dispersion, within-row z-scores, 0..5 histogram."""
+    for frame in (m.X, m.X_test):
+        r = frame[RATING_COLS].to_numpy(dtype=np.float32)
+        mean, std = r.mean(axis=1, keepdims=True), r.std(axis=1, keepdims=True)
+        frame["rating_std"] = std[:, 0]
+        frame["rating_median"] = np.median(r, axis=1)
+        z = (r - mean) / np.where(std > 0, std, 1.0)
+        for i, col in enumerate(RATING_COLS):
+            frame[f"z_{col}"] = z[:, i]
+        for v in range(6):
+            frame[f"n_rating_{v}"] = (r == v).sum(axis=1).astype(np.int8)
+
+
+def add_segment(m: Matrices) -> None:
+    """PR-10 segment: rating minus its (travel x class) segment mean (no labels)."""
+    both = pd.concat([m.X, m.X_test])
+    key = both["type_of_travel"].astype(str) + "|" + both["class"].astype(str)
+    means = both[RATING_COLS].groupby(key.to_numpy()).mean()
+    codes = {k: i for i, k in enumerate(sorted(means.index))}
+    for frame in (m.X, m.X_test):
+        fk = (frame["type_of_travel"].astype(str) + "|" + frame["class"].astype(str)).to_numpy()
+        frame["segment"] = pd.Categorical(pd.Series(fk).map(codes).to_numpy(), categories=list(range(len(codes))))
+        seg_means = means.loc[fk].to_numpy()
+        dev = frame[RATING_COLS].to_numpy(dtype=np.float32) - seg_means
+        for i, col in enumerate(RATING_COLS):
+            frame[f"segdev_{col}"] = dev[:, i]
+        frame["segdev_mean"] = dev.mean(axis=1)
+
+
+def add_numcat(
+    m: Matrices, cols: list[str] = NUMCAT_COLS, cnt: bool = True, cat: bool = True
+) -> None:
+    """PR-10 numcat: numerics duplicated as category + per-value frequency."""
+    both = pd.concat([m.X, m.X_test])
+    for col in cols:
+        counts = both[col].value_counts(dropna=False)
+        levels = counts.index[counts >= 20].dropna()
+        for frame in (m.X, m.X_test):
+            if cnt:
+                frame[f"cnt_{col}"] = frame[col].map(counts).astype(float).to_numpy()
+            if cat:
+                frame[f"cat_{col}"] = pd.Categorical(frame[col].where(frame[col].isin(levels)), categories=levels)
+
+
+TE_FD_COLS = ["te_fd", "te_fd_class", "te_fd_travel", "te_fd_cust"]
+TE_FD_PLUS = ["te_fd_class_travel", "te_fd_cust_travel", "te_fd_dep", "te_fd_dep_arr", "te_fd_age"]
+
+
+def add_te_fd_keys(m: Matrices) -> None:
+    """Route keys (flight_distance, alone and x each categorical); TE fit per fold."""
+    for frame in (m.X, m.X_test):
+        fd = frame["flight_distance"].astype(str)
+        frame["te_fd"] = fd
+        frame["te_fd_class"] = fd + "|" + frame["class"].astype(str)
+        frame["te_fd_travel"] = fd + "|" + frame["type_of_travel"].astype(str)
+        frame["te_fd_cust"] = fd + "|" + frame["customer_type"].astype(str)
+
+
+def add_te_fd_plus_keys(m: Matrices) -> None:
+    for frame in (m.X, m.X_test):
+        fd = frame["flight_distance"].astype(str)
+        tr = frame["type_of_travel"].astype(str)
+        frame["te_fd_class_travel"] = fd + "|" + frame["class"].astype(str) + "|" + tr
+        frame["te_fd_cust_travel"] = fd + "|" + frame["customer_type"].astype(str) + "|" + tr
+
+
+def add_flight_keys(m: Matrices, age: bool = False) -> None:
+    for frame in (m.X, m.X_test):
+        fd = frame["flight_distance"].astype(str)
+        dep = frame["departure_delay_in_minutes"].astype(str)
+        frame["te_fd_dep"] = fd + "|" + dep
+        frame["te_fd_dep_arr"] = fd + "|" + dep + "|" + frame["arrival_delay_in_minutes"].astype(str)
+        if age:
+            frame["te_fd_age"] = fd + "|" + frame["age"].astype(str)
+
+
+def add_orig_fd_class(m: Matrices) -> None:
+    """Original's smoothed rate per (flight_distance, class), shrunk to the fd rate."""
+    orig = load_original().to_pandas()
+    prior = float(orig[TARGET].mean())
+    g = orig.groupby("flight_distance")[TARGET].agg(["sum", "count"])
+    fd_rate = (g["sum"] + 20 * prior) / (g["count"] + 20)
+    gc = orig.groupby([orig["flight_distance"], orig["class"].astype(str)])[TARGET].agg(["sum", "count"])
+    for frame in (m.X, m.X_test):
+        base = frame["flight_distance"].map(fd_rate).astype(float).fillna(prior).to_numpy()
+        idx = pd.MultiIndex.from_arrays([frame["flight_distance"], frame["class"].astype(str)])
+        s_ = gc["sum"].reindex(idx).fillna(0).to_numpy()
+        c_ = gc["count"].reindex(idx).fillna(0).to_numpy()
+        frame["orig_fd_class_rate"] = (s_ + 10 * base) / (c_ + 10)
+
+
+def add_route(m: Matrices, plus: bool = False) -> None:
+    add_te_fd_keys(m)
+    add_orig_fd(m)
+    add_numcat(m, cols=["flight_distance"], cat=False)
+    if plus:
+        add_te_fd_plus_keys(m)
+        add_orig_fd_class(m)
+
+
+ORIG_KEYS = {
+    "fdcats": ["flight_distance", "gender", "customer_type", "type_of_travel", "class"],
+    "fdage": ["flight_distance", "age"],
+    "fdr3": ["flight_distance", "online_boarding", "inflight_wifi_service", "seat_comfort"],
+}
+
+
+def add_orig_keys(m: Matrices) -> None:
+    """Original's rate on finer route keys, shrunk toward the original fd rate."""
+    orig = load_original().to_pandas()
+    prior = float(orig[TARGET].mean())
+    g = orig.groupby("flight_distance")[TARGET].agg(["sum", "count"])
+    fd_rate = (g["sum"] + 20 * prior) / (g["count"] + 20)
+    for c in m.cat_cols:
+        orig[c] = orig[c].astype(str)
+    for frame in (m.X, m.X_test):
+        base = frame["flight_distance"].map(fd_rate).astype(float).fillna(prior).to_numpy()
+        for name, keys in ORIG_KEYS.items():
+            gk = orig.groupby(keys)[TARGET].agg(["sum", "count"])
+            idx = pd.MultiIndex.from_arrays(
+                [frame[k].astype(str) if k in m.cat_cols else frame[k] for k in keys]
+            )
+            s_ = gk["sum"].reindex(idx).fillna(0).to_numpy()
+            c_ = gk["count"].reindex(idx).fillna(0).to_numpy()
+            frame[f"orig_{name}_rate"] = (s_ + 5 * base) / (c_ + 5)
+
+
+def add_route_agg(m: Matrices) -> None:
+    """Route-level means of features over train+test (no labels), + row deviation."""
+    both = pd.concat([m.X, m.X_test])
+    cols = [*RATING_COLS, "age", "departure_delay_in_minutes"]
+    num = both[cols].astype(float)
+    num["is_business"] = (both["class"].astype(str) == "Business").astype(float)
+    num["is_personal"] = (both["type_of_travel"].astype(str) == "Personal Travel").astype(float)
+    num["is_loyal"] = (both["customer_type"].astype(str) == "Loyal Customer").astype(float)
+    means = num.groupby(both["flight_distance"].to_numpy()).mean()
+    for frame in (m.X, m.X_test):
+        mm = means.loc[frame["flight_distance"].to_numpy()].to_numpy()
+        for i, c in enumerate(means.columns):
+            frame[f"fdmean_{c}"] = mm[:, i]
+
+
+def add_orig_fd(m: Matrices) -> None:
+    """Original's satisfaction rate / count per flight_distance (no synthetic labels)."""
+    orig = load_original().to_pandas()
+    prior = float(orig[TARGET].mean())
+    g = orig.groupby("flight_distance")[TARGET].agg(["sum", "count"])
+    rate = (g["sum"] + 20 * prior) / (g["count"] + 20)
+    for frame in (m.X, m.X_test):
+        frame["orig_fd_rate"] = frame["flight_distance"].map(rate).astype(float).fillna(prior).to_numpy()
+        frame["orig_fd_count"] = frame["flight_distance"].map(g["count"]).astype(float).fillna(0).to_numpy()
+
+
+ARM_BUILDERS = {
+    "profile": add_profile,
+    "segment": add_segment,
+    "numcat": add_numcat,
+    "nc_cnt": lambda m: add_numcat(m, cat=False),
+    "nc_cat": lambda m: add_numcat(m, cnt=False),
+    "nc_fd": lambda m: add_numcat(m, cols=["flight_distance"]),
+    "nc_age": lambda m: add_numcat(m, cols=["age"]),
+    "nc_delays": lambda m: add_numcat(m, cols=NUMCAT_COLS[2:]),
+    "te_fd": add_te_fd_keys,
+    "orig_fd": add_orig_fd,
+    "route": add_route,
+    "route_plus": lambda m: add_route(m, plus=True),
+    "route_origk": lambda m: (add_route(m), add_orig_keys(m)),
+    "route_agg": lambda m: (add_route(m), add_route_agg(m)),
+    "route_fdcat": lambda m: (add_route(m), add_numcat(m, cols=["flight_distance"], cnt=False)),
+    "route_flight": lambda m: (add_route(m), add_flight_keys(m)),
+    "route_fdage": lambda m: (add_route(m), add_flight_keys(m, age=True)),
+}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--arm", required=True, choices=["base", "orig", "te_pairs", "cat_ratings"])
+    parser.add_argument("--arm", required=True, choices=["base", "orig", "te_pairs", "cat_ratings", *ARM_BUILDERS])
     args = parser.parse_args()
 
     m = build_matrices(with_original=args.arm == "orig")
@@ -94,6 +278,8 @@ def main() -> None:
         for frame in (m.X, m.X_test):
             for col in RATING_COLS:
                 frame[col] = pd.Categorical(frame[col], categories=list(range(6)))
+    elif args.arm in ARM_BUILDERS:
+        ARM_BUILDERS[args.arm](m)
     print(f"arm {args.arm}: train {m.X.shape}  test {m.X_test.shape}", flush=True)
 
     def fit_fold(
@@ -105,6 +291,13 @@ def main() -> None:
         fold: int,
     ) -> tuple[np.ndarray, np.ndarray]:
         t0 = time.time()
+        te_cols = [c for c in (*TE_FD_COLS, *TE_FD_PLUS) if c in x_tr.columns]
+        if te_cols:
+            x_tr, x_va, x_te = add_fold_safe_target_encoding(
+                x_tr, y_tr, [x_va, x_te], te_cols, {1: "sat"},
+                smooth=TE_SMOOTH,
+            )
+            x_tr, x_va, x_te = (f.drop(columns=te_cols) for f in (x_tr, x_va, x_te))
         if args.arm == "te_pairs":
             x_tr, x_va, x_te = add_fold_safe_target_encoding(
                 x_tr, y_tr, [x_va, x_te], PAIR_COLS, {1: "sat"}
@@ -129,7 +322,7 @@ def main() -> None:
 
     oof, test, fold_scores = run_cv(m.X, m.y, m.X_test, fit_fold, n_outputs=1, score_fn=fold_score)
     oof_auc = float(roc_auc_score(m.y, oof))
-    name = f"lgbm_arm_{args.arm}"
+    name = f"lgbm_arm_{args.arm}" + os.environ.get("S6E10_ARM_SUFFIX", "")
     save_cv_result(RESULTS_DIR, name, fold_scores, oof_auc, metric_name="auc")
     np.save(RESULTS_DIR / f"oof_{name}.npy", oof)
     np.save(RESULTS_DIR / f"test_{name}.npy", test)
@@ -148,6 +341,13 @@ def main() -> None:
     print(f"\n{name}: OOF {oof_auc:.6f}  per-fold delta {np.round(deltas, 6).tolist()}")
     print(f"{name}: OOF delta {d_oof:+.6f}  positive folds {n_pos}/5  → {verdict}")
     print(f"corr with control {np.corrcoef(oof, ctrl)[0, 1]:.4f}")
+    route_path = RESULTS_DIR / f"oof_{ROUTE_CONTROL}.npy"
+    if name != ROUTE_CONTROL and route_path.exists():
+        rc = np.load(route_path)
+        splits = StratifiedKFold(n_splits=5, shuffle=True, random_state=42).split(m.X, m.y)
+        rd = [roc_auc_score(m.y[va], oof[va]) - roc_auc_score(m.y[va], rc[va]) for _, va in splits]
+        print(f"vs {ROUTE_CONTROL}: OOF delta {oof_auc - float(roc_auc_score(m.y, rc)):+.6f}  "
+              f"per-fold {np.round(rd, 6).tolist()}")
 
 
 if __name__ == "__main__":

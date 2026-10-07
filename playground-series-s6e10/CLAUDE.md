@@ -335,6 +335,71 @@ first because each one *bounds* the effect (gate on magnitude, not on "the struc
 - **Re-run with TabM (6 legs): FAIL (null).** Stack OOF **0.959172** vs 0.959169 → **+0.000002**
   (C = 0.1). **Closed: LR stacking over these legs.**
 
+### PR-10 — per-row rating-profile features (registered 2026-10-07, before any number)
+
+- **Arms** (`src/run_lgbm_arm.py`, PR-3 instrument, base LGBM config, paired vs
+  `lgbm_pr1_base`; each arm ~45 s so all are run):
+  * `profile` — rating_std, rating_median, within-row z-score of each of the 13 ratings
+    ((r − row mean)/row std), and the 6-bin histogram (count of 0s…5s per row);
+  * `segment` — the rating deviations from the row's (type_of_travel × class) segment mean
+    of that rating (global, no labels; rule 2), plus a 6-level segment key;
+  * `numcat` — Deotte-style: `age`, `flight_distance` and the two delays duplicated as
+    `category` + per-value count (frequency) of each; synthetic generators often leave
+    value-level artefacts in numerics that a split on the raw value cannot isolate.
+- **Bar (PASS)**: OOF delta ≥ **+0.0005** AND ≥ 4/5 folds (unchanged). Screening rule: any
+  arm with delta ≥ +0.0002 is re-run on the tuned config (`lgbm_pr5_tuned`) and priced at
+  the submitted blend before anything is adopted (lesson 7).
+- **Prior**: profile ~10% (trees on 700k rows already see the ratings jointly; PR-4a showed
+  added rating columns dilute), segment ~5%, numcat ~15% (the only one aimed at a
+  generator artefact rather than at structure the trees can already learn).
+
+### PR-11 — seed bagging of the submitted legs (registered 2026-10-07, before any number)
+
+- **Arm**: RealMLP v1 at seeds 43/44/45 (+42 existing) → `realmlp_v1_s4x`; tuned LGBM at
+  seeds 43-45 if the CPU frees up. Blend = submitted recipe with each leg replaced by the
+  mean rank of its M seeds.
+- **Instrument**: M-slope (lesson 1) — paired delta of blend(M) − blend(1) at M = 1..4,
+  fit `|delta| ~ M**b` on all M (not just three points; lesson 4). Report b.
+- **Bar (ADOPT)**: delta at M = 4 ≥ **+0.0005**; bookkeeping adoption (it costs no
+  information) is allowed at any positive delta since a bagged leg can only be submitted,
+  never hurt in expectation — but it is logged as sub-bar.
+- **Prior** ~5% to clear the bar: b ≈ −1 (variance reduction) is the expected mechanism;
+  RealMLP per-seed fold-1 spread is ±0.00013, so averaging four seeds should buy ~+0.0001.
+
+### PR-12 — flight_distance as a ROUTE key (registered 2026-10-07, after the PR-10 screens)
+
+PR-10 screens (base config, paired vs `lgbm_pr1_base`) found that `flight_distance`
+(3,521 distinct values, peaky counts: 594 mi ×11.5k) behaves like a route ID:
+`te_fd` (fold-safe TE of fd, fd×class, fd×travel, fd×customer) **+0.001269** 5/5;
+`orig_fd` (original's smoothed satisfaction rate + count per fd — no synthetic labels)
+**+0.001100** 5/5; `nc_cnt` (value counts) +0.000576 5/5. Age / delays as categories
+*hurt* (−0.00047 / −0.00024): the effect is specific to the route key.
+- **Arms** (base config first, then tuned config): `route` = te_fd + orig_fd + cnt_fd;
+  `route_plus` = route + richer keys (fd×class×travel, fd×customer×travel TE; original
+  per-(fd, class) rate).
+- **Bar (ADOPT)**: on the tuned config, OOF delta vs `lgbm_pr5_tuned` ≥ **+0.0005** AND
+  ≥ 4/5 folds; then re-priced at the deliverable (blend with RealMLP — which also needs the
+  route features to be fair, so RealMLP gets a route variant too).
+- **Prior**: ~80% that `route` clears the bar on the tuned config (each component already
+  does solo on base); ~40% that `route_plus` adds ≥ +0.0002 over `route`.
+
+- **PR-10 RESULT (2026-10-07)**: `profile` **−0.000360** 0/5 (harmful), `segment` −0.000094
+  0/5, `numcat` **+0.000488 5/5** (sub-bar, but the signal that led to PR-12). Decomposition
+  (base config, vs `lgbm_pr1_base`): fd only +0.000409; counts only +0.000576; cats only
+  +0.000387; age −0.000467; delays −0.000239. **The whole effect is `flight_distance`.**
+- **PR-12 RESULTS (2026-10-07)**. Facts: all 3,521 synthetic fd values are original values
+  (100.0% of rows); per-route sat rates correlate 0.865 between synthetic and original.
+  Base config, vs `lgbm_pr1_base`: `route` **+0.001416** 5/5 (0.960184); `route_plus`
+  +0.001319 (finer keys dilute); on top of `route`: `route_agg` (route means of features)
+  +0.000073 4/5, `route_origk` (original rate on fd+cats / fd+age / fd+3 ratings) −0.000103,
+  `route_flight` (TE of fd+delays, a "same flight" key) −0.000055, fd as raw category
+  −0.000894; TE smoothing 5 / 80 / auto vs 20: +0.000065 / −0.000065 / +0.000041 (noise).
+  Exact-match lookups into the original (fd+age+cats etc.): residual corr ≤ 0.006 — the
+  generator does not copy individual rows.
+  **Tuned config (`tune_lgbm.py --evaluate --route` → `lgbm_pr12_route`): OOF 0.960522,
+  +0.001520 vs `lgbm_pr5_tuned`, 5/5 → PASS.** `xgb_route` (GPU, v1 params) 0.96020
+  (+0.00158 vs `xgb_v1`). Route features live in `src/route.py` (all legs take `--route`).
+
 ## Next steps (remove each item when implemented)
 
 Closed so far: original as rows (PR-1) and as features (PR-3); pairwise rating TE (PR-4a);

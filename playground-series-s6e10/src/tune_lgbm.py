@@ -95,16 +95,22 @@ def search() -> None:
     print(f"\nbest {study.best_value:.5f} (control trial {study.trials[0].value:.5f}) → {PARAMS_FILE}")
 
 
-def evaluate() -> None:
+def evaluate(route: bool = False) -> None:
     tuned = json.loads(PARAMS_FILE.read_text())
     params = {**CONTROL_PARAMS, **tuned}
     print(f"evaluate (CPU, paired): {tuned}", flush=True)
     m = build_matrices()
+    if route:
+        from route import add_route_global
+        add_route_global(m)
 
     def fit_fold(
         x_tr: pd.DataFrame, y_tr: np.ndarray, x_va: pd.DataFrame, y_va: np.ndarray,
         x_te: pd.DataFrame, fold: int,
     ) -> tuple[np.ndarray, np.ndarray]:
+        if route:
+            from route import route_te
+            x_tr, x_va, x_te = route_te(x_tr, y_tr, [x_va, x_te])
         model = LGBMClassifier(**params)
         model.fit(
             x_tr, y_tr, eval_set=[(x_va, y_va)],
@@ -119,7 +125,7 @@ def evaluate() -> None:
         score_fn=lambda yv, pv: float(roc_auc_score(yv, pv)),
     )
     oof_auc = float(roc_auc_score(m.y, oof))
-    name = "lgbm_pr5_tuned"
+    name = "lgbm_pr12_route" if route else "lgbm_pr5_tuned"
     save_cv_result(RESULTS_DIR, name, fold_scores, oof_auc, metric_name="auc")
     np.save(RESULTS_DIR / f"oof_{name}.npy", oof)
     np.save(RESULTS_DIR / f"test_{name}.npy", test)
@@ -132,17 +138,25 @@ def evaluate() -> None:
     verdict = "PASS" if d_oof >= BAR and n_pos >= 4 else "FAIL"
     print(f"\n{name}: OOF {oof_auc:.6f}  per-fold delta {np.round(deltas, 6).tolist()}")
     print(f"{name}: OOF delta {d_oof:+.6f}  positive folds {n_pos}/5  → {verdict}")
+    if route:
+        tuned_oof = np.load(RESULTS_DIR / "oof_lgbm_pr5_tuned.npy")
+        splits = StratifiedKFold(n_splits=5, shuffle=True, random_state=42).split(m.X, m.y)
+        td = [roc_auc_score(m.y[va], oof[va]) - roc_auc_score(m.y[va], tuned_oof[va]) for _, va in splits]
+        dt = oof_auc - float(roc_auc_score(m.y, tuned_oof))
+        print(f"vs lgbm_pr5_tuned: OOF delta {dt:+.6f}  per-fold {np.round(td, 6).tolist()}  "
+              f"→ {'PASS' if dt >= BAR and sum(d > 0 for d in td) >= 4 else 'FAIL'}")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--search", action="store_true")
     parser.add_argument("--evaluate", action="store_true")
+    parser.add_argument("--route", action="store_true", help="PR-12 route features")
     args = parser.parse_args()
     if args.search:
         search()
     if args.evaluate:
-        evaluate()
+        evaluate(route=args.route)
 
 
 if __name__ == "__main__":

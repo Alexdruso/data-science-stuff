@@ -82,6 +82,7 @@ def main() -> None:
     parser.add_argument("--epochs", type=int, default=None)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--override", default="{}", help="JSON dict of config overrides")
+    parser.add_argument("--route", action="store_true", help="PR-12 route features")
     parser.add_argument("--tag", default="", help="run-name suffix; required with --override")
     parser.add_argument(
         "--fold1", action="store_true",
@@ -96,6 +97,10 @@ def main() -> None:
     if args.epochs is not None:
         cfg["epochs"] = args.epochs
     m = build_matrices()
+    if args.route:
+        from route import add_route_global
+        add_route_global(m)
+        args.tag = args.tag or "route"
     # is_original is constant 0 here; RealMLP's robust scaler has nothing to scale.
     X = m.X.drop(columns=["is_original"])
     X_test = m.X_test.drop(columns=["is_original"])
@@ -118,6 +123,9 @@ def main() -> None:
         t0 = time.time()
         torch.manual_seed(args.seed + fold)
         np.random.seed(args.seed + fold)
+        if args.route:
+            from route import route_te
+            x_tr, x_va, x_te = route_te(x_tr, y_tr, [x_va, x_te])
         tr, va, te = to_frames((x_tr, x_va, x_te), m.cat_cols)
         model = RealMLP_TD_Classifier(**{**cfg, "random_state": args.seed + fold})
         model.fit(
