@@ -95,16 +95,23 @@ def search() -> None:
     print(f"\nbest {study.best_value:.5f} (control trial {study.trials[0].value:.5f}) → {PARAMS_FILE}")
 
 
-def evaluate(route: bool = False, resid: bool = False) -> None:
+def evaluate(route: bool = False, resid: bool = False, orig: bool = False) -> None:
     import os
     params_file = RESULTS_DIR / os.environ.get("S6E10_LGBM_PARAMS", PARAMS_FILE.name)
     tuned = json.loads(params_file.read_text())
     params = {**CONTROL_PARAMS, **tuned}
     print(f"evaluate (CPU, paired): {tuned}", flush=True)
-    m = build_matrices()
+    m = build_matrices(with_original=orig)
+    n_test = len(m.X_test)
+    if orig:
+        m.X_test = pd.concat([m.X_test, m.X_orig], ignore_index=True)
     if route:
         from route import add_route_global
         add_route_global(m)
+    x_orig = None
+    if orig:
+        x_orig = m.X_test.iloc[n_test:].reset_index(drop=True)
+        m.X_test = m.X_test.iloc[:n_test].reset_index(drop=True)
 
     def fit_fold(
         x_tr: pd.DataFrame, y_tr: np.ndarray, x_va: pd.DataFrame, y_va: np.ndarray,
@@ -112,7 +119,12 @@ def evaluate(route: bool = False, resid: bool = False) -> None:
     ) -> tuple[np.ndarray, np.ndarray]:
         if route:
             from route import route_te
-            x_tr, x_va, x_te = route_te(x_tr, y_tr, [x_va, x_te])
+            if x_orig is not None:
+                x_tr, x_va, x_te, x_o = route_te(x_tr, y_tr, [x_va, x_te, x_orig])
+                x_tr = pd.concat([x_tr, x_o[x_tr.columns]], ignore_index=True)
+                y_tr = np.concatenate([y_tr, m.y_orig])
+            else:
+                x_tr, x_va, x_te = route_te(x_tr, y_tr, [x_va, x_te])
         if resid:
             from run_lgbm_arm import route_residual
             x_tr, x_va, x_te = route_residual(x_tr, y_tr, [x_va, x_te])
@@ -131,7 +143,7 @@ def evaluate(route: bool = False, resid: bool = False) -> None:
     )
     oof_auc = float(roc_auc_score(m.y, oof))
     name = ("lgbm_pr13_resid" if resid else "lgbm_pr12_route") if route else "lgbm_pr5_tuned"
-    name += os.environ.get("S6E10_LGBM_SUFFIX", "")
+    name += os.environ.get("S6E10_LGBM_SUFFIX", "") + ("_orig" if orig else "")
     save_cv_result(RESULTS_DIR, name, fold_scores, oof_auc, metric_name="auc")
     np.save(RESULTS_DIR / f"oof_{name}.npy", oof)
     np.save(RESULTS_DIR / f"test_{name}.npy", test)
@@ -159,11 +171,12 @@ def main() -> None:
     parser.add_argument("--evaluate", action="store_true")
     parser.add_argument("--route", action="store_true", help="PR-12 route features")
     parser.add_argument("--resid", action="store_true", help="PR-13 residual route encoding (with --route)")
+    parser.add_argument("--orig", action="store_true", help="append original rows to each training fold (with --route)")
     args = parser.parse_args()
     if args.search:
         search()
     if args.evaluate:
-        evaluate(route=args.route, resid=args.resid)
+        evaluate(route=args.route, resid=args.resid, orig=args.orig)
 
 
 if __name__ == "__main__":

@@ -99,7 +99,11 @@ Original target: bool, 43.4% positive (56,428 / 129,880).
 
 ## Current best
 
-**2026-10-07: rank-blend 0.475·`lgbm_pr12_route` + 0.525·`realmlp_route` — OOF 0.960932**
+**2026-10-07 (end of day): `blend_final_1007_orig2.csv`, honest OOF 0.961435** — route
+features (PR-12) + residual route TE (PR-13) + RealMLP fd/age embeddings (PR-15) + original
+rows appended to training folds (PR-16) in both legs. See the submission log.
+
+Earlier on 10-07: rank-blend 0.475·`lgbm_pr12_route` + 0.525·`realmlp_route` — OOF 0.960932
 (honest +0.00176 over the row below; PR-12). Legs: RealMLP+route 0.96065, tuned LGBM+route
 0.960522, XGB+route 0.96020. The table below predates PR-12.
 
@@ -305,6 +309,8 @@ first because each one *bounds* the effect (gate on magnitude, not on "the struc
 | Date | File | Recipe | OOF | Note |
 |---|---|---|---|---|
 | 2026-10-05 | `blend_lgbmt65_realmlp35.csv` | 0.65·rank(`test_lgbm_pr5_tuned`) + 0.35·rank(`test_realmlp_v1`) | 0.959169 | first submission; LB not checked (LB-blind) |
+| 2026-10-07 | `blend_final_1007_orig2.csv` | honest-NM: `realmlp_route_ls0_emb4_fdcat_agecat_orig` 0.52 + `lgbm_pr13_resid_orig` 0.17 + `lgbm_pr12_route_orig` 0.17 + ls0_emb4_fdclass 0.10 + ls0 0.05 | 0.961441 | honest **0.961435** — current best; LB not checked |
+| 2026-10-07 | `blend_final_1007_orig.csv` | 9-leg honest-NM: `realmlp_route_ls0_emb4_fdcat_agecat_orig` 0.54 + `lgbm_pr13_resid` 0.26 + 7 RealMLP variants (≤0.07 each) | 0.961401 | honest **0.961395** (+0.000118 vs `blend_final_1007`); LB not checked |
 | 2026-10-07 | `blend_final_1007.csv` | 8-leg rank blend, honest-NM weights (avg of halves): `lgbm_pr13_resid` 0.30 + RealMLP route variants (ls0_emb4 0.16, delaycat 0.12, ls0_emb4_fdclass 0.11, ls0 0.10, ls0_emb2 0.09, fdclass 0.07, emb24 0.05) | 0.961284 | honest 0.961277 (+0.000034 vs submission 3 — NN-variant breadth); LB not checked |
 | 2026-10-07 | `blend_lgbmresid35_mlpage30_mlpdelay35.csv` | 0.35·rank(`lgbm_pr13_resid`) + 0.30·rank(`realmlp_route_fdcat_agecat`) + 0.35·rank(`realmlp_route_fdcat_agecat_delaycat`) | 0.961247 | honest 4-leg fit 0.961243 (+0.00031 vs submission 2); LB not checked |
 | 2026-10-07 | `blend_route_lgbm_realmlp_w52.csv` | 0.475·rank(`test_lgbm_pr12_route`) + 0.525·rank(`test_realmlp_route`) | 0.960932 | PR-12 route features in both legs; honest delta +0.001761 vs the 10-05 recipe (w 0.55/0.50 per half) |
@@ -482,8 +488,23 @@ is already the NN's route channel.
 - **Bar (ADOPT)**: solo OOF ≥ +0.0003 over the paired leg AND ≥ 4/5 folds positive, then a
   positive honest delta at the blend. **Prior ~10%** (PR-1 null on LGBM; delays off-
   distribution) — the only reason to run it is that RealMLP has differed from LGBM all day.
+- **RESULT: FAIL on the solo bar, but real and it pays at the blend.** OOF **0.96128**
+  (folds 0.96156/0.96040/0.96204/0.96136/0.96109), delta **+0.000196**, **5/5** positive
+  (+22/+27/+28/+12/+5 e-5), corr 0.9993. Honest 2-leg with `lgbm_pr13_resid` **0.961391**
+  (vs 0.961209 for the no-orig agecat leg). Adopted for the submission as bookkeeping (best
+  honest OOF), not as a bar-clearing lever. Reading: unlike LGBM (PR-1), the NN uses the
+  original rows — plausibly because they add ~34 labelled rows per route embedding.
+- **LGBM + original rows, with route (bookkeeping follow-up, same session):** PR-1's null does
+  NOT hold once route features exist. `lgbm_pr12_route_orig` 0.960743 (+0.000221 vs
+  `lgbm_pr12_route`, 5/5); `lgbm_pr13_resid_orig` **0.960811** (+0.000289 vs
+  `lgbm_pr12_route`, 5/5) — best LGBM leg. Both sub-bar solo; blend honest 0.961435.
 
 ## Next steps (remove each item when implemented)
+
+**From 10-07 (do these first):** (a) original rows are now live for both legs — try
+down-weighting them / dropping their delays (off-distribution), and RealMLP+orig with the
+other embedding variants; (b) re-tune LGBM *with* orig+route (PR-14 tuned without orig);
+(c) XGB/CatBoost with route+orig to see if they regain blend weight.
 
 Closed so far: original as rows (PR-1) and as features (PR-3); pairwise rating TE (PR-4a);
 categorical ratings (PR-4b); duplicate/frequency structure (PR-6, by screen); RealMLP tuning (PR-7); TabM (PR-8); LR stack (PR-9). Sub-bar but real: RealMLP (PR-2), LGBM tuning (PR-5).
