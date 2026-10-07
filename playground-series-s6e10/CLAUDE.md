@@ -305,6 +305,7 @@ first because each one *bounds* the effect (gate on magnitude, not on "the struc
 | Date | File | Recipe | OOF | Note |
 |---|---|---|---|---|
 | 2026-10-05 | `blend_lgbmt65_realmlp35.csv` | 0.65·rank(`test_lgbm_pr5_tuned`) + 0.35·rank(`test_realmlp_v1`) | 0.959169 | first submission; LB not checked (LB-blind) |
+| 2026-10-07 | `blend_final_1007.csv` | 8-leg rank blend, honest-NM weights (avg of halves): `lgbm_pr13_resid` 0.30 + RealMLP route variants (ls0_emb4 0.16, delaycat 0.12, ls0_emb4_fdclass 0.11, ls0 0.10, ls0_emb2 0.09, fdclass 0.07, emb24 0.05) | 0.961284 | honest 0.961277 (+0.000034 vs submission 3 — NN-variant breadth); LB not checked |
 | 2026-10-07 | `blend_lgbmresid35_mlpage30_mlpdelay35.csv` | 0.35·rank(`lgbm_pr13_resid`) + 0.30·rank(`realmlp_route_fdcat_agecat`) + 0.35·rank(`realmlp_route_fdcat_agecat_delaycat`) | 0.961247 | honest 4-leg fit 0.961243 (+0.00031 vs submission 2); LB not checked |
 | 2026-10-07 | `blend_route_lgbm_realmlp_w52.csv` | 0.475·rank(`test_lgbm_pr12_route`) + 0.525·rank(`test_realmlp_route`) | 0.960932 | PR-12 route features in both legs; honest delta +0.001761 vs the 10-05 recipe (w 0.55/0.50 per half) |
 
@@ -455,8 +456,32 @@ is already the NN's route channel.
 - **PR-15 cont.**: `--fdcat --agecat` **0.96102** solo, 2-leg honest 0.961209 (+0.00006 vs
   fdcat — sub the +0.0002 swap bar, but the best NN leg); `+--delaycat` 0.96102, 2-leg
   0.961223; `--fdmin 5` (more fd levels) 0.96091, 0.961138 (null). `embedding_size 16`
-  override produced bit-identical folds to the default → not plumbed through; discarded.
+  override produced bit-identical folds to the default — `train_realmlp.py` uses OUR
+  `data_science_stuff.kaggle.models.RealMLP_TD_Classifier`, not pytabkit's, and unknown keys
+  are silently ignored. Its keys: `embed_dim` (cat embedding size, default 8), `ls_eps`
+  (label smoothing), `onehot_thresh`. A `use_ls` override was likewise a no-op (run killed).
   4-leg honest (resid LGBM + agecat + delaycat + fdcat) **0.961243** → submission 3.
+
+- **More nulls (2026-10-07 pm)**: `route_persona` (TE of age×gender×customer×travel) +0.000051;
+  `route_fdage2` (TE fd×age) −0.000069; LGBM native-categorical fd with strong cat
+  regularisation −0.000195; residual k 5/50 vs 20: +0.000167/+0.000160 vs +0.000145 (flat);
+  `catboost_route_fdcat` (fd, age as CatBoost cats) 0.95996, +0.000009 at the blend;
+  RealMLP `--fdclasscat` 0.96101, +0.000014 as a 4th leg; row `id` carries nothing (AUC
+  0.50007, no residual drift / autocorrelation).
+
+- **RealMLP config variants** (correct keys): `ls_eps 0` 0.96106; `+embed_dim 4` **0.96108**;
+  `embed_dim 2` 0.96107; `embed_dim 24` 0.96100; ls0+delaycat 0.96104; ls0+emb4+fdclass
+  0.96103. All within ±0.00005 solo; together they add ~+0.00003 at the blend (averaging).
+
+### PR-16 — original rows appended to RealMLP training folds (registered 2026-10-07, before any number)
+
+- **Arm**: `train_realmlp.py --route --fdcat --agecat --orig` with `ls_eps 0, embed_dim 4`
+  (paired against `realmlp_route_ls0_emb4_fdcat_agecat`, 0.96108): all 129,880 original rows
+  appended to each fold's training split only, `is_original` = 1 kept as a feature; route TE
+  for those rows is transformed by the fold's encoder (never fit on them).
+- **Bar (ADOPT)**: solo OOF ≥ +0.0003 over the paired leg AND ≥ 4/5 folds positive, then a
+  positive honest delta at the blend. **Prior ~10%** (PR-1 null on LGBM; delays off-
+  distribution) — the only reason to run it is that RealMLP has differed from LGBM all day.
 
 ## Next steps (remove each item when implemented)
 

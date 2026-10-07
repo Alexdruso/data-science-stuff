@@ -399,7 +399,8 @@ def main() -> None:
             )
             # The raw integer keys stay out of the model: TE is the feature.
             x_tr, x_va, x_te = (f.drop(columns=PAIR_COLS) for f in (x_tr, x_va, x_te))
-        model = LGBMClassifier(**PARAMS)
+        import json as _json
+        model = LGBMClassifier(**{**PARAMS, **_json.loads(os.environ.get("S6E10_LGBM_EXTRA", "{}"))})
         model.fit(
             x_tr, y_tr, eval_set=[(x_va, y_va)],
             callbacks=[early_stopping(50, verbose=False), log_evaluation(0)],

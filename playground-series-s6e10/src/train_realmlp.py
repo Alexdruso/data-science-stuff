@@ -87,6 +87,7 @@ def main() -> None:
     parser.add_argument("--fdmin", type=int, default=20, help="min count for an fd embedding level")
     parser.add_argument("--delaycat", action="store_true", help="delays (count>=20 levels) as embedded categories")
     parser.add_argument("--fdclasscat", action="store_true", help="(fd, class) as one embedded category")
+    parser.add_argument("--orig", action="store_true", help="append original rows to each training fold")
     parser.add_argument("--agecat", action="store_true", help="age as an embedded category")
     parser.add_argument("--ratingcat", action="store_true", help="the 13 ratings as embedded categories")
     parser.add_argument("--resid", action="store_true", help="PR-13 residual route encoding (with --route)")
@@ -103,7 +104,11 @@ def main() -> None:
     cfg = {**REALMLP_TD_CONFIG, **CFG, **overrides}
     if args.epochs is not None:
         cfg["epochs"] = args.epochs
-    m = build_matrices()
+    m = build_matrices(with_original=args.orig)
+    n_test = len(m.X_test)
+    if args.orig:
+        # Ride along with X_test through every global feature builder, split back below.
+        m.X_test = pd.concat([m.X_test, m.X_orig], ignore_index=True)
     if args.route:
         from route import add_route_global
         add_route_global(m)
@@ -151,9 +156,15 @@ def main() -> None:
         args.tag += "_ratingcat"
     if args.resid:
         args.tag += "_resid"
+    x_orig = None
+    if args.orig:
+        x_orig = m.X_test.iloc[n_test:].reset_index(drop=True)
+        m.X_test = m.X_test.iloc[:n_test].reset_index(drop=True)
+        args.tag += "_orig"
     # is_original is constant 0 here; RealMLP's robust scaler has nothing to scale.
-    X = m.X.drop(columns=["is_original"])
-    X_test = m.X_test.drop(columns=["is_original"])
+    drop = [] if args.orig else ["is_original"]
+    X = m.X.drop(columns=drop)
+    X_test = m.X_test.drop(columns=drop)
     print(
         f"RealMLP on {'cuda' if torch.cuda.is_available() else 'cpu'}: "
         f"train {X.shape} test {X_test.shape} epochs={cfg['epochs']} "
@@ -175,7 +186,14 @@ def main() -> None:
         np.random.seed(args.seed + fold)
         if args.route:
             from route import route_te
-            x_tr, x_va, x_te = route_te(x_tr, y_tr, [x_va, x_te])
+            if x_orig is not None:
+                x_tr, x_va, x_te, x_o = route_te(x_tr, y_tr, [x_va, x_te, x_orig])
+            else:
+                x_tr, x_va, x_te = route_te(x_tr, y_tr, [x_va, x_te])
+        if x_orig is not None:
+            assert m.y_orig is not None
+            x_tr = pd.concat([x_tr, x_o[x_tr.columns]], ignore_index=True)
+            y_tr = np.concatenate([y_tr, m.y_orig])
         if args.resid:
             from run_lgbm_arm import route_residual
             x_tr, x_va, x_te = route_residual(x_tr, y_tr, [x_va, x_te])

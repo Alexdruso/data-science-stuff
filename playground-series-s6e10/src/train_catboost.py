@@ -70,8 +70,15 @@ def main() -> None:
         device_params["thread_count"] = 4
     print(f"CatBoost on {DEVICE}: train {m.X.shape}  test {m.X_test.shape}", flush=True)
 
-    X = _prepare(m.X, m.cat_cols)
-    X_test = _prepare(m.X_test, m.cat_cols)
+    cat_cols = list(m.cat_cols)
+    fdcat = "--fdcat" in sys.argv
+    if fdcat:
+        for frame in (m.X, m.X_test):
+            frame["fd_str"] = frame["flight_distance"].astype(str)
+            frame["age_str"] = frame["age"].astype(str)
+        cat_cols += ["fd_str", "age_str"]
+    X = _prepare(m.X, cat_cols)
+    X_test = _prepare(m.X_test, cat_cols)
 
     def fit_fold(
         x_tr: pd.DataFrame,
@@ -85,7 +92,7 @@ def main() -> None:
             from route import route_te
             x_tr, x_va, x_te = route_te(x_tr, y_tr, [x_va, x_te])
         model = CatBoostClassifier(
-            **params, **device_params, cat_features=m.cat_cols
+            **params, **device_params, cat_features=cat_cols
         )
         model.fit(x_tr, y_tr)
         print(f"  fold {fold} fitted", flush=True)
@@ -102,7 +109,7 @@ def main() -> None:
     oof_auc = float(roc_auc_score(m.y, oof))
     print(f"\nOOF AUC: {oof_auc:.5f}")
 
-    run_name = "catboost_route" if route else ("catboost_v1_tuned" if tuned else "catboost_v1")
+    run_name = ("catboost_route_fdcat" if fdcat else "catboost_route") if route else ("catboost_v1_tuned" if tuned else "catboost_v1")
     save_cv_result(RESULTS_DIR, run_name, fold_scores, oof_auc, metric_name="auc")
     np.save(RESULTS_DIR / f"oof_{run_name}.npy", oof)
     np.save(RESULTS_DIR / f"test_{run_name}.npy", test)
