@@ -84,6 +84,9 @@ def main() -> None:
     parser.add_argument("--override", default="{}", help="JSON dict of config overrides")
     parser.add_argument("--route", action="store_true", help="PR-12 route features")
     parser.add_argument("--fdcat", action="store_true", help="flight_distance as an embedded category")
+    parser.add_argument("--fdmin", type=int, default=20, help="min count for an fd embedding level")
+    parser.add_argument("--delaycat", action="store_true", help="delays (count>=20 levels) as embedded categories")
+    parser.add_argument("--fdclasscat", action="store_true", help="(fd, class) as one embedded category")
     parser.add_argument("--agecat", action="store_true", help="age as an embedded category")
     parser.add_argument("--ratingcat", action="store_true", help="the 13 ratings as embedded categories")
     parser.add_argument("--resid", action="store_true", help="PR-13 residual route encoding (with --route)")
@@ -109,18 +112,36 @@ def main() -> None:
     if args.fdcat:
         both = pd.concat([m.X, m.X_test])
         counts = both["flight_distance"].value_counts()
-        levels = counts.index[counts >= 20]
+        levels = counts.index[counts >= args.fdmin]
         for frame in (m.X, m.X_test):
             frame["fd_cat"] = pd.Categorical(
                 frame["flight_distance"].where(frame["flight_distance"].isin(levels)), categories=levels
             )
         cat_cols.append("fd_cat")
-        args.tag += "_fdcat"
+        args.tag += "_fdcat" + ("" if args.fdmin == 20 else f"{args.fdmin}")
     if args.agecat:
         for frame in (m.X, m.X_test):
             frame["age_cat"] = pd.Categorical(frame["age"], categories=sorted(pd.concat([m.X, m.X_test])["age"].unique()))
         cat_cols.append("age_cat")
         args.tag += "_agecat"
+    if args.fdclasscat:
+        key = lambda f: f["flight_distance"].astype(str) + "|" + f["class"].astype(str)
+        counts = pd.concat([key(m.X), key(m.X_test)]).value_counts()
+        levels = counts.index[counts >= 20]
+        for frame in (m.X, m.X_test):
+            k = key(frame)
+            frame["fdclass_cat"] = pd.Categorical(k.where(k.isin(levels)), categories=levels)
+        cat_cols.append("fdclass_cat")
+        args.tag += "_fdclasscat"
+    if args.delaycat:
+        both = pd.concat([m.X, m.X_test])
+        for col in ("departure_delay_in_minutes", "arrival_delay_in_minutes"):
+            counts = both[col].value_counts()
+            levels = counts.index[counts >= 20]
+            for frame in (m.X, m.X_test):
+                frame[f"{col}_cat"] = pd.Categorical(frame[col].where(frame[col].isin(levels)), categories=levels)
+            cat_cols.append(f"{col}_cat")
+        args.tag += "_delaycat"
     if args.ratingcat:
         from features import RATING_COLS
         for frame in (m.X, m.X_test):

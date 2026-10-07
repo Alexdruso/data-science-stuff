@@ -134,7 +134,7 @@ def add_numcat(
 
 
 TE_FD_COLS = ["te_fd", "te_fd_class", "te_fd_travel", "te_fd_cust"]
-TE_FD_PLUS = ["te_fd_class_travel", "te_fd_cust_travel", "te_fd_dep", "te_fd_dep_arr", "te_fd_age"]
+TE_FD_PLUS = ["te_fd_class_travel", "te_fd_cust_travel", "te_fd_dep", "te_fd_dep_arr", "te_fd_age", "te_persona"]
 
 
 def add_te_fd_keys(m: Matrices) -> None:
@@ -163,6 +163,17 @@ def add_flight_keys(m: Matrices, age: bool = False) -> None:
         frame["te_fd_dep_arr"] = fd + "|" + dep + "|" + frame["arrival_delay_in_minutes"].astype(str)
         if age:
             frame["te_fd_age"] = fd + "|" + frame["age"].astype(str)
+
+
+def add_persona_key(m: Matrices) -> None:
+    for frame in (m.X, m.X_test):
+        frame["te_persona"] = (frame["age"].astype(str) + "|" + frame["gender"].astype(str) + "|"
+                               + frame["customer_type"].astype(str) + "|" + frame["type_of_travel"].astype(str))
+
+
+def add_fd_age_key(m: Matrices) -> None:
+    for frame in (m.X, m.X_test):
+        frame["te_fd_age"] = frame["flight_distance"].astype(str) + "|" + frame["age"].astype(str)
 
 
 def add_orig_fd_class(m: Matrices) -> None:
@@ -282,6 +293,8 @@ ARM_BUILDERS = {
     "route_resid_fine": add_route,
     "route_resid_ores": lambda m: (add_route(m), add_orig_resid(m)),
     "route_fdcat": lambda m: (add_route(m), add_numcat(m, cols=["flight_distance"], cnt=False)),
+    "route_persona": lambda m: (add_route(m), add_persona_key(m)),
+    "route_fdage2": lambda m: (add_route(m), add_fd_age_key(m)),
     "route_flight": lambda m: (add_route(m), add_flight_keys(m)),
     "route_fdage": lambda m: (add_route(m), add_flight_keys(m, age=True)),
 }
@@ -377,7 +390,7 @@ def main() -> None:
             )
             x_tr, x_va, x_te = (f.drop(columns=te_cols) for f in (x_tr, x_va, x_te))
         if args.arm in ("route_resid", "resid_only", "route_resid_ores"):
-            x_tr, x_va, x_te = route_residual(x_tr, y_tr, [x_va, x_te])
+            x_tr, x_va, x_te = route_residual(x_tr, y_tr, [x_va, x_te], k=float(os.environ.get("S6E10_RESID_K", "20")))
         if args.arm == "route_resid_fine":
             x_tr, x_va, x_te = route_residual(x_tr, y_tr, [x_va, x_te], keys=RESID_KEYS_FINE)
         if args.arm == "te_pairs":

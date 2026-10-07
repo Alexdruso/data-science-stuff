@@ -305,6 +305,7 @@ first because each one *bounds* the effect (gate on magnitude, not on "the struc
 | Date | File | Recipe | OOF | Note |
 |---|---|---|---|---|
 | 2026-10-05 | `blend_lgbmt65_realmlp35.csv` | 0.65·rank(`test_lgbm_pr5_tuned`) + 0.35·rank(`test_realmlp_v1`) | 0.959169 | first submission; LB not checked (LB-blind) |
+| 2026-10-07 | `blend_lgbmresid35_mlpage30_mlpdelay35.csv` | 0.35·rank(`lgbm_pr13_resid`) + 0.30·rank(`realmlp_route_fdcat_agecat`) + 0.35·rank(`realmlp_route_fdcat_agecat_delaycat`) | 0.961247 | honest 4-leg fit 0.961243 (+0.00031 vs submission 2); LB not checked |
 | 2026-10-07 | `blend_route_lgbm_realmlp_w52.csv` | 0.475·rank(`test_lgbm_pr12_route`) + 0.525·rank(`test_realmlp_route`) | 0.960932 | PR-12 route features in both legs; honest delta +0.001761 vs the 10-05 recipe (w 0.55/0.50 per half) |
 
 ### PR-8 — TabM leg (registered 2026-10-05, before any number)
@@ -440,6 +441,22 @@ Then registered before their numbers: `--fdcat --resid`, `--fdcat --agecat`,
 `lgbm_pr13_resid` ≥ +0.0002 over the fdcat leg's 0.961149 (a lower bar than +0.0005 because
 it is a leg *swap*, not an added lever, and costs nothing). Prior ~20% each: the embedding
 is already the NN's route channel.
+
+- **PR-15 results**: `--fdcat --ratingcat` 0.96091 solo, 2-leg honest 0.961133 (**FAIL**,
+  −0.000016; as a 3rd leg +0.000024 = averaging); `--fdcat --resid` 0.96094 solo, 2-leg
+  0.961148 (**FAIL**, −0.000001 — the embedding already carries what the residual adds to
+  trees). TabM `--route` (fd embedding + route TE): fold 1 0.95853 at 33 min/fold → killed by
+  timebox (far below RealMLP). Segment-aware LR stacker (travel×class×customer dummies ×
+  logits) over the best 2 legs: 0.961133-0.961152 vs rank blend 0.961149 — null.
+
+- **PR-14 RESULT: FAIL by screen, stopped at 15/20 trials.** Incumbent (PR-5 params) 0.95935
+  on the search subsample; best of 15 trials 0.95936 (+0.00001). The route features did not
+  move the LGBM optimum; 5-fold evaluate not run (gate on magnitude). **Closed: LGBM re-tune.**
+- **PR-15 cont.**: `--fdcat --agecat` **0.96102** solo, 2-leg honest 0.961209 (+0.00006 vs
+  fdcat — sub the +0.0002 swap bar, but the best NN leg); `+--delaycat` 0.96102, 2-leg
+  0.961223; `--fdmin 5` (more fd levels) 0.96091, 0.961138 (null). `embedding_size 16`
+  override produced bit-identical folds to the default → not plumbed through; discarded.
+  4-leg honest (resid LGBM + agecat + delaycat + fdcat) **0.961243** → submission 3.
 
 ## Next steps (remove each item when implemented)
 
