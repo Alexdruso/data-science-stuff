@@ -52,10 +52,22 @@ PARAMS: dict[str, object] = {
 
 def main() -> None:
     route = "--route" in sys.argv
-    m = build_matrices()
+    orig = "--orig" in sys.argv  # original rows appended to each training fold (with --route)
+    m = build_matrices(with_original=orig)
+    n_test = len(m.X_test)
+    if orig:
+        m.X_test = pd.concat([m.X_test, m.X_orig], ignore_index=True)
     if route:
         from route import add_route_global
         add_route_global(m)
+    x_orig = None
+    if orig:
+        x_orig = m.X_test.iloc[n_test:].reset_index(drop=True)
+        m.X_test = m.X_test.iloc[:n_test].reset_index(drop=True)
+    extras = [e for e in os.environ.get("S6E10_EXTRAS", "").split(",") if e]
+    if extras:
+        from route import add_extras
+        add_extras(m, x_orig, extras)
     params = load_params(RESULTS_DIR, PARAMS, "best_params_xgboost.json")
     tuned = (RESULTS_DIR / "best_params_xgboost.json").exists()
     print(f"XGBoost on {DEVICE}: train {m.X.shape}  test {m.X_test.shape}", flush=True)
@@ -70,7 +82,12 @@ def main() -> None:
     ) -> tuple[np.ndarray, np.ndarray]:
         if route:
             from route import route_te
-            x_tr, x_va, x_te = route_te(x_tr, y_tr, [x_va, x_te])
+            if x_orig is not None:
+                x_tr, x_va, x_te, x_o = route_te(x_tr, y_tr, [x_va, x_te, x_orig])
+                x_tr = pd.concat([x_tr, x_o[x_tr.columns]], ignore_index=True)
+                y_tr = np.concatenate([y_tr, m.y_orig])
+            else:
+                x_tr, x_va, x_te = route_te(x_tr, y_tr, [x_va, x_te])
         model = XGBClassifier(**params)
         model.fit(x_tr, y_tr, eval_set=[(x_va, y_va)], verbose=False)
         print(f"  fold {fold} best_iter={model.best_iteration}", flush=True)
@@ -88,6 +105,7 @@ def main() -> None:
     print(f"\nOOF AUC: {oof_auc:.5f}")
 
     run_name = "xgb_route" if route else ("xgb_v1_tuned" if tuned else "xgb_v1")
+    run_name += "".join(f"_{e}" for e in extras) + ("_orig" if orig else "")
     save_cv_result(RESULTS_DIR, run_name, fold_scores, oof_auc, metric_name="auc")
     np.save(RESULTS_DIR / f"oof_{run_name}.npy", oof)
     np.save(RESULTS_DIR / f"test_{run_name}.npy", test)

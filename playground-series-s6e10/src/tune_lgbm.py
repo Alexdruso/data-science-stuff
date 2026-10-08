@@ -99,6 +99,7 @@ def evaluate(route: bool = False, resid: bool = False, orig: bool = False) -> No
     import os
     params_file = RESULTS_DIR / os.environ.get("S6E10_LGBM_PARAMS", PARAMS_FILE.name)
     tuned = json.loads(params_file.read_text())
+    nfolds = int(os.environ.get("S6E10_NFOLDS", "5"))
     params = {**CONTROL_PARAMS, **tuned}
     print(f"evaluate (CPU, paired): {tuned}", flush=True)
     m = build_matrices(with_original=orig)
@@ -112,6 +113,11 @@ def evaluate(route: bool = False, resid: bool = False, orig: bool = False) -> No
     if orig:
         x_orig = m.X_test.iloc[n_test:].reset_index(drop=True)
         m.X_test = m.X_test.iloc[:n_test].reset_index(drop=True)
+    extras = [e for e in os.environ.get("S6E10_EXTRAS", "").split(",") if e]
+    if extras:
+        from route import add_extras
+        add_extras(m, x_orig, extras)
+        print(f"extras {extras}: train {m.X.shape}", flush=True)
 
     def fit_fold(
         x_tr: pd.DataFrame, y_tr: np.ndarray, x_va: pd.DataFrame, y_va: np.ndarray,
@@ -138,12 +144,14 @@ def evaluate(route: bool = False, resid: bool = False, orig: bool = False) -> No
         return val, model.predict_proba(x_te)[:, 1]
 
     oof, test, fold_scores = run_cv(
-        m.X, m.y, m.X_test, fit_fold, n_outputs=1,
+        m.X, m.y, m.X_test, fit_fold, n_outputs=1, n_splits=nfolds,
         score_fn=lambda yv, pv: float(roc_auc_score(yv, pv)),
     )
     oof_auc = float(roc_auc_score(m.y, oof))
     name = ("lgbm_pr13_resid" if resid else "lgbm_pr12_route") if route else "lgbm_pr5_tuned"
+    name += "".join(f"_{e}" for e in extras)
     name += os.environ.get("S6E10_LGBM_SUFFIX", "") + ("_orig" if orig else "")
+    name += "" if nfolds == 5 else f"_k{nfolds}"
     save_cv_result(RESULTS_DIR, name, fold_scores, oof_auc, metric_name="auc")
     np.save(RESULTS_DIR / f"oof_{name}.npy", oof)
     np.save(RESULTS_DIR / f"test_{name}.npy", test)

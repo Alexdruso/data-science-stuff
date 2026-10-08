@@ -499,6 +499,60 @@ is already the NN's route channel.
   `lgbm_pr12_route`, 5/5); `lgbm_pr13_resid_orig` **0.960811** (+0.000289 vs
   `lgbm_pr12_route`, 5/5) — best LGBM leg. Both sub-bar solo; blend honest 0.961435.
 
+### 2026-10-08 — pre-registrations (written before any of today's numbers)
+
+Instrument for every deliverable read today: `src/blend_nm.py` (rank blend, Nelder-Mead weights
+fit on a fixed half, scored on the other, both directions; reproduces the submitted
+`blend_final_1007_orig2` at honest **0.961435**). Reference = that 5-leg blend.
+
+- **PR-17 — original-row dose for RealMLP.** Arms: `--origrep 2` (original rows ×2),
+  `--orignodelay` (original delay columns → NaN, fold-median filled). Paired vs
+  `realmlp_route_ls0_emb4_fdcat_agecat_orig` (0.96128). Bar (swap): solo ≥ +0.0001 at ≥ 4/5
+  folds, then a positive honest delta at the blend. Prior ~30% (×2): PR-16 says the NN uses
+  the original rows; the dose-response is untested.
+- **PR-18 — full-data refit (learning-curve read).** Test predictions today are the mean of 5
+  models each fit on 80% of train; refitting on 100% gives every route ~25% more rows. OOF
+  cannot see this, so measure the learning curve instead: tuned LGBM + route + orig, folds 1-3,
+  training on 50% / 75% / 100% of the fold's synthetic rows. Fit AUC vs log2(n) and extrapolate
+  to 1.25×. Bar (ADOPT a refit leg): extrapolated gain ≥ **+0.0003** for the leg. Prior ~35%
+  (route-ID problems are data-hungry per key). Risk: a refit has no early-stopping set — use
+  the per-fold best_iter × 1.1 (LGBM) / fixed best epoch (RealMLP).
+  **Measurable variant (preferred, registered at the same time):** 10-fold CV of the main legs
+  (`--nfolds 10` / `S6E10_NFOLDS=10`) — every model sees 90% of train and the OOF *measures*
+  it, so no extrapolation is needed. Bar: honest blend with the k10 legs swapped in ≥ **+0.0002**
+  over the reference (a swap, costs nothing but GPU/CPU time).
+
+- **PR-19 — original-data teacher logits on top of route** (registered before its number;
+  source: public notebook goodpjw2008 "More Aux Carriers" reports +0.0007 for XGB *with* route
+  features, +0.0002 without — our PR-3 tested the teacher only pre-route). `src/og_model.py`:
+  XGB d8 / LGBM fit on the original only → logits for every synthetic row (no synthetic labels;
+  original rows get 5-fold OOF teacher logits when appended). Screen (base LGBM, vs
+  `lgbm_arm_route`): `route_og`, `route_ogx`, `route_og_agg`. Bar: base-config delta ≥ +0.0003
+  at ≥ 4/5 folds → build tuned LGBM + RealMLP legs with it, then honest blend ≥ **+0.0005** over
+  the reference. Prior ~55% (an external measurement on the same data).
+- **PR-17 ×2 arm RESULT: FAIL** — killed after 2 folds, both below the paired leg
+  (0.96148 vs 0.96156, 0.96022 vs 0.96040). More original dose does not help.
+- XGB + route + orig rows (`xgb_route_orig`): **0.96046** (+0.00026 vs `xgb_route`).
+
+- **PR-19 RESULTS.** Teacher (`og_model.py`): og_xgb AUC 0.95514 on synthetic train by itself
+  (original 5-fold 0.99479). Base-config screen vs `lgbm_arm_route` (0.960184): `route_og`
+  **+0.000295** 5/5; `route_og_agg` (+ route profile = per-fd feature means) **+0.000399** 5/5 →
+  screen PASS. Tuned (`S6E10_EXTRAS=og,agg tune_lgbm.py --evaluate --route --orig` →
+  `lgbm_pr12_route_og_agg_orig`): **0.960989**, +0.000246 vs `lgbm_pr12_route_orig`, 5/5 — best
+  LGBM leg. **At the deliverable: honest +0.000088** (0.961524 vs 0.961435; weight 0.32) →
+  FAIL vs the +0.0005 bar (lesson 7: the RealMLP leg already carries most of it), adopted as
+  bookkeeping. RealMLP + og,agg: folds 1-2 0.96144 / 0.96038 vs 0.96156 / 0.96040 — the NN does
+  not use the teacher.
+- **Residual-key probe (blend residuals, split-half):** no key (fd, fd×cats, age, persona,
+  delays, rating tuples) carries correctable signal — every additive correction ≤ 0. kNN lookup
+  of the nearest original row within the same route: residual corr ≈ 0 (no near-copying).
+- **PR-21 — public OOF/test pairs (external; a separate, clearly labelled track).** Public
+  datasets on the SAME folds (`StratifiedKFold(5, True, 42)`, id order — verified):
+  `cdeotte/s6e10-tfm-oof-and-test-predictions` (11 TFMs) in `data/public_oof/`. LR-on-logits
+  stack (`src/stack_public.py`): ours (6 legs) 0.961534 → ours + 11 TFMs **0.961783**
+  (+0.00025; TabPFN-3.5 solo 0.961145 is the top coefficient). Our own TabPFN leg is blocked:
+  TabPFN-3 needs the Prior Labs token/licence, not on this box.
+
 ## Next steps (remove each item when implemented)
 
 **From 10-07 (do these first):** (a) original rows are now live for both legs — try

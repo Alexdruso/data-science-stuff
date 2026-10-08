@@ -273,6 +273,11 @@ def add_orig_fd(m: Matrices) -> None:
         frame["orig_fd_count"] = frame["flight_distance"].map(g["count"]).astype(float).fillna(0).to_numpy()
 
 
+def _og(m: Matrices, cols: list[str] | None = None) -> None:
+    from og_model import add_og
+    add_og(m, cols=cols)
+
+
 ARM_BUILDERS = {
     "profile": add_profile,
     "segment": add_segment,
@@ -297,6 +302,10 @@ ARM_BUILDERS = {
     "route_fdage2": lambda m: (add_route(m), add_fd_age_key(m)),
     "route_flight": lambda m: (add_route(m), add_flight_keys(m)),
     "route_fdage": lambda m: (add_route(m), add_flight_keys(m, age=True)),
+    # PR-19: original-data teacher logits (src/og_model.py), on top of route.
+    "route_og": lambda m: (add_route(m), _og(m)),
+    "route_ogx": lambda m: (add_route(m), _og(m, ["og_xgb"])),
+    "route_og_agg": lambda m: (add_route(m), _og(m), add_route_agg(m)),
 }
 
 

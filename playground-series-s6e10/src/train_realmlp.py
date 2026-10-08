@@ -88,6 +88,10 @@ def main() -> None:
     parser.add_argument("--delaycat", action="store_true", help="delays (count>=20 levels) as embedded categories")
     parser.add_argument("--fdclasscat", action="store_true", help="(fd, class) as one embedded category")
     parser.add_argument("--orig", action="store_true", help="append original rows to each training fold")
+    parser.add_argument("--origrep", type=int, default=1, help="replicate the original rows N times (with --orig)")
+    parser.add_argument("--orignodelay", action="store_true", help="original rows' delay columns → NaN (fold-median filled)")
+    parser.add_argument("--nfolds", type=int, default=5, help="CV folds (PR-18: 10 = models on 90%% of train)")
+    parser.add_argument("--extras", default="", help="comma list of og,agg,aux,auxall (route.add_extras)")
     parser.add_argument("--agecat", action="store_true", help="age as an embedded category")
     parser.add_argument("--ratingcat", action="store_true", help="the 13 ratings as embedded categories")
     parser.add_argument("--resid", action="store_true", help="PR-13 residual route encoding (with --route)")
@@ -161,6 +165,21 @@ def main() -> None:
         x_orig = m.X_test.iloc[n_test:].reset_index(drop=True)
         m.X_test = m.X_test.iloc[:n_test].reset_index(drop=True)
         args.tag += "_orig"
+        if args.orignodelay:
+            # Original delays are ~12x the synthetic ones (off-distribution).
+            for col in x_orig.columns:
+                if "delay" in col and not col.endswith("_cat") and x_orig[col].dtype.kind == "f" or col in (
+                    "departure_delay_in_minutes", "arrival_delay_in_minutes"
+                ):
+                    x_orig[col] = np.nan
+            args.tag += "nd"
+        if args.origrep > 1:
+            args.tag += f"x{args.origrep}"
+    extras = [e for e in args.extras.split(",") if e]
+    if extras:
+        from route import add_extras
+        add_extras(m, x_orig, extras)
+        args.tag += "".join(f"_{e}" for e in extras)
     # is_original is constant 0 here; RealMLP's robust scaler has nothing to scale.
     drop = [] if args.orig else ["is_original"]
     X = m.X.drop(columns=drop)
@@ -192,8 +211,8 @@ def main() -> None:
                 x_tr, x_va, x_te = route_te(x_tr, y_tr, [x_va, x_te])
         if x_orig is not None:
             assert m.y_orig is not None
-            x_tr = pd.concat([x_tr, x_o[x_tr.columns]], ignore_index=True)
-            y_tr = np.concatenate([y_tr, m.y_orig])
+            x_tr = pd.concat([x_tr, *[x_o[x_tr.columns]] * args.origrep], ignore_index=True)
+            y_tr = np.concatenate([y_tr, *[m.y_orig] * args.origrep])
         if args.resid:
             from run_lgbm_arm import route_residual
             x_tr, x_va, x_te = route_residual(x_tr, y_tr, [x_va, x_te])
@@ -206,7 +225,7 @@ def main() -> None:
             y_va.astype(np.int64),
             cat_col_names=cat_cols,
             # Per fold, or the five folds overwrite each other's best checkpoint.
-            ckpt_path=CKPT_DIR / f"{args.tag or 'v1'}_s{args.seed}_f{fold}.pth",
+            ckpt_path=CKPT_DIR / f"{args.tag or 'v1'}_s{args.seed}_k{args.nfolds}_f{fold}.pth",
             X_test=te,
         )
         val = np.asarray(model.best_val_probs_)[:, 1]
@@ -235,13 +254,14 @@ def main() -> None:
         return float(roc_auc_score(y_va, val_pred))
 
     oof, test, fold_scores = run_cv(
-        X, m.y, X_test, fit_fold, n_outputs=1, score_fn=fold_score,
+        X, m.y, X_test, fit_fold, n_splits=args.nfolds, n_outputs=1, score_fn=fold_score,
         after_fold=lambda _f: torch.cuda.empty_cache(),
     )
     oof_auc = float(roc_auc_score(m.y, oof))
     print(f"\nfolds {[round(s, 5) for s in fold_scores]}  OOF AUC: {oof_auc:.5f}")
 
     run_name = f"realmlp_{args.tag or 'v1'}" + ("" if args.seed == 42 else f"_s{args.seed}")
+    run_name += "" if args.nfolds == 5 else f"_k{args.nfolds}"
     save_cv_result(RESULTS_DIR, run_name, fold_scores, oof_auc, metric_name="auc")
     np.save(RESULTS_DIR / f"oof_{run_name}.npy", oof)
     np.save(RESULTS_DIR / f"test_{run_name}.npy", test)
