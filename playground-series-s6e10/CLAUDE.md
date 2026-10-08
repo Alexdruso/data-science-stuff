@@ -99,6 +99,11 @@ Original target: bool, 43.4% positive (56,428 / 129,880).
 
 ## Current best
 
+**2026-10-08: `blend_own_1008b.csv`, honest OOF 0.961695 (submitted)** — adds the original-data
+teacher logit + route profile (PR-19) and aux-task expected ratings (PR-20) to the tree legs,
+aux features to RealMLP. Own work only. A hybrid with the public OOF library
+(`hybrid_lrstack_v1.csv`, 0.962101) is written but not submitted (PR-21, user's call).
+
 **2026-10-07 (end of day): `blend_final_1007_orig2.csv`, honest OOF 0.961435** — route
 features (PR-12) + residual route TE (PR-13) + RealMLP fd/age embeddings (PR-15) + original
 rows appended to training folds (PR-16) in both legs. See the submission log.
@@ -308,6 +313,7 @@ first because each one *bounds* the effect (gate on magnitude, not on "the struc
 
 | Date | File | Recipe | OOF | Note |
 |---|---|---|---|---|
+| 2026-10-08 | `blend_own_1008b.csv` | honest-NM 10 legs: + teacher/route-profile LGBM, aux-task LGBMs (incl. extra-trees), RealMLP + aux / + og,agg (`blend_nm.py`) | 0.961717 | honest **0.961695** (+0.00026 vs 10-07); own work only, no public predictions; LB not checked |
 | 2026-10-05 | `blend_lgbmt65_realmlp35.csv` | 0.65·rank(`test_lgbm_pr5_tuned`) + 0.35·rank(`test_realmlp_v1`) | 0.959169 | first submission; LB not checked (LB-blind) |
 | 2026-10-07 | `blend_final_1007_orig2.csv` | honest-NM: `realmlp_route_ls0_emb4_fdcat_agecat_orig` 0.52 + `lgbm_pr13_resid_orig` 0.17 + `lgbm_pr12_route_orig` 0.17 + ls0_emb4_fdclass 0.10 + ls0 0.05 | 0.961441 | honest **0.961435** — current best; LB not checked |
 | 2026-10-07 | `blend_final_1007_orig.csv` | 9-leg honest-NM: `realmlp_route_ls0_emb4_fdcat_agecat_orig` 0.54 + `lgbm_pr13_resid` 0.26 + 7 RealMLP variants (≤0.07 each) | 0.961401 | honest **0.961395** (+0.000118 vs `blend_final_1007`); LB not checked |
@@ -553,12 +559,44 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   (+0.00025; TabPFN-3.5 solo 0.961145 is the top coefficient). Our own TabPFN leg is blocked:
   TabPFN-3 needs the Prior Labs token/licence, not on this box.
 
+- **PR-21 cont.** Full public pool (`cdeotte/s6e10-124-public-oof-and-test-predictions`, 124
+  pairs, + the 11 TFMs; same folds, no member above 0.96175 solo → no obvious leak): public-only
+  LR stack **0.962093**; + our 7 legs **0.962089-0.962101** (C 0.03-0.3) — **our legs add
+  nothing to the public pool.** `submissions/hybrid_lrstack_v1.csv` (C=0.3, OOF 0.962101) is
+  written but NOT submitted: using public predictions is the user's call. Our own best:
+  `submissions/blend_own_1008a.csv` (7 legs, honest 0.961551).
+- **RealMLP schedule re-screen (fold 1, vs base 0.96156):** flat_anneal e6 0.96151, e4 0.96139,
+  e8·flat0.5 0.96157 — noise. Schedule stays closed (PR-7).
+- **PR-22 — TabICL leg (registered before its number).** Open-licence TFM (`/tmp/tabicl_venv`,
+  `src/export_tfm.py` → `src/run_tabicl.py`) on route TE (per fold) + og + agg + aux, stratified
+  context subsample. Probe (fold 1, first 20k val rows; LGBM og_agg 0.96172 on the same rows):
+  ctx 30k 0.95969, 100k 0.96032, 200k 0.96069. Full run at ctx 100k (test predicted once by
+  the fold-1 model). Bar: positive honest gain at our blend AND in the public-pool stack
+  (the pool is the real competitor now). Prior ~25% (public TFMs earn the largest stack
+  coefficients despite weak solos).
+
+- **Aux-task features (PR-20, `src/aux_feats.py`, label-free, train+test+original, 5-fold
+  XGB per column):** tuned LGBM + og,agg,aux 0.961114 / + auxall **0.961125** (+0.00013 vs og,agg,
+  5/5); LGBM `extra_trees` + lr 0.02 (`best_params_lgbm_xt.json`) **0.961156**; RealMLP + auxall
+  (orig rows, no og) **0.96147** (+0.00019 vs its no-aux twin, 5/5) — best leg. Own blend after
+  these: honest **0.961695** (`blend_own_1008b.csv`). XGB + og,agg 0.96087 → +0.000002 at the
+  blend (GBDT copies).
+- **PR-22 RESULT: FAIL.** TabICL ctx 100k: OOF folds 0.95960/0.95839/0.96030/0.96018/0.96007;
+  rank-blend weight 0; LR stack +0.000004. The public TFM weights do not transfer to a
+  small-context TabICL.
+
 ## Next steps (remove each item when implemented)
 
-**From 10-07 (do these first):** (a) original rows are now live for both legs — try
-down-weighting them / dropping their delays (off-distribution), and RealMLP+orig with the
-other embedding variants; (b) re-tune LGBM *with* orig+route (PR-14 tuned without orig);
-(c) XGB/CatBoost with route+orig to see if they regain blend weight.
+**From 10-08 (do these first):** (a) **user decision**: may the deliverable use the public
+OOF/test library (PR-21)? The public pool alone stacks to 0.962093 vs our own 0.9617 and our
+legs add nothing to it — if yes, the work becomes "find members that move the pool"; if no,
+keep building our own breadth. (b) Final-submission refit: legs on 10 folds (90% data) or
+a 100% refit for the test predictions (PR-18 learning curve: ~+0.0008 AUC per data doubling
+for LGBM ⇒ ~+0.00015 for 80→90%) — do it once the leg set is frozen. (c) TFMs earn the
+largest pool weights; ours (TabICL ctx 100k) did not — a TabPFN leg needs the Prior Labs token.
+Done 10-08 from the 10-07 list: orig ×2 (worse), orig without delays (flat, killed), XGB/Cat
+with route+orig (XGB +0.00026 solo, 0 at the blend); LGBM re-tune with orig not run (PR-14
+showed the optimum did not move).
 
 Closed so far: original as rows (PR-1) and as features (PR-3); pairwise rating TE (PR-4a);
 categorical ratings (PR-4b); duplicate/frequency structure (PR-6, by screen); RealMLP tuning (PR-7); TabM (PR-8); LR stack (PR-9). Sub-bar but real: RealMLP (PR-2), LGBM tuning (PR-5).

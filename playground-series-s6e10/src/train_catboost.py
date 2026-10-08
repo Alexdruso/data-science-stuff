@@ -57,17 +57,29 @@ def _prepare(frame: pd.DataFrame, cat_cols: list[str]) -> pd.DataFrame:
 
 def main() -> None:
     route = "--route" in sys.argv
-    m = build_matrices()
+    orig = "--orig" in sys.argv  # original rows appended to each training fold (with --route)
+    m = build_matrices(with_original=orig)
+    n_test = len(m.X_test)
+    if orig:
+        m.X_test = pd.concat([m.X_test, m.X_orig], ignore_index=True)
     if route:
         from route import add_route_global
         add_route_global(m)
+    x_orig = None
+    if orig:
+        x_orig = m.X_test.iloc[n_test:].reset_index(drop=True)
+        m.X_test = m.X_test.iloc[:n_test].reset_index(drop=True)
+    extras = [e for e in os.environ.get("S6E10_EXTRAS", "").split(",") if e]
+    if extras:
+        from route import add_extras
+        add_extras(m, x_orig, extras)
     params = load_params(RESULTS_DIR, PARAMS, "best_params_catboost.json")
     tuned = (RESULTS_DIR / "best_params_catboost.json").exists()
     device_params: dict[str, object] = {"task_type": DEVICE}
     if DEVICE == "GPU":
         device_params["gpu_ram_part"] = GPU_RAM_PART
     else:
-        device_params["thread_count"] = 4
+        device_params["thread_count"] = int(os.environ.get("S6E10_CATBOOST_THREADS", "4"))
     print(f"CatBoost on {DEVICE}: train {m.X.shape}  test {m.X_test.shape}", flush=True)
 
     cat_cols = list(m.cat_cols)
@@ -77,6 +89,16 @@ def main() -> None:
             frame["fd_str"] = frame["flight_distance"].astype(str)
             frame["age_str"] = frame["age"].astype(str)
         cat_cols += ["fd_str", "age_str"]
+    if "--numcat" in sys.argv:
+        # PR-24: a categorical twin of every raw numeric/rating column (CatBoost ordered TS).
+        from features import RATING_COLS
+        twins = ["flight_distance", "age", "departure_delay_in_minutes", "arrival_delay_in_minutes", *RATING_COLS]
+        for frame in [m.X, m.X_test] + ([x_orig] if x_orig is not None else []):
+            for c in twins:
+                frame[f"{c}_str"] = frame[c].fillna(-1).astype(int).astype(str)
+        cat_cols += [f"{c}_str" for c in twins]
+    if x_orig is not None:
+        x_orig = _prepare(x_orig, cat_cols)
     X = _prepare(m.X, cat_cols)
     X_test = _prepare(m.X_test, cat_cols)
 
@@ -90,7 +112,12 @@ def main() -> None:
     ) -> tuple[np.ndarray, np.ndarray]:
         if route:
             from route import route_te
-            x_tr, x_va, x_te = route_te(x_tr, y_tr, [x_va, x_te])
+            if x_orig is not None:
+                x_tr, x_va, x_te, x_o = route_te(x_tr, y_tr, [x_va, x_te, x_orig])
+                x_tr = pd.concat([x_tr, x_o[x_tr.columns]], ignore_index=True)
+                y_tr = np.concatenate([y_tr, m.y_orig])
+            else:
+                x_tr, x_va, x_te = route_te(x_tr, y_tr, [x_va, x_te])
         model = CatBoostClassifier(
             **params, **device_params, cat_features=cat_cols
         )
@@ -110,6 +137,7 @@ def main() -> None:
     print(f"\nOOF AUC: {oof_auc:.5f}")
 
     run_name = ("catboost_route_fdcat" if fdcat else "catboost_route") if route else ("catboost_v1_tuned" if tuned else "catboost_v1")
+    run_name += ("_numcat" if "--numcat" in sys.argv else "") + "".join(f"_{e}" for e in extras) + ("_orig" if orig else "")
     save_cv_result(RESULTS_DIR, run_name, fold_scores, oof_auc, metric_name="auc")
     np.save(RESULTS_DIR / f"oof_{run_name}.npy", oof)
     np.save(RESULTS_DIR / f"test_{run_name}.npy", test)

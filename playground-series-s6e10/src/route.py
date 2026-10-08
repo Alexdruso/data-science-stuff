@@ -66,6 +66,9 @@ def add_extras(m: Matrices, x_orig: pd.DataFrame | None, extras: list[str]) -> N
             vals = means.reindex(tail["flight_distance"].to_numpy()).to_numpy()
             for i, c in enumerate(new):
                 x_orig[c] = vals[:, i]
+    if "auxr" in extras:
+        from aux_reg import add_aux_reg
+        add_aux_reg(m, x_orig)
     if "aux" in extras or "auxall" in extras:
         from aux_feats import add_aux
         add_aux(m, x_orig, which="all" if "auxall" in extras else "ev")
