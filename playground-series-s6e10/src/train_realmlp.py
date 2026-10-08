@@ -92,6 +92,8 @@ def main() -> None:
     parser.add_argument("--orignodelay", action="store_true", help="original rows' delay columns → NaN (fold-median filled)")
     parser.add_argument("--nfolds", type=int, default=5, help="CV folds (PR-18: 10 = models on 90%% of train)")
     parser.add_argument("--extras", default="", help="comma list of og,agg,aux,auxall (route.add_extras)")
+    parser.add_argument("--pseudo", type=float, default=0.0,
+                        help="PR-25: >0 = refit on train + test rows with labels SAMPLED from this fold's own model (weight via repeats ignored)")
     parser.add_argument("--agecat", action="store_true", help="age as an embedded category")
     parser.add_argument("--ratingcat", action="store_true", help="the 13 ratings as embedded categories")
     parser.add_argument("--resid", action="store_true", help="PR-13 residual route encoding (with --route)")
@@ -230,6 +232,23 @@ def main() -> None:
         )
         val = np.asarray(model.best_val_probs_)[:, 1]
         test = model.predict_proba(te)[:, 1]
+        if args.pseudo > 0:
+            # Honest: the test labels come from this fold's model, which never saw the val fold.
+            print(f"    stage1 val AUC {roc_auc_score(y_va, val):.5f}", flush=True)
+            del model
+            torch.cuda.empty_cache()
+            rng = np.random.default_rng(args.seed + fold)
+            pick = rng.random(len(te)) < args.pseudo
+            y_pl = (rng.random(int(pick.sum())) < test[pick]).astype(np.int64)
+            tr2 = pd.concat([tr, te[pick]], ignore_index=True)
+            y2 = np.concatenate([y_tr.astype(np.int64), y_pl])
+            model = RealMLP_TD_Classifier(**{**cfg, "random_state": args.seed + fold})
+            model.fit(tr2, y2, va, y_va.astype(np.int64), cat_col_names=cat_cols,
+                      ckpt_path=CKPT_DIR / f"{args.tag or 'v1'}_s{args.seed}_k{args.nfolds}_f{fold}_pl.pth",
+                      X_test=te)
+            val = np.asarray(model.best_val_probs_)[:, 1]
+            test = model.predict_proba(te)[:, 1]
+            del tr2
         print(
             f"  fold {fold}: AUC {roc_auc_score(y_va, val):.5f} "
             f"({time.time() - t0:.0f}s)",
@@ -262,6 +281,7 @@ def main() -> None:
 
     run_name = f"realmlp_{args.tag or 'v1'}" + ("" if args.seed == 42 else f"_s{args.seed}")
     run_name += "" if args.nfolds == 5 else f"_k{args.nfolds}"
+    run_name += "" if args.pseudo == 0 else f"_pl{args.pseudo:g}"
     save_cv_result(RESULTS_DIR, run_name, fold_scores, oof_auc, metric_name="auc")
     np.save(RESULTS_DIR / f"oof_{run_name}.npy", oof)
     np.save(RESULTS_DIR / f"test_{run_name}.npy", test)

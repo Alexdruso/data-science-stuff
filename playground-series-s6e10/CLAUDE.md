@@ -585,6 +585,32 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   rank-blend weight 0; LR stack +0.000004. The public TFM weights do not transfer to a
   small-context TabICL.
 
+- **PR-25 — honest transductive pseudo-labelling (registered before its number).**
+  `src/pseudo_lgbm.py`: per fold, stage 1 = LGBM-xt leg (og,agg,auxall, orig rows); stage 2 =
+  refit on the same rows + all test rows with SOFT labels from the fold's own stage-1 model
+  (`cross_entropy` objective), test weight 1.0 / 0.3. The val fold never enters training and
+  the pseudo-labels depend only on the fold's training labels → honest OOF. Paired vs stage 1.
+  Bar: OOF ≥ +0.0002 at ≥ 4/5 folds, then a positive honest delta at the blend. Prior ~20%
+  (self-distillation mostly smooths; the hoped-for mechanism is more rows per route). Not in
+  the public pool's tried list (they used soft labels of TRAIN rows: +0.00005).
+
+- **More 10-08 legs.** CatBoost CPU (numeric/rating twins as categoricals + og,agg,auxall + orig
+  rows; `--numcat`) **0.96094** (old CatBoost route 0.95996) → own LR stack +0.000028; CatBoost
+  GPU depth 6 / l2 10 0.96108 → +0.000000 (redundant). RealMLP aux + delaycat 0.96150; + auxr
+  0.96146 (null). LGBM-xt + auxr (E[fd], E[age] given the other 20 columns,
+  `src/aux_reg.py`) 0.961197 (+0.00004, 3/5). **Own LR stack (`stack_public.py --ours`, 13
+  legs) 0.961744** > NM blend 0.961695 → `submissions/own_lrstack_1008.csv` (not submitted).
+- **PR-18 measured (10-fold):** RealMLP auxall at 10 folds **0.96157** vs 0.96147 at 5 folds
+  (+0.0001 for 80→90% data); swapped into the own stack +0.000047 (0.961791). Sub-bar per leg,
+  but it applies to every leg; a 100%-data refit should give about twice that on test.
+- **PR-25 fold 1:** stage 1 0.96110 → pseudo-labelled (w=1) **0.96123** (+0.00013), w=0.3
+  0.96117. Fold 1 took 58 min with both arms; rerunning all folds with w=1 only. RealMLP
+  version queued (`--pseudo 1.0`: test labels sampled from the fold's own stage-1 model).
+  **RealMLP pseudo: FAIL** — fold 1 0.96148 vs its stage 1 0.96168 (−0.0002); sampled hard
+  labels add noise. Killed after fold 1.
+  **PR-25 LGBM: FAIL** — w=1 per fold +0.00013 / −0.00005 / −0.00004 (folds 1-3), mean ≈ 0;
+  killed after fold 3 (32-38 min/fold). Honest self-training on test adds nothing here.
+
 ## Next steps (remove each item when implemented)
 
 **From 10-08 (do these first):** (a) **user decision**: may the deliverable use the public

@@ -12,6 +12,7 @@ of CatBoost's gap to LightGBM.
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -74,6 +75,7 @@ def main() -> None:
         from route import add_extras
         add_extras(m, x_orig, extras)
     params = load_params(RESULTS_DIR, PARAMS, "best_params_catboost.json")
+    params = {**params, **json.loads(os.environ.get("S6E10_CATBOOST_OVERRIDE", "{}"))}
     tuned = (RESULTS_DIR / "best_params_catboost.json").exists()
     device_params: dict[str, object] = {"task_type": DEVICE}
     if DEVICE == "GPU":
@@ -129,7 +131,8 @@ def main() -> None:
         return float(roc_auc_score(y_va, val_pred))
 
     oof, test, fold_scores = run_cv(
-        X, m.y, X_test, fit_fold, n_outputs=1, score_fn=fold_score
+        X, m.y, X_test, fit_fold, n_outputs=1, score_fn=fold_score,
+        n_splits=int(os.environ.get("S6E10_NFOLDS", "5"))
     )
     for fold, score in enumerate(fold_scores, 1):
         print(f"  Fold {fold} AUC: {score:.5f}")
@@ -137,7 +140,8 @@ def main() -> None:
     print(f"\nOOF AUC: {oof_auc:.5f}")
 
     run_name = ("catboost_route_fdcat" if fdcat else "catboost_route") if route else ("catboost_v1_tuned" if tuned else "catboost_v1")
-    run_name += ("_numcat" if "--numcat" in sys.argv else "") + "".join(f"_{e}" for e in extras) + ("_orig" if orig else "")
+    run_name += ("" if os.environ.get("S6E10_NFOLDS", "5") == "5" else f"_k{os.environ['S6E10_NFOLDS']}")
+    run_name += os.environ.get("S6E10_CATBOOST_SUFFIX", "") + ("_numcat" if "--numcat" in sys.argv else "") + "".join(f"_{e}" for e in extras) + ("_orig" if orig else "")
     save_cv_result(RESULTS_DIR, run_name, fold_scores, oof_auc, metric_name="auc")
     np.save(RESULTS_DIR / f"oof_{run_name}.npy", oof)
     np.save(RESULTS_DIR / f"test_{run_name}.npy", test)
