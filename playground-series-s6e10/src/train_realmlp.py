@@ -99,6 +99,10 @@ def main() -> None:
     parser.add_argument("--resid", action="store_true", help="PR-13 residual route encoding (with --route)")
     parser.add_argument("--tag", default="", help="run-name suffix; required with --override")
     parser.add_argument(
+        "--fullfit", action="store_true",
+        help="fit once on ALL train rows (fixed epochs; needs epoch_select=last), save test_<run>_full.npy",
+    )
+    parser.add_argument(
         "--fold1", action="store_true",
         help="fit fold 1 only (same split as run_cv) and print its AUC; saves no arrays",
     )
@@ -257,6 +261,17 @@ def main() -> None:
         del model, tr, va, te
         torch.cuda.empty_cache()
         return val, test
+
+    if args.fullfit:
+        # No validation is used for selection with epoch_select="last", so the "val" frame
+        # is a slice of the training rows, there only to satisfy the fit API.
+        if cfg.get("epoch_select") != "last":
+            raise SystemExit("--fullfit needs epoch_select=last (nothing to early-stop on)")
+        _, test = fit_fold(X, m.y, X.iloc[:2000], m.y[:2000], X_test, 0)
+        run_name = f"realmlp_{args.tag or 'v1'}" + ("" if args.seed == 42 else f"_s{args.seed}")
+        np.save(RESULTS_DIR / f"test_{run_name}_full.npy", test)
+        print(f"full-fit test → test_{run_name}_full.npy", flush=True)
+        return
 
     if args.fold1:
         # Same splitter and seed as run_cv, so this is fold 1 of a full run.

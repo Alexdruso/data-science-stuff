@@ -318,6 +318,7 @@ first because each one *bounds* the effect (gate on magnitude, not on "the struc
 | Date | File | Recipe | OOF | Note |
 |---|---|---|---|---|
 | 2026-10-09 | `hybrid_lrstack_1009.csv` | LR (C 0.3) on 199 public pairs + 6 own k10 legs (honest RealMLP) | 0.962162 | first submission using public predictions (user: objective winning); LB not checked |
+| 2026-10-09 | `hybrid_lrstack_1009b_nomlp.csv` | hedge v2: pool 214 (+15 members from public notebook outputs, `data/public_oof/kout_norm`) without public MLPs + 6 own legs, C 0.1 | 0.962135 | best robust candidate; full-pool version `hybrid_lrstack_1009b.csv` 0.962161 = unchanged, not submitted |
 | 2026-10-09 | `hybrid_lrstack_1009_nomlp.csv` | same, without the 53 public MLP members (inflation hedge) | 0.962107 | robust candidate; LB not checked |
 | 2026-10-08 | `blend_own_1008b.csv` | honest-NM 10 legs: + teacher/route-profile LGBM, aux-task LGBMs (incl. extra-trees), RealMLP + aux / + og,agg (`blend_nm.py`) | 0.961717 | honest **0.961695** (+0.00026 vs 10-07); own work only, no public predictions; LB not checked |
 | 2026-10-05 | `blend_lgbmt65_realmlp35.csv` | 0.65·rank(`test_lgbm_pr5_tuned`) + 0.35·rank(`test_realmlp_v1`) | 0.959169 | first submission; LB not checked (LB-blind) |
@@ -653,6 +654,13 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   matrices (`knn_leg.py`, |Spearman|-weighted metric, solo 0.9577 at k 400) → stack −0.000013;
   alternative original-data teachers (LGBM depth 2-8, min_child 500/2000, no delays, no fd) all
   0.9534-0.9552 solo vs og_xgb 0.9551 — teacher structure does not matter.
+- **Afternoon:** honest e3 leg 0.96138 (< e4); TabICL route leg in the full pool −0.000013 (closed);
+  per-member test/OOF logit-scale check: all 0.995-0.999 (no broken public member). `--fullfit`
+  added to `train_realmlp.py` (fixed epochs, all train rows): `hybrid_lrstack_1009_fullmix.csv` (test of
+  the 2 RealMLP legs = mean logit of k10 + 2 full-fit seeds) is Spearman 0.99998 with the submitted
+  file — not worth a slot. 15 more pairs pulled from public notebook OUTPUTS (kratosyan route-id
+  teacher, kagankoral encodings, koumeimaki ladder, hermengardo CatBoost, amanatar original-prior):
+  full stack unchanged (0.962161), no-MLP hedge +0.00003 (0.962135).
 - **TabPFN: blocked.** The cached Prior Labs token had expired; tabpfn 9.1 (default checkpoint is now
   TabPFN-3.5) deleted it after verification failed. The user must log in at ux.priorlabs.ai, accept the
   v3.5 license and export `TABPFN_TOKEN`; then `/tmp/tabpfn_venv/bin/python src/run_tabpfn.py` (venv
