@@ -661,6 +661,10 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   file — not worth a slot. 15 more pairs pulled from public notebook OUTPUTS (kratosyan route-id
   teacher, kagankoral encodings, koumeimaki ladder, hermengardo CatBoost, amanatar original-prior):
   full stack unchanged (0.962161), no-MLP hedge +0.00003 (0.962135).
+- **Evening re-pull (18:45):** new since 09:45 UTC — dmitriykolmikov / rabari9999 datasets (submissions
+  only), 5 notebook outputs; only chinzorigtganbat's v10 has OOF/test pairs (4 GBDT members, `cz_*`;
+  its blend columns are stack-level and excluded). Pool 218: full stack **0.962173** (C 0.1), no-MLP
+  0.962131 — both below the pre-set submit bars (0.962190 / 0.962165) → **not submitted**.
 - **TabPFN: blocked.** The cached Prior Labs token had expired; tabpfn 9.1 (default checkpoint is now
   TabPFN-3.5) deleted it after verification failed. The user must log in at ux.priorlabs.ai, accept the
   v3.5 license and export `TABPFN_TOKEN`; then `/tmp/tabpfn_venv/bin/python src/run_tabpfn.py` (venv
