@@ -611,6 +611,28 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   **PR-25 LGBM: FAIL** — w=1 per fold +0.00013 / −0.00005 / −0.00004 (folds 1-3), mean ≈ 0;
   killed after fold 3 (32-38 min/fold). Honest self-training on test adds nothing here.
 
+### 2026-10-09
+
+- **User directive: "objective is winning"** → the public OOF library (PR-21) is used in the
+  deliverable from today; own-only blends remain the fallback/second final.
+- **Pool rebuilt** (`src/pool_build.py` → `data/public_oof/_pool/`, logits, id order): every
+  public source normalised (npy / npz / csv / wide parquet), checks = length, NaN, OOF AUC
+  ≤ 0.9635 (in-sample guard), test alignment (Spearman ≥ 0.9 vs our LGBM test leg), near-dup
+  (corr > 0.99999). **Stack-level members are excluded** (najiama blends `nj_*`, anything named
+  blend/stack): they were fit on their own folds and leak into a nested stack. 199 pairs
+  (was 135). Public-only LR stack 0.962100 (C 0.1; was 0.962093) — the new sources add ~0.
+- **⚠️ RealMLP OOF was inflated.** `train_realmlp.py` used `epoch_select="auc"` — the epoch is
+  picked on the very fold it is scored on (the PR-2 caveat, now measured). Honest fixed-epoch
+  runs (new `epoch_select="last"` in the package; the schedule anneals over `epochs`), fold 1,
+  same config as the best leg: e4 **0.96144**, e5 0.96141, e6 0.96130 vs the selected 16-epoch
+  run ~0.9616-0.9618 ⇒ inflation **~+0.0002 on the solo**, and the LR stack hands the inflated
+  legs the largest coefficients (+0.48, +0.35 in pool + ours, 0.962143). Every RealMLP number
+  in this file before 10-09 is optimistic by about that much; the GBDT legs are unaffected
+  (early stopping on the val fold moves them ≤ 1e-5). Many public pytabkit RealMLP members
+  restore the best epoch on X_val too, so the public pool's OOF is optimistic as well (public
+  LB sits ~0.0004 below public stack CVs).
+  **Rule from now on: every NN leg that feeds a stack uses `epoch_select="last"`.**
+
 ## Next steps (remove each item when implemented)
 
 **From 10-08 (do these first):** (a) **user decision**: may the deliverable use the public

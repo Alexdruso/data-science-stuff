@@ -561,8 +561,11 @@ class RealMLP_TD_Classifier(BaseEstimator):
         best_score, best_epoch = -np.inf, 0
         best_val_probs: NDArray[Any] | None = None
         epoch_select = str(p.get("epoch_select", "bacc"))
-        if epoch_select not in {"bacc", "bll", "auc"}:
-            msg = f"epoch_select must be 'bacc', 'bll' or 'auc', got {epoch_select!r}"
+        if epoch_select not in {"bacc", "bll", "auc", "last"}:
+            msg = (
+                "epoch_select must be 'bacc', 'bll', 'auc' or 'last', "
+                f"got {epoch_select!r}"
+            )
             raise ValueError(msg)
         if epoch_select == "auc" and n_classes != 2:
             msg = (
@@ -711,7 +714,12 @@ class RealMLP_TD_Classifier(BaseEstimator):
             if live_state is not None:
                 self.model_.load_state_dict(live_state, strict=True)
 
-            if epoch_select == "auc":
+            if epoch_select == "last":
+                # No selection: the final epoch is kept. Selecting the epoch on
+                # the fold that is then scored inflates OOF (s6e10: ~+0.0003),
+                # so this is the honest choice whenever OOF feeds a stacker.
+                epoch_score = float(epoch)
+            elif epoch_select == "auc":
                 # Binary ROC AUC on the positive-class probability. `bacc`
                 # thresholds at argmax and `bll` optimises calibration; on an
                 # AUC competition both select the wrong epoch, because AUC is

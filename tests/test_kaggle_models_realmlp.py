@@ -163,6 +163,7 @@ def test_realmlp_per_sample_weight_length_mismatch_raises(tmp_path: Path) -> Non
 
 def test_realmlp_config_defaults_preserved() -> None:
     # The s6e6-proven defaults the port must not drift from.
+    assert REALMLP_TD_CONFIG["epoch_select"] == "bacc"
     assert REALMLP_TD_CONFIG["loss_prior_power"] == 1.075
     assert REALMLP_TD_CONFIG["n_ens"] == 8
     assert REALMLP_TD_CONFIG["lr_sched"] == "flat_cos"
@@ -228,3 +229,70 @@ def test_realmlp_mixup_and_sam_guards(tmp_path: Path) -> None:
             ckpt_path=tmp_path / "g.pth",
             per_sample_weight=np.ones(len(y_tr)),
         )
+
+
+def _binary_frame(n: int, seed: int) -> "tuple[pd.DataFrame, NDArray[np.int64]]":
+    """Two-class analogue of `_frame`, for the AUC epoch-selection path."""
+    rng = np.random.default_rng(seed)
+    y = np.tile(np.array([0, 1], dtype=np.int64), n // 2 + 1)[:n]
+    df = pd.DataFrame(
+        {
+            "num_a": rng.normal(0, 1, n) + y,
+            "num_b": rng.normal(0, 1, n),
+            "cat_small": rng.integers(0, 3, n),
+            "cat_large": rng.integers(0, 15, n),
+        }
+    )
+    return df, y
+
+
+def test_realmlp_epoch_select_auc_binary(tmp_path: Path) -> None:
+    torch.manual_seed(0)
+    x_tr, y_tr = _binary_frame(180, seed=0)
+    x_va, y_va = _binary_frame(60, seed=1)
+    cats = ["cat_small", "cat_large"]
+
+    clf = RealMLP_TD_Classifier(**_TINY, epoch_select="auc", loss_prior_power=0.0)
+    clf.fit(x_tr, y_tr, x_va, y_va, cat_col_names=cats, ckpt_path=tmp_path / "a.pth")
+
+    # best_score_ is now an AUC, so it must live on the AUC scale.
+    assert 0.0 <= clf.best_score_ <= 1.0
+    assert clf.best_val_probs_ is not None
+    assert clf.best_val_probs_.shape == (60, 2)
+    proba = clf.predict_proba(x_va)
+    assert proba.shape == (60, 2)
+    np.testing.assert_allclose(proba.sum(axis=1), 1.0, atol=1e-5)
+
+
+def test_realmlp_epoch_select_auc_rejects_multiclass(tmp_path: Path) -> None:
+    x_tr, y_tr = _frame(120, seed=0)  # 3 classes
+    x_va, y_va = _frame(45, seed=1)
+
+    with pytest.raises(ValueError, match="binary-only"):
+        RealMLP_TD_Classifier(**_TINY, epoch_select="auc").fit(
+            x_tr, y_tr, x_va, y_va, ckpt_path=tmp_path / "a.pth"
+        )
+
+
+def test_realmlp_epoch_select_rejects_unknown(tmp_path: Path) -> None:
+    x_tr, y_tr = _frame(120, seed=0)
+    x_va, y_va = _frame(45, seed=1)
+
+    # A typo must fail loudly rather than silently falling through to bacc.
+    with pytest.raises(ValueError, match="epoch_select must be"):
+        RealMLP_TD_Classifier(**_TINY, epoch_select="roc_auc").fit(
+            x_tr, y_tr, x_va, y_va, ckpt_path=tmp_path / "a.pth"
+        )
+
+
+def test_realmlp_epoch_select_last_keeps_final_epoch(tmp_path: Path) -> None:
+    torch.manual_seed(0)
+    x_tr, y_tr = _binary_frame(180, seed=0)
+    x_va, y_va = _binary_frame(60, seed=1)
+    params = {**_TINY, "epochs": 3, "use_early_stopping": True}
+    clf = RealMLP_TD_Classifier(**params, epoch_select="last", loss_prior_power=0.0)
+    clf.fit(x_tr, y_tr, x_va, y_va, ckpt_path=tmp_path / "a.pth")
+
+    # The "score" is the epoch index, so the last epoch (index 2) is kept.
+    assert clf.best_score_ == 2.0
+    np.testing.assert_allclose(clf.predict_proba(x_va), clf.best_val_probs_, atol=1e-5)
