@@ -99,6 +99,10 @@ Original target: bool, 43.4% positive (56,428 / 129,880).
 
 ## Current best
 
+**2026-10-09: `hybrid_lrstack_1009.csv`, OOF 0.962162 (submitted)** — LR stack of 199 public OOF
+pairs + 6 own k10 legs (RealMLPs now honest). Hedge `hybrid_lrstack_1009_nomlp.csv` 0.962107
+(no public MLP members, which are probably epoch-selection-inflated) also submitted.
+
 **2026-10-08: `blend_own_1008b.csv`, honest OOF 0.961695 (submitted)** — adds the original-data
 teacher logit + route profile (PR-19) and aux-task expected ratings (PR-20) to the tree legs,
 aux features to RealMLP. Own work only. A hybrid with the public OOF library
@@ -313,6 +317,8 @@ first because each one *bounds* the effect (gate on magnitude, not on "the struc
 
 | Date | File | Recipe | OOF | Note |
 |---|---|---|---|---|
+| 2026-10-09 | `hybrid_lrstack_1009.csv` | LR (C 0.3) on 199 public pairs + 6 own k10 legs (honest RealMLP) | 0.962162 | first submission using public predictions (user: objective winning); LB not checked |
+| 2026-10-09 | `hybrid_lrstack_1009_nomlp.csv` | same, without the 53 public MLP members (inflation hedge) | 0.962107 | robust candidate; LB not checked |
 | 2026-10-08 | `blend_own_1008b.csv` | honest-NM 10 legs: + teacher/route-profile LGBM, aux-task LGBMs (incl. extra-trees), RealMLP + aux / + og,agg (`blend_nm.py`) | 0.961717 | honest **0.961695** (+0.00026 vs 10-07); own work only, no public predictions; LB not checked |
 | 2026-10-05 | `blend_lgbmt65_realmlp35.csv` | 0.65·rank(`test_lgbm_pr5_tuned`) + 0.35·rank(`test_realmlp_v1`) | 0.959169 | first submission; LB not checked (LB-blind) |
 | 2026-10-07 | `blend_final_1007_orig2.csv` | honest-NM: `realmlp_route_ls0_emb4_fdcat_agecat_orig` 0.52 + `lgbm_pr13_resid_orig` 0.17 + `lgbm_pr12_route_orig` 0.17 + ls0_emb4_fdclass 0.10 + ls0 0.05 | 0.961441 | honest **0.961435** — current best; LB not checked |
@@ -632,13 +638,34 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   restore the best epoch on X_val too, so the public pool's OOF is optimistic as well (public
   LB sits ~0.0004 below public stack CVs).
   **Rule from now on: every NN leg that feeds a stack uses `epoch_select="last"`.**
+- **Honest RealMLP legs (k10, e4, `epoch_select="last"`):** auxall **0.96144**, +delaycat 0.96145,
+  +fdclasscat 0.96145, seed 43 0.96139, og,agg 0.96128 (vs 0.96157-0.96160 selected).
+- **Stacks (LR on logits, nested on the base folds, `stack_public.py`):** pool-only (199) 0.962144
+  (C 0.1; C 0.001 / 0.003 / 0.01 / 1 / 3: 0.962039 / 0.962090 / 0.962136 / 0.962144 / 0.962141);
+  pool + 6 own legs (2 honest RealMLP + CatBoost + 3 LGBM, all k10) **0.962162** (C 0.3) →
+  **SUBMITTED `hybrid_lrstack_1009.csv`**. Our legs add +0.00002 to the pool — noise level.
+  + all 5 honest RealMLPs: 0.962152 (no gain from NN breadth).
+- **Inflation hedge:** pool without the 53 public MLP-type members (realmlp/rmlp/mlp/deepfm/gl_e/gl_n)
+  + our 6 legs **0.962107** (−0.000056 OOF — within the plausible inflation of those members) →
+  **SUBMITTED `hybrid_lrstack_1009_nomlp.csv`** as the robust candidate. With 5 honest RealMLPs 0.962104.
+- **Nulls (10-09):** nested residual LGBM on top of the LR stack with raw context + top-20 members
+  (`stack_resid.py`) 0.962134 vs 0.962144 (−0.00001, 2/5 folds up); GPU kNN leg on the TFM
+  matrices (`knn_leg.py`, |Spearman|-weighted metric, solo 0.9577 at k 400) → stack −0.000013;
+  alternative original-data teachers (LGBM depth 2-8, min_child 500/2000, no delays, no fd) all
+  0.9534-0.9552 solo vs og_xgb 0.9551 — teacher structure does not matter.
+- **TabPFN: blocked.** The cached Prior Labs token had expired; tabpfn 9.1 (default checkpoint is now
+  TabPFN-3.5) deleted it after verification failed. The user must log in at ux.priorlabs.ai, accept the
+  v3.5 license and export `TABPFN_TOKEN`; then `/tmp/tabpfn_venv/bin/python src/run_tabpfn.py` (venv
+  must be recreated after a reboot: `uv venv /tmp/tabpfn_venv -p 3.12 && uv pip install tabpfn`).
 
 ## Next steps (remove each item when implemented)
 
-**From 10-08 (do these first):** (a) **user decision**: may the deliverable use the public
-OOF/test library (PR-21)? The public pool alone stacks to 0.962093 vs our own 0.9617 and our
-legs add nothing to it — if yes, the work becomes "find members that move the pool"; if no,
-keep building our own breadth. (b) Final-submission refit: legs on 10 folds (90% data) or
+**From 10-09 (do these first):** (a) RESOLVED — public pool is used (user: "objective is
+winning"). The work is "find members that move the pool": honest NN breadth, kNN, residual
+stacker and teacher variants all failed today; the only member class with large stack weights
+we lack is a TabPFN-3.5 leg (needs the user's Prior Labs license, see 10-09). (a2) Finals:
+`hybrid_lrstack_1009.csv` (0.962162) vs the inflation hedge `_nomlp` (0.962107) — decide with
+`select-finals`; re-pull the public pool before the end (new members keep appearing). (b) Final-submission refit: legs on 10 folds (90% data) or
 a 100% refit for the test predictions (PR-18 learning curve: ~+0.0008 AUC per data doubling
 for LGBM ⇒ ~+0.00015 for 80→90%) — do it once the leg set is frozen. (c) TFMs earn the
 largest pool weights; ours (TabICL ctx 100k) did not — a TabPFN leg needs the Prior Labs token.
