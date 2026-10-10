@@ -736,6 +736,9 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
     69 exported columns plain 0.96037 → down-weight |y−p|>0.8 (4.5% of rows) **0.96075** → soft labels
     0.7·y+0.3·p **0.96087 (+0.0005 solo)** — a real LEG gain, but screens −0.000017/−0.000018 at the
     stack (absorbed, lesson 7). Worth using for any own-only blend.
+- **17:00 re-pull:** dmitriykolmikov all-categorical CatBoost (0.96067) + fast LGBM, denpugovkin exp022
+  members (numeric-key CatBoost CTR, LGBM view B, RealMLP view B, 2 controls; blends excluded) →
+  `data/public_oof/s6e10-pm1010-new/`, pool 233: stack **0.962154** (−0.000015) → not submitted.
 - **Combiner variants (`src/stack_variants.py`)**: + consensus curvature / member spread 0.962162
   (= base); rank-logit inputs 0.961148 (worse). LR on logits stays.
 - **Inflation transfer measured:** swapping our two honest RealMLPs for their epoch-selected twins
