@@ -797,6 +797,10 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   1; 1009_nomlp 0.962107 / 0.99910 (submitted); 1010 0.962162 / 0.99958; bagstack_1010 0.962180 /
   0.99938; **pr34_bagstack_nest10 0.962189 / 0.99948** (below bar, unsubmitted); own_lrstack_1010
   (own-only) 0.961861 / 0.99431.
+- **21:00-21:15:** PR-34 seed check (bag seed 1) 0.962183 vs seed 0 0.962189 → true ≈ 0.962186, the
+  bar miss is real. Near-duplicate member clustering before the LR (corr > 0.9995 / 0.999 / 0.998 →
+  203 / 165 / 99 clusters): 0.962162 / 0.962175 / 0.962092 → null. Route-local TabPFN-3 on the FULL
+  fold 1 (ctx 50k, local 0.5): solo 0.96025, screen −0.000016 → null (closes the 20k-row ambiguity).
 - **Combiner variants (`src/stack_variants.py`)**: + consensus curvature / member spread 0.962162
   (= base); rank-logit inputs 0.961148 (worse). LR on logits stays.
 - **Inflation transfer measured:** swapping our two honest RealMLPs for their epoch-selected twins
