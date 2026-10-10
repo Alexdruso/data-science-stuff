@@ -807,6 +807,8 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   **0.962196** — best honest OOF of the day, still < 0.962199, and its own legs were selected on the
   same OOF (optimistic by a few 1e-6). Written `submissions/pr34b_bagstack_fwdlegs.csv`, NOT submitted.
   Seed check (bag seed 1): **0.962184** → true ≈ 0.96219; the 0.962196 was partly seed luck.
+- **21:50 SUBMITTED on user request (LB not checked by me):** `pr34_bagstack_nest10.csv` and
+  `pr34b_bagstack_fwdlegs.csv`.
 - **Combiner variants (`src/stack_variants.py`)**: + consensus curvature / member spread 0.962162
   (= base); rank-logit inputs 0.961148 (worse). LR on logits stays.
 - **Inflation transfer measured:** swapping our two honest RealMLPs for their epoch-selected twins
