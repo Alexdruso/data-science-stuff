@@ -81,6 +81,8 @@ def sources() -> list[tuple[str, np.ndarray, np.ndarray]]:
 
 def main() -> None:
     OUT.mkdir(exist_ok=True)
+    for f in OUT.glob("*.npy"):  # members dropped by this build must not linger
+        f.unlink()
     y = build_features(pl.read_csv(DATA_DIR / "train.csv"))[TARGET].to_numpy()
     ref_t = logit(np.load(RESULTS_DIR / "test_lgbm_pr12_route_og_agg_orig.npy"))
     kept_o: list[np.ndarray] = []

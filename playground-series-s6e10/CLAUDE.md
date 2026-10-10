@@ -670,6 +670,47 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   v3.5 license and export `TABPFN_TOKEN`; then `/tmp/tabpfn_venv/bin/python src/run_tabpfn.py` (venv
   must be recreated after a reboot: `uv venv /tmp/tabpfn_venv -p 3.12 && uv pip install tabpfn`).
 
+### 2026-10-10
+
+- **Pool re-pull:** added koumeimaki `s6e10-route-tfm-nn-oof` (full-context TabPFN-3.5 0.96118,
+  TabICL, TabM, RealMLP, 3 GBDTs; same folds, verified). `pool_build.py` now clears `_pool/`
+  first (members dropped by dedup were lingering: 378 pairs on disk vs 225 built). Pool 225 +
+  6 own legs: **0.962162** (C 0.1) — flat; the pool is saturated by more of the same kinds.
+- **TabPFN-3 runs locally without a licence click**: `run_tabpfn.py` defaults to the cached
+  v3 checkpoint (`~/.cache/tabpfn/tabpfn-v3-classifier-v3_default.ckpt`). The 3.5 checkpoint
+  still needs the licence accepted at ux.priorlabs.ai (token saved at `~/.config/tabpfn/token`,
+  outside the repo). Fold-1 probe (20k val rows, n_est 1): our 69 engineered columns ctx 50k
+  0.96033 / **ctx 100k 0.96098**; raw 21 (fd categorical) ctx 100k 0.95871.
+- **Member screen (`src/screen_member.py`)**: a candidate's fold-1 predictions vs the nested
+  stack OOF, 2-feature LR, 10-fold × 5 on the 140k rows. Controls (calibrated before any
+  candidate number): noise −0.000017, kNN −0.000017, TabICL −0.000015, in-pool tabfm
+  −0.000021 (all ±0.000005) ⇒ the null sits at about −0.00002.
+- **PR-27 (registered before its number) — TabPFN-3 on engineered features / route-local
+  context.** Bar for a full 5-fold run: screen delta ≥ **+0.00002** (≥ 4σ above the null).
+  Bar to submit: full stack ≥ **+0.00003** over 0.962162. Prior ~25% (TabICL on the same
+  matrices was null; TabPFN is stronger and the public TabPFNs earn large coefficients).
+- **PR-27 RESULTS.** TabPFN-3, 69 engineered columns, ctx 100k, full fold 1: solo 0.96008, corr
+  0.9935 with the stack, screen **−0.000019 → FAIL** (= null). Route-local context (`--local 0.5`:
+  each 4k-query batch's context = training rows on its routes + random fill, ctx 50k) lifts the
+  solo +0.0006 over a random 50k context (0.96092 vs 0.96033 on 20k rows) but screens no better
+  than random ctx 100k (−0.00008 vs −0.00011 at n=20k, where the null is wider) → closed.
+  TabDPT (`src/run_tabdpt.py`, retrieval TFM): no flash attention on the 2060 → >25 min per 20k
+  rows, infeasible. Naive Bayes over all columns (+ rating×segment pairs): solo 0.9335, screen
+  −0.000004 → null.
+- TabPFN-3 on the RAW 21 columns (fd categorical; the kind of member that earns the pool's
+  largest weights — tabfm, limix2), ctx 100k, full fold 1: solo 0.95723, screen **−0.000023** →
+  null. Original-data teacher logits as members: −0.000009 / −0.000012 → null.
+- **PR-28 — swap-noise DAE (label-free, train + test) → MLP head (`src/dae_leg.py`)**, registered
+  with the PR-27 bar. 12 DAE epochs: solo 0.95947, screen −0.000026; 60 epochs: solo 0.96015,
+  corr 0.9928, screen −0.000021 → **FAIL**. A better solo just raises the correlation with the stack.
+- **Segment-gated LR stack** (separate weights per class / travel / customer / class×travel):
+  0.961946-0.962132, all below the single LR (0.962162).
+- **Combiner variants (`src/stack_variants.py`)**: + consensus curvature / member spread 0.962162
+  (= base); rank-logit inputs 0.961148 (worse). LR on logits stays.
+- **Inflation transfer measured:** swapping our two honest RealMLPs for their epoch-selected twins
+  (+0.00014/+0.00016 solo) moves the stack +0.00002 (0.962182). One inflated member passes ~1/7 of
+  its inflation through; the 53 public MLPs can plausibly explain all of the hedge's −0.000055.
+
 ## Next steps (remove each item when implemented)
 
 **From 10-09 (do these first):** (a) RESOLVED — public pool is used (user: "objective is
