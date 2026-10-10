@@ -752,6 +752,21 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   students **0.96204 vs 0.96151** (+0.00053 at equal teacher strength; data size explains ~+0.00005).
   ⇒ Distilling OOF predictions into a high-capacity student leaks the val labels through the
   teacher's models; the stack-teacher +0.000032 is leak. PR-31 **FAIL** (honest soft labels = null). LGBM soft-label sweep: a = 0.15 0.96058 < a = 0.3 0.96087.
+- **Robust-combiner round (18:00-18:20):** L1 LR stack (saga) C 0.003 / 0.01: 0.962066 / 0.962083
+  (worse). Monotone-in-ratings LGBM (fold 1): 0.96033, screen −0.000020 (null). OOF-vs-test
+  correlation gap as an inflation detector: separates our inflated RealMLP twins from the honest
+  ones by only ~1 MAD of the cross-family spread → not usable to filter public members.
+- **PR-32 — member-bagged LR stack (`src/stack_bagged.py`), registered 18:20 after an 8-bag pilot**
+  (pilot, 239 members: 0.962183 vs single LR 0.962154 on the same members). Each bag = nested LR
+  (C 0.1) on a random half of the members; deliverable = mean of z-scored bag logits. Settings fixed
+  before the full run: 32 bags, frac 0.5, seed 0. Bar to submit: **≥ 0.962199** (+0.00003 over
+  0.962169, the best single-LR stack today). Mechanism: variance reduction of the stacker AND no
+  single (possibly inflated) member can dominate — a robustness gain the LB should also see.
+  **RESULT: FAIL vs bar.** 32 bags 0.962180 (1/4/8/16 bags: 0.962110/0.962168/0.962183/0.962182);
+  excluding the 17:00 members 0.962182; frac 0.3 0.962130. Real but small (+0.00001-0.00003);
+  written (`bagstack_1010*.csv`), not submitted.
+- **Residual MLP stacker** (`src/stack_mlp.py`, MLP on member logits added to a frozen LR term,
+  zero-init head): 0.962150 vs LR 0.962156, every fold ±0.000002 → null; LR is the ceiling.
 - **Combiner variants (`src/stack_variants.py`)**: + consensus curvature / member spread 0.962162
   (= base); rank-logit inputs 0.961148 (worse). LR on logits stays.
 - **Inflation transfer measured:** swapping our two honest RealMLPs for their epoch-selected twins
