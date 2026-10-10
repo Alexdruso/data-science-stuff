@@ -767,6 +767,12 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   written (`bagstack_1010*.csv`), not submitted.
 - **Residual MLP stacker** (`src/stack_mlp.py`, MLP on member logits added to a frozen LR term,
   zero-init head): 0.962150 vs LR 0.962156, every fold ±0.000002 → null; LR is the ceiling.
+- **PR-33 — 20-fold legs (registered 18:55, before any k20 number).** RealMLP honest e4 auxall and
+  +delaycat, and LGBM-xt (og,agg,auxall, orig rows), refit at `--nfolds 20` (95% of train per model;
+  PR-18 measured k5→k10 = +0.00005 at the stack). The k20 legs REPLACE their k10 twins. Deliverable
+  fixed now: bagged stack (16 bags, frac 0.5, seed 0) over the pool minus the 17:00 members (226) +
+  6 own legs. Bar to submit: **≥ 0.962199**. Prior ~30% (k20 alone ≈ +0.00002-0.00003, bagging
+  +0.00001-0.00003 — the bar needs both).
 - **Combiner variants (`src/stack_variants.py`)**: + consensus curvature / member spread 0.962162
   (= base); rank-logit inputs 0.961148 (worse). LR on logits stays.
 - **Inflation transfer measured:** swapping our two honest RealMLPs for their epoch-selected twins
