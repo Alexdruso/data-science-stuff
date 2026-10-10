@@ -705,6 +705,24 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   corr 0.9928, screen −0.000021 → **FAIL**. A better solo just raises the correlation with the stack.
 - **Segment-gated LR stack** (separate weights per class / travel / customer / class×travel):
   0.961946-0.962132, all below the single LR (0.962162).
+- **PM re-pull (13:40):** `sachith7` stack-OOF update adds `lgb_cpu_strong` (0.961083) → pool 226,
+  stack **0.962169** (+0.000007, below bar). Other new notebooks: submissions or weak members only.
+- **PR-29 — Google TabFM on our compact features (registered 14:05, before the full number).**
+  `src/run_tabfm.py` (NVIDIA `structured-data-models`, `/tmp/sdm_venv`; 1.64B params → fp32 does not
+  fit 6 GB, fp16 gives NaN, **bf16 works**; ctx ≤ 3000 with 28 columns). Features: raw 21 + 4 route
+  TEs + og_xgb + orig_fd_rate + fd count; 4 bags × fresh 3k context, mean logit. Probe (20k fold-1
+  rows): solo 0.95925, corr 0.985, screen **+0.000084** vs TabPFN-3 −0.000109 on the same rows ⇒
+  ~+0.0002 above the null — first candidate today above it (the pool's raw-column TabFM already
+  earns the largest coefficient). Full run: OOF all folds, test from fold 1's 4 contexts. Bar to
+  submit: full stack ≥ **+0.00003** over 0.962169. Prior ~50%.
+  **RESULT: FAIL.** Full fold 1 (140k rows, same seeds): solo 0.95744, screen **−0.000022** (null).
+  The 20k probe was a lucky subset — the other six 20k slices of the SAME predictions screen
+  −0.00010 to −0.00014 (one +0.000018). ⚠️ **Screen on full folds only**: the reported ± is CV noise
+  within the subset, not row-sampling noise, so 20k-row screens can mislead by 2e-4. Run killed
+  after fold 1.
+- **Kumo-large** (same runner, `--model kumo`, ctx 5000 × 2 bags, full fold 1, ~3 min/fold): solo
+  0.95874, screen **−0.000017** → null. The TFM family (TabPFN-3, TabICL, TabFM, Kumo) is closed on
+  this hardware; new members have to come from the public pool (re-pull 17:00 and 19:30).
 - **Combiner variants (`src/stack_variants.py`)**: + consensus curvature / member spread 0.962162
   (= base); rank-logit inputs 0.961148 (worse). LR on logits stays.
 - **Inflation transfer measured:** swapping our two honest RealMLPs for their epoch-selected twins
