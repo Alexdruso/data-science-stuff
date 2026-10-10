@@ -773,6 +773,13 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   fixed now: bagged stack (16 bags, frac 0.5, seed 0) over the pool minus the 17:00 members (226) +
   6 own legs. Bar to submit: **≥ 0.962199**. Prior ~30% (k20 alone ≈ +0.00002-0.00003, bagging
   +0.00001-0.00003 — the bar needs both).
+- **Own-only honest LR stack (19:35):** 8 legs (4 honest RealMLPs incl. auxall k20, CatBoost, 3 LGBM
+  incl. xt k20) **0.961835** — the fallback if the pool is LB-inflated.
+- **Soft labels on the TUNED LGBM-xt leg** (`S6E10_SOFT=0.3` in `tune_lgbm.py`, honest inner 3-fold
+  teacher 0.9607, k10): folds 1-2 0.96152 / 0.96140 vs plain 0.96153 / 0.96140 → **null**; killed.
+  The +0.0005 of PR-30 was a regulariser for an untuned model, not information.
+- **k20 legs (PR-33):** RealMLP auxall k20 OOF 0.96144 (= k10); LGBM-xt k20 0.961398 (k10 0.961354).
+  Interim bagged stack with them 0.962183 (= without) → the k-fold lever is spent.
 - **Combiner variants (`src/stack_variants.py`)**: + consensus curvature / member spread 0.962162
   (= base); rank-logit inputs 0.961148 (worse). LR on logits stays.
 - **Inflation transfer measured:** swapping our two honest RealMLPs for their epoch-selected twins

@@ -123,20 +123,40 @@ def evaluate(route: bool = False, resid: bool = False, orig: bool = False) -> No
         x_tr: pd.DataFrame, y_tr: np.ndarray, x_va: pd.DataFrame, y_va: np.ndarray,
         x_te: pd.DataFrame, fold: int,
     ) -> tuple[np.ndarray, np.ndarray]:
+        x_o = None
         if route:
             from route import route_te
             if x_orig is not None:
                 x_tr, x_va, x_te, x_o = route_te(x_tr, y_tr, [x_va, x_te, x_orig])
-                x_tr = pd.concat([x_tr, x_o[x_tr.columns]], ignore_index=True)
-                y_tr = np.concatenate([y_tr, m.y_orig])
             else:
                 x_tr, x_va, x_te = route_te(x_tr, y_tr, [x_va, x_te])
+        w_tr = None
+        soft = float(os.environ.get("S6E10_SOFT", "0"))
+        if soft > 0:
+            # PR-30 honest soft labels: inner 3-fold teacher on the fold's synthetic training rows,
+            # exact soft CE via duplication — (x, 1) weighted t, (x, 0) weighted 1 - t
+            p_in = np.zeros(len(y_tr))
+            for ia, ib in StratifiedKFold(3, shuffle=True, random_state=fold).split(x_tr, y_tr):
+                tm = LGBMClassifier(**{**params, "n_estimators": 800, "learning_rate": 0.03})
+                tm.fit(x_tr.iloc[ia], y_tr[ia])
+                p_in[ib] = tm.predict_proba(x_tr.iloc[ib])[:, 1]
+            print(f"    inner teacher AUC {roc_auc_score(y_tr, p_in):.5f}", flush=True)
+            t = (1 - soft) * y_tr + soft * p_in
+            n = len(y_tr)
+            x_tr = pd.concat([x_tr, x_tr], ignore_index=True)
+            w_tr = np.concatenate([t, 1 - t])
+            y_tr = np.concatenate([np.ones(n, int), np.zeros(n, int)])
+        if x_o is not None:
+            x_tr = pd.concat([x_tr, x_o[x_tr.columns]], ignore_index=True)
+            y_tr = np.concatenate([y_tr, m.y_orig])
+            if w_tr is not None:
+                w_tr = np.concatenate([w_tr, np.ones(len(m.y_orig))])
         if resid:
             from run_lgbm_arm import route_residual
             x_tr, x_va, x_te = route_residual(x_tr, y_tr, [x_va, x_te])
         model = LGBMClassifier(**params)
         model.fit(
-            x_tr, y_tr, eval_set=[(x_va, y_va)],
+            x_tr, y_tr, sample_weight=w_tr, eval_set=[(x_va, y_va)],
             callbacks=[early_stopping(100, verbose=False), log_evaluation(0)],
         )
         val = model.predict_proba(x_va)[:, 1]
@@ -151,6 +171,7 @@ def evaluate(route: bool = False, resid: bool = False, orig: bool = False) -> No
     name = ("lgbm_pr13_resid" if resid else "lgbm_pr12_route") if route else "lgbm_pr5_tuned"
     name += "".join(f"_{e}" for e in extras)
     name += os.environ.get("S6E10_LGBM_SUFFIX", "") + ("_orig" if orig else "")
+    name += f"_soft{os.environ['S6E10_SOFT']}" if float(os.environ.get("S6E10_SOFT", "0")) > 0 else ""
     name += "" if nfolds == 5 else f"_k{nfolds}"
     save_cv_result(RESULTS_DIR, name, fold_scores, oof_auc, metric_name="auc")
     np.save(RESULTS_DIR / f"oof_{name}.npy", oof)
