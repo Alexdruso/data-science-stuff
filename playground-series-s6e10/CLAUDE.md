@@ -789,6 +789,14 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
 - **Own-only forward selection** (75 honest own legs, nested LR C 1; timed out after 6 steps):
   s43 RealMLP → LGBM-xt k20 → lgbm_arm_nc_cat → RealMLP og,agg → CatBoost numcat (k5) → RealMLP
   auxall k20 = **0.961863** (vs 8-leg hand pick 0.961835) → `submissions/own_lrstack_1010.csv`.
+- **Partial-view members (20:40):** LGBM on ratings-only (13 raw) 0.95329 / with aux 0.95953, context-only
+  (route + demographics + delays, no rating-derived columns) 0.88785 (corr 0.79 with the stack).
+  Fold-1 screens −0.000015 / −0.000014 / −0.000017 / **−0.000004** (context); context run on all 5 folds
+  + test and added to the single-LR stack: 0.962155 vs 0.962169 → null (fold-1 hint was noise).
+- **Finals table (20:50; OOF / test Spearman vs the submitted `hybrid_lrstack_1009`):** 1009 0.962162 /
+  1; 1009_nomlp 0.962107 / 0.99910 (submitted); 1010 0.962162 / 0.99958; bagstack_1010 0.962180 /
+  0.99938; **pr34_bagstack_nest10 0.962189 / 0.99948** (below bar, unsubmitted); own_lrstack_1010
+  (own-only) 0.961861 / 0.99431.
 - **Combiner variants (`src/stack_variants.py`)**: + consensus curvature / member spread 0.962162
   (= base); rank-logit inputs 0.961148 (worse). LR on logits stays.
 - **Inflation transfer measured:** swapping our two honest RealMLPs for their epoch-selected twins
