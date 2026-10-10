@@ -747,8 +747,11 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   teacher (0.9613) 0.96168 (screen −0.000006); kNN-400 OOF teacher (0.9576) 0.96117.
   ⚠️ The stack/k10 teachers are LEAKY for a high-capacity student: their OOF on fold-1 training rows
   comes from models that saw fold-1 val labels. The kNN placebo shows no local leak, but strength
-  and leak are confounded → matched leaky-vs-honest LGBM teacher test running. Not adoptable until
-  that is settled. LGBM soft-label sweep: a = 0.15 0.96058 < a = 0.3 0.96087.
+  and leak are confounded. **Matched test settles it — LEAK:** same LGBM config/columns, teacher =
+  ordinary 5-fold OOF (folds 2-5 trained WITH fold-1 val rows) 0.96068 vs honest inner 0.96052 →
+  students **0.96204 vs 0.96151** (+0.00053 at equal teacher strength; data size explains ~+0.00005).
+  ⇒ Distilling OOF predictions into a high-capacity student leaks the val labels through the
+  teacher's models; the stack-teacher +0.000032 is leak. PR-31 **FAIL** (honest soft labels = null). LGBM soft-label sweep: a = 0.15 0.96058 < a = 0.3 0.96087.
 - **Combiner variants (`src/stack_variants.py`)**: + consensus curvature / member spread 0.962162
   (= base); rank-logit inputs 0.961148 (worse). LR on logits stays.
 - **Inflation transfer measured:** swapping our two honest RealMLPs for their epoch-selected twins
