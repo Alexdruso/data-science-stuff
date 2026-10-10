@@ -724,6 +724,18 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   0.95874, screen **−0.000017** → null. The TFM family (TabPFN-3, TabICL, TabFM, Kumo) is closed on
   this hardware (raw-column TabFM, 6 × 3k contexts — a second draw of the pool's top-weight member —
   solo 0.95604, screen −0.000022: also null); new members have to come from the public pool (re-pull 17:00 and 19:30).
+- **Out-of-the-box round (15:30-16:05):**
+  - Hidden-ID screen: every column's synthetic values ⊂ original values (delays: 186 of 466) — the
+    generator treated all columns as categorical; no new high-cardinality ID besides fd (delaycat and
+    flight keys already tested).
+  - Route-reliability-gated stack (`src/stack_gated.py`, member logits × standardised log route
+    count): 0.962145 / lean 3-feature gate 0.962155 vs 0.962169 → null.
+  - AUC-direct stacker (`src/stack_auc.py`, LR weights fine-tuned on a soft pairwise AUC with L2 pull
+    to LR): 0.961836-0.961963 → worse; log-loss LR is already AUC-optimal here.
+  - **PR-30 label-noise cleaning (`src/label_clean.py`, fold 1, honest inner 3-fold p):** LGBM on the
+    69 exported columns plain 0.96037 → down-weight |y−p|>0.8 (4.5% of rows) **0.96075** → soft labels
+    0.7·y+0.3·p **0.96087 (+0.0005 solo)** — a real LEG gain, but screens −0.000017/−0.000018 at the
+    stack (absorbed, lesson 7). Worth using for any own-only blend.
 - **Combiner variants (`src/stack_variants.py`)**: + consensus curvature / member spread 0.962162
   (= base); rank-logit inputs 0.961148 (worse). LR on logits stays.
 - **Inflation transfer measured:** swapping our two honest RealMLPs for their epoch-selected twins
