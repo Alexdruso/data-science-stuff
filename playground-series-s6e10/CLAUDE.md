@@ -722,7 +722,8 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   after fold 1.
 - **Kumo-large** (same runner, `--model kumo`, ctx 5000 × 2 bags, full fold 1, ~3 min/fold): solo
   0.95874, screen **−0.000017** → null. The TFM family (TabPFN-3, TabICL, TabFM, Kumo) is closed on
-  this hardware; new members have to come from the public pool (re-pull 17:00 and 19:30).
+  this hardware (raw-column TabFM, 6 × 3k contexts — a second draw of the pool's top-weight member —
+  solo 0.95604, screen −0.000022: also null); new members have to come from the public pool (re-pull 17:00 and 19:30).
 - **Combiner variants (`src/stack_variants.py`)**: + consensus curvature / member spread 0.962162
   (= base); rank-logit inputs 0.961148 (worse). LR on logits stays.
 - **Inflation transfer measured:** swapping our two honest RealMLPs for their epoch-selected twins
