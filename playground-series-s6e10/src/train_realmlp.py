@@ -94,6 +94,13 @@ def main() -> None:
     parser.add_argument("--extras", default="", help="comma list of og,agg,aux,auxall (route.add_extras)")
     parser.add_argument("--pseudo", type=float, default=0.0,
                         help="PR-25: >0 = refit on train + test rows with labels SAMPLED from this fold's own model (weight via repeats ignored)")
+    parser.add_argument("--soft", type=float, default=0.0,
+                        help="PR-30 soft labels: target = (1-a)·y + a·p, p = inner 3-fold LGBM on the "
+                             "fold's synthetic training rows (exact soft CE via weighted row duplication)")
+    parser.add_argument("--soft-teacher", default="",
+                        help="with --soft: p = this OOF array (results/oof_<name>.npy, id order) instead of inner LGBM")
+    parser.add_argument("--soft-inner-nn", action="store_true",
+                        help="with --soft: p = inner 3-fold RealMLP (honest born-again teacher)")
     parser.add_argument("--agecat", action="store_true", help="age as an embedded category")
     parser.add_argument("--ratingcat", action="store_true", help="the 13 ratings as embedded categories")
     parser.add_argument("--resid", action="store_true", help="PR-13 residual route encoding (with --route)")
@@ -207,6 +214,7 @@ def main() -> None:
         fold: int,
     ) -> tuple[np.ndarray, np.ndarray]:
         t0 = time.time()
+        row_ids = x_tr.index.to_numpy()
         torch.manual_seed(args.seed + fold)
         np.random.seed(args.seed + fold)
         if args.route:
@@ -215,6 +223,37 @@ def main() -> None:
                 x_tr, x_va, x_te, x_o = route_te(x_tr, y_tr, [x_va, x_te, x_orig])
             else:
                 x_tr, x_va, x_te = route_te(x_tr, y_tr, [x_va, x_te])
+        n_syn = len(x_tr)
+        soft_t = None
+        if args.soft > 0 and args.soft_teacher:
+            tch = np.load(RESULTS_DIR / f"oof_{args.soft_teacher}.npy")[row_ids]
+            p_in = 1 / (1 + np.exp(-tch)) if (tch.min() < 0 or tch.max() > 1) else tch
+            print(f"    teacher p AUC {roc_auc_score(y_tr, p_in):.5f}", flush=True)
+            soft_t = (1 - args.soft) * y_tr + args.soft * p_in
+        elif args.soft > 0 and args.soft_inner_nn:
+            # honest born-again teacher: inner 3-fold RealMLP on the fold's synthetic training rows
+            p_in = np.zeros(n_syn)
+            for ia, ib in StratifiedKFold(3, shuffle=True, random_state=fold).split(x_tr, y_tr):
+                f_a, f_b = to_frames((x_tr.iloc[ia], x_tr.iloc[ib]), cat_cols)
+                tm = RealMLP_TD_Classifier(**{**cfg, "random_state": args.seed + fold + 100})
+                tm.fit(f_a, y_tr[ia].astype(np.int64), f_b, y_tr[ib].astype(np.int64),
+                       cat_col_names=cat_cols, ckpt_path=CKPT_DIR / f"inner_{fold}.pth", X_test=f_b)
+                p_in[ib] = tm.predict_proba(f_b)[:, 1]
+                del tm
+                torch.cuda.empty_cache()
+            print(f"    inner RealMLP teacher AUC {roc_auc_score(y_tr, p_in):.5f}", flush=True)
+            soft_t = (1 - args.soft) * y_tr + args.soft * p_in
+        elif args.soft > 0:
+            from lightgbm import LGBMClassifier
+            p_in = np.zeros(n_syn)
+            for a_i, b_i in StratifiedKFold(3, shuffle=True, random_state=fold).split(x_tr, y_tr):
+                gbm = LGBMClassifier(n_estimators=800, learning_rate=0.03, num_leaves=127,
+                                     min_child_samples=200, colsample_bytree=0.6, subsample=0.8,
+                                     subsample_freq=1, reg_lambda=5.0, n_jobs=12, verbose=-1)
+                gbm.fit(x_tr.iloc[a_i], y_tr[a_i])
+                p_in[b_i] = gbm.predict_proba(x_tr.iloc[b_i])[:, 1]
+            print(f"    inner p AUC {roc_auc_score(y_tr, p_in):.5f}", flush=True)
+            soft_t = (1 - args.soft) * y_tr + args.soft * p_in
         if x_orig is not None:
             assert m.y_orig is not None
             x_tr = pd.concat([x_tr, *[x_o[x_tr.columns]] * args.origrep], ignore_index=True)
@@ -224,12 +263,21 @@ def main() -> None:
             x_tr, x_va, x_te = route_residual(x_tr, y_tr, [x_va, x_te])
         tr, va, te = to_frames((x_tr, x_va, x_te), cat_cols)
         model = RealMLP_TD_Classifier(**{**cfg, "random_state": args.seed + fold})
+        psw = None
+        if soft_t is not None:
+            # each synthetic row twice: (x, 1) weighted t and (x, 0) weighted 1 - t; others hard
+            syn = tr.iloc[:n_syn]
+            tr = pd.concat([syn, tr], ignore_index=True)
+            psw = np.concatenate([soft_t, 1 - soft_t, np.ones(len(y_tr) - n_syn)])
+            y_tr = np.concatenate([np.ones(n_syn), np.zeros(n_syn), y_tr[n_syn:]])
+            psw = psw * len(psw) / psw.sum() / 1.0
         model.fit(
             tr,
             y_tr.astype(np.int64),
             va,
             y_va.astype(np.int64),
             cat_col_names=cat_cols,
+            per_sample_weight=psw,
             # Per fold, or the five folds overwrite each other's best checkpoint.
             ckpt_path=CKPT_DIR / f"{args.tag or 'v1'}_s{args.seed}_k{args.nfolds}_f{fold}.pth",
             X_test=te,
@@ -280,6 +328,8 @@ def main() -> None:
         val, _ = fit_fold(
             X.iloc[tr_idx], m.y[tr_idx], X.iloc[va_idx], m.y[va_idx], X_test.iloc[:1000], 1
         )
+        np.save(RESULTS_DIR / f"probe_realmlp_{args.tag or 'v1'}_f1.npy",
+                np.stack([va_idx.astype(float), val]))
         print(f"FOLD1 tag={args.tag or 'v1'} seed={args.seed} {overrides} "
               f"AUC {roc_auc_score(m.y[va_idx], val):.5f}", flush=True)
         return

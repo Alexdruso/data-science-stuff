@@ -739,6 +739,16 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
 - **17:00 re-pull:** dmitriykolmikov all-categorical CatBoost (0.96067) + fast LGBM, denpugovkin exp022
   members (numeric-key CatBoost CTR, LGBM view B, RealMLP view B, 2 controls; blends excluded) →
   `data/public_oof/s6e10-pm1010-new/`, pool 233: stack **0.962154** (−0.000015) → not submitted.
+- **PR-31 — soft labels / distillation into RealMLP (fold 1, honest e4 reference 0.96144).**
+  `train_realmlp.py --soft a [--soft-teacher OOF | --soft-inner-nn]`: exact soft CE via weighted row
+  duplication. Students (a = 0.3): inner LGBM teacher (0.9587) 0.96145; honest inner RealMLP teacher
+  (0.9607) 0.96134; honest inner 5-fold LGBM on 69 cols (`src/inner_teacher.py`, 0.96052) 0.96151
+  (screen −0.000015); **pool-stack OOF teacher (0.9621) 0.96197, screen +0.000032**; own k10 LGBM OOF
+  teacher (0.9613) 0.96168 (screen −0.000006); kNN-400 OOF teacher (0.9576) 0.96117.
+  ⚠️ The stack/k10 teachers are LEAKY for a high-capacity student: their OOF on fold-1 training rows
+  comes from models that saw fold-1 val labels. The kNN placebo shows no local leak, but strength
+  and leak are confounded → matched leaky-vs-honest LGBM teacher test running. Not adoptable until
+  that is settled. LGBM soft-label sweep: a = 0.15 0.96058 < a = 0.3 0.96087.
 - **Combiner variants (`src/stack_variants.py`)**: + consensus curvature / member spread 0.962162
   (= base); rank-logit inputs 0.961148 (worse). LR on logits stays.
 - **Inflation transfer measured:** swapping our two honest RealMLPs for their epoch-selected twins
