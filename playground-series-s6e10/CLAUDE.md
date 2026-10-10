@@ -780,6 +780,15 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   The +0.0005 of PR-30 was a regulariser for an untuned model, not information.
 - **k20 legs (PR-33):** RealMLP auxall k20 OOF 0.96144 (= k10); LGBM-xt k20 0.961398 (k10 0.961354).
   Interim bagged stack with them 0.962183 (= without) → the k-fold lever is spent.
+- **PR-33 RESULT: FAIL** — registered deliverable (k20 legs, bagged 16, 226-pool) **0.962181** < 0.962199.
+- 10 stacker nesting folds (single LR, 232 members): 0.962177 vs 0.962169 at 5.
+- **PR-34 (registered 20:24, before its number):** bagged stack, 16 bags, frac 0.5, seed 0, `--nest 10`,
+  232 members (no 17:00 members) + 6 own k10 legs. Bar **≥ 0.962199** (unchanged).
+  **RESULT: 0.962189 → FAIL by 0.00001** (best honest OOF today, +0.00002 over the single LR).
+  Written `submissions/pr34_bagstack_nest10.csv`, not submitted (bar not moved).
+- **Own-only forward selection** (75 honest own legs, nested LR C 1; timed out after 6 steps):
+  s43 RealMLP → LGBM-xt k20 → lgbm_arm_nc_cat → RealMLP og,agg → CatBoost numcat (k5) → RealMLP
+  auxall k20 = **0.961863** (vs 8-leg hand pick 0.961835) → `submissions/own_lrstack_1010.csv`.
 - **Combiner variants (`src/stack_variants.py`)**: + consensus curvature / member spread 0.962162
   (= base); rank-logit inputs 0.961148 (worse). LR on logits stays.
 - **Inflation transfer measured:** swapping our two honest RealMLPs for their epoch-selected twins

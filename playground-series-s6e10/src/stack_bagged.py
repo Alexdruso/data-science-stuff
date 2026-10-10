@@ -28,13 +28,13 @@ from data_science_stuff.kaggle.io import competition_dirs, write_submission
 DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 
 
-def one_bag(O, T, y, cols, C):
+def one_bag(O, T, y, cols, C, nest=5):
     oof, test = np.zeros(len(y)), np.zeros(len(T))
-    for tr, va in StratifiedKFold(5, shuffle=True, random_state=42).split(O, y):
+    for tr, va in StratifiedKFold(nest, shuffle=True, random_state=42).split(O, y):
         sc = StandardScaler().fit(O[tr][:, cols])
         lr = LogisticRegression(C=C, max_iter=3000).fit(sc.transform(O[tr][:, cols]), y[tr])
         oof[va] = lr.decision_function(sc.transform(O[va][:, cols]))
-        test += lr.decision_function(sc.transform(T[:, cols])) / 5
+        test += lr.decision_function(sc.transform(T[:, cols])) / nest
     mu, sd = oof.mean(), oof.std()
     return (oof - mu) / sd, (test - mu) / sd
 
@@ -49,6 +49,7 @@ def main() -> None:
     p.add_argument("--C", type=float, default=0.1)
     p.add_argument("--jobs", type=int, default=10)
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--nest", type=int, default=5, help="stacker nesting folds (rows' OOF stays honest)")
     p.add_argument("--write", default="")
     a = p.parse_args()
     y = build_features(pl.read_csv(DATA_DIR / "train.csv"))[TARGET].to_numpy()
@@ -58,7 +59,7 @@ def main() -> None:
     print(f"{len(keep)} members", flush=True)
     rng = np.random.default_rng(a.seed)
     subsets = [np.sort(rng.choice(len(keep), int(len(keep) * a.frac), replace=False)) for _ in range(a.bags)]
-    res = Parallel(n_jobs=a.jobs)(delayed(one_bag)(O, T, y, c, a.C) for c in subsets)
+    res = Parallel(n_jobs=a.jobs)(delayed(one_bag)(O, T, y, c, a.C, a.nest) for c in subsets)
     oof = np.mean([r[0] for r in res], axis=0)
     test = np.mean([r[1] for r in res], axis=0)
     for k in (1, 4, 8, 16, len(res)):
