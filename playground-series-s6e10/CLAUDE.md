@@ -801,6 +801,11 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   bar miss is real. Near-duplicate member clustering before the LR (corr > 0.9995 / 0.999 / 0.998 →
   203 / 165 / 99 clusters): 0.962162 / 0.962175 / 0.962092 → null. Route-local TabPFN-3 on the FULL
   fold 1 (ctx 50k, local 0.5): solo 0.96025, screen −0.000016 → null (closes the 20k-row ambiguity).
+- **21:20 final re-pull:** nothing new with OOF/test pairs (one meta-stack notebook = stack-level, excluded).
+- **PR-34b (exploratory, same bar):** PR-34 recipe with the 6 forward-selected own legs (s43 RealMLP,
+  LGBM-xt k20, lgbm_arm_nc_cat, RealMLP og,agg, CatBoost numcat k5, RealMLP auxall k20):
+  **0.962196** — best honest OOF of the day, still < 0.962199, and its own legs were selected on the
+  same OOF (optimistic by a few 1e-6). Written `submissions/pr34b_bagstack_fwdlegs.csv`, NOT submitted.
 - **Combiner variants (`src/stack_variants.py`)**: + consensus curvature / member spread 0.962162
   (= base); rank-logit inputs 0.961148 (worse). LR on logits stays.
 - **Inflation transfer measured:** swapping our two honest RealMLPs for their epoch-selected twins
@@ -808,6 +813,14 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   its inflation through; the 53 public MLPs can plausibly explain all of the hedge's −0.000055.
 
 ## Next steps (remove each item when implemented)
+
+**From 10-10 (end of day):** the stack is saturated: 30+ levers today (TFMs ×5 kinds, DAE, NB, label
+cleaning, distillation (leak!), partial views, 8 combiner variants, k20 legs) were all ≤ +0.00003. Best
+honest candidates: `pr34b_bagstack_fwdlegs` 0.962196 / `pr34_bagstack_nest10` 0.962189 (both unsubmitted,
+just under the +0.00003 bar). Real remaining sources: (1) new public members (re-pull daily; the pool
+moved +0.00001 today); (2) TabPFN-3.5 own runs only if the user accepts the licence; (3) finals choice
+between the full stack and the hedges.
+
 
 **From 10-09 (do these first):** (a) RESOLVED — public pool is used (user: "objective is
 winning"). The work is "find members that move the pool": honest NN breadth, kNN, residual
