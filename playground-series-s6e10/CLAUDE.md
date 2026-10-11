@@ -835,6 +835,11 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   other folds' labels). The clean test — per (route, fold) val residual vs the training folds'
   route mean, by route-count bin — gives slopes −0.002 to +0.003 (± 0.004-0.006) for both the
   stack and the best single leg → **route shrinkage is already optimal; no route signal left.**
+- **EBM member (`interpret-core` installed in .venv; /tmp/ebm_all.py → `results/{oof,test}_ebm_i32.npy`):**
+  Explainable Boosting Machine (GAM + 32 pairwise terms, 4 outer bags) on the 69 fold-safe
+  `tfm_fold{k}.npz` columns, ~13 min/fold CPU. OOF folds 0.9594-0.9611 (best additive model so far);
+  fold-1 screen −0.000003 (above the −0.00002 null, under the +0.00002 bar). Full PR-34b stack with it
+  **0.962194** vs 0.962196 / 0.962184 without (seeds 0 / 1) → **null**.
 
 ## Next steps (remove each item when implemented)
 
