@@ -844,6 +844,11 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   parquet OOF+test (0.9586-0.9594) → `data/public_oof/s6e10-albanese-gbdt11/`, pool 252. Stack (PR-34b
   recipe, seed 0) **0.962185** → null. NB `pool_build.py` clears `_pool`, so the hand-added `gen_v1`
   is gone again (it was null anyway).
+- **19:15 re-pull:** `kagankoral/s6e10-ablation-members-oof` (17 members: LGB/XGB/Cat raw / enc3 / enc4
+  k5+k10, all-categorical CatBoosts 0.9611, 3 RealMLPs) → pool 269. Stack (PR-34b recipe, seed 0, without
+  the goodpjw/albanese additions) **0.962174** → null.
+- **10-11 summary:** every lever today null (4 public batches = 53 members, original-block lookups, residual
+  signal by key, EBM). Best honest deliverable unchanged: `pr34b_bagstack_fwdlegs` (≈0.96219, submitted 10-10).
 
 ## Next steps (remove each item when implemented)
 
