@@ -840,6 +840,10 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   `tfm_fold{k}.npz` columns, ~13 min/fold CPU. OOF folds 0.9594-0.9611 (best additive model so far);
   fold-1 screen −0.000003 (above the −0.00002 null, under the +0.00002 bar). Full PR-34b stack with it
   **0.962194** vs 0.962196 / 0.962184 without (seeds 0 / 1) → **null**.
+- **17:00 re-pull:** no new datasets; notebook `francescoalbanesephd/s6e10-gbdt-v1-1` ships LGBM/Cat/XGB
+  parquet OOF+test (0.9586-0.9594) → `data/public_oof/s6e10-albanese-gbdt11/`, pool 252. Stack (PR-34b
+  recipe, seed 0) **0.962185** → null. NB `pool_build.py` clears `_pool`, so the hand-added `gen_v1`
+  is gone again (it was null anyway).
 
 ## Next steps (remove each item when implemented)
 
