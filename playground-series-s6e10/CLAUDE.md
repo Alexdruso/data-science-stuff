@@ -815,6 +815,27 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   (+0.00014/+0.00016 solo) moves the stack +0.00002 (0.962182). One inflated member passes ~1/7 of
   its inflation through; the 53 public MLPs can plausibly explain all of the hedge's −0.000055.
 
+### 2026-10-11
+
+- **Re-pull (09:50):** new `goodpjw2008/s6e10-goodpjw2008-extra-members-oof` (17 unpublished
+  members: view-A k10 trees, CatBoost CTR/aux, 7 RealMLP variants, TabM, and `gen_v1`, a
+  chain-rule generative classifier). `gen_v1` was REJECTED by pool_build's test-align check (rho
+  0.866) but is aligned (its OOF rho with a reference leg is 0.864, the same) → added by hand. Pool
+  250 pairs. Rabari "top18" / dmitriykolmikov fd sets = submissions only.
+- **Paired stack (PR-34b recipe, 16 bags, frac 0.5, nest 10, 6 fwd own legs, no 17:00 members):**
+  with the new members **0.962181** (seed 0) vs without 0.962196 / 0.962184 (seeds 0 / 1) → **null**.
+  ⚠️ 4 bagged stacks in parallel × 6 jobs OOM-crash the workers — run them one at a time.
+- **Original-block lookup screen (`/tmp/blocks.py`):** exact matches of column blocks (13
+  ratings, ratings+cats, ratings+cats+age, demo+fd, demo+fd+delays, rating halves) against the
+  original, smoothed original label rate as an extra LR input next to the stack logit: every
+  in-sample delta within ±0.000003 → the generator copied no blocks the stack misses.
+- **Residual-signal screen by key:** split-half covariance of per-key stack residuals. Ratings,
+  rating halves, demographics, age, delays: |z| < 2.5 (no residual structure). fd and every fd×X key
+  show z ≈ −5 to −9, but that is the OOF-TE artifact (a row's residual includes −β·noise of the
+  other folds' labels). The clean test — per (route, fold) val residual vs the training folds'
+  route mean, by route-count bin — gives slopes −0.002 to +0.003 (± 0.004-0.006) for both the
+  stack and the best single leg → **route shrinkage is already optimal; no route signal left.**
+
 ## Next steps (remove each item when implemented)
 
 **From 10-10 (end of day):** the stack is saturated: 30+ levers today (TFMs ×5 kinds, DAE, NB, label
