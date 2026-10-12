@@ -875,6 +875,13 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
 - **Per-fold standardisation of member logits before the LR** (removes fold-model offsets; scored by
   mean per-fold AUC, single LR C 0.1, 232 members): none 0.962170 / mean-centred 0.962168 / z 0.962164
   → null.
+- **Stack-recipe averages** (z-sum of any two of the 15 stack OOFs on disk): best 0.962195 (pr34 + pr34b)
+  vs pr34b alone 0.962196 → null.
+- **Seed-row screen (`/tmp/seed.py`):** max exact column matches (of 21) between a synthetic row and the
+  original rows on its route: mode 15 vs 12 under a column-shuffled null — but the label of the
+  best-matching original rows (corr 0.70 with y) adds nothing to the pr34b stack (5-fold LR on 60k rows:
+  −0.000035 overall, −0.00005 to −0.0015 for rows with ≥ 15 / 17 / 19 matches) → the stack already
+  contains the original's per-route information; closed (confirms the 10-08 kNN residual test).
 
 ## Next steps (remove each item when implemented)
 
