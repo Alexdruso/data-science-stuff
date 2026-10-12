@@ -850,6 +850,32 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
 - **10-11 summary:** every lever today null (4 public batches = 53 members, original-block lookups, residual
   signal by key, EBM). Best honest deliverable unchanged: `pr34b_bagstack_fwdlegs` (≈0.96219, submitted 10-10).
 
+### 2026-10-12
+
+- **Re-pull (09:30):** new public members with OOF/test pairs: ewtherka factorization machines (8: FM,
+  FFM, cross, k32, seeds), tuongtnc 15-fold DANet and fine-tuned MVM, kava1 RealMLP
+  (`data/public_oof/s6e10-pm1012-new/`), chinzorigtganbat v12 LGBM/XGB reference + source-stats
+  (`s6e10-cz-v12/`). `pool_build.py` test-align check made relative (reject only if the test rho
+  is < 0.9 AND > 0.03 below the member's own OOF rho with the reference leg) — it had been rejecting
+  aligned weak members (`gl_f` GAM, `gen_v1`). Pool 282.
+- **Full-row 2-feature screen (`/tmp/scr_all.py`: pr34b stack logit + candidate, 5-fold LR on all
+  700k rows):** noise −0.000001, in-pool TabPFN-3.5 +0.000002; all 15 new members within
+  −0.000005…+0.000004 → **null** (the 3 paired bagged restacks were stopped as redundant).
+- **TabPFN-3.5 still blocked** (token present, licence not accepted).
+- **PR-35 — fine-tuned TabPFN-3 (registered before any number).** `src/run_tabpfn_ft.py`:
+  `FinetunedTabPFNClassifier` on the local v3 checkpoint (no licence), 69 exported fold-safe columns,
+  fine-tuned on fold-1 training rows only (early stopping on a 5% split of them), inference ctx 50k.
+  Different in kind from every pool TFM (all zero-shot). Bar for 5 folds: full-fold-1 screen
+  (`screen_member.py`, null ≈ −0.00002) ≥ **+0.00002**; submit bar: stack ≥ +0.00003 over the PR-34b
+  recipe. Prior ~15% (zero-shot TabPFN-3 on the same columns screened −0.000019).
+  **PR-35 RESULT: FAIL** (fold 1, first 20k val rows, inference ctx 50k, n_est 1): no-op control
+  (lr 1e-12, same path) **0.95991**; fine-tuned 3k-row meta-batches, lr 1e-5, 4 min 0.95909 (−0.0008);
+  6k-row meta-batches, lr 2e-6, 8 min 0.95966 (−0.00025). 10k-row meta-batches OOM on 6 GB. Fine-tuning
+  at the small contexts that fit on the 2060 degrades large-context inference → closed on this hardware.
+- **Per-fold standardisation of member logits before the LR** (removes fold-model offsets; scored by
+  mean per-fold AUC, single LR C 0.1, 232 members): none 0.962170 / mean-centred 0.962168 / z 0.962164
+  → null.
+
 ## Next steps (remove each item when implemented)
 
 **From 10-10 (end of day):** the stack is saturated: 30+ levers today (TFMs ×5 kinds, DAE, NB, label

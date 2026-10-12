@@ -6,7 +6,8 @@ Writes data/public_oof/_pool/{oof,test}_<src>__<name>.npy (logits, float32, id o
 for every pair that passes the checks below; prints one line per accepted / rejected pair.
 
 Checks per pair: lengths, no NaN; OOF AUC in [0.90, 0.9635] (above that is an in-sample
-"OOF"); test aligned with id order (Spearman with the reference test leg ≥ 0.9); and not a
+"OOF"); test aligned with id order (Spearman with the reference test leg ≥ 0.9, or within 0.03
+of the member's OOF Spearman with the reference OOF leg); and not a
 near-copy of a pair already accepted (OOF corr > 0.99999). Pairs on other fold seeds are
 kept: each row is still out of fold under its own split, which is all a stacker needs.
 """
@@ -85,6 +86,7 @@ def main() -> None:
         f.unlink()
     y = build_features(pl.read_csv(DATA_DIR / "train.csv"))[TARGET].to_numpy()
     ref_t = logit(np.load(RESULTS_DIR / "test_lgbm_pr12_route_og_agg_orig.npy"))
+    ref_o = logit(np.load(RESULTS_DIR / "oof_lgbm_pr12_route_og_agg_orig.npy"))
     kept_o: list[np.ndarray] = []
     n_ok = 0
     for name, o, t in sources():
@@ -100,9 +102,12 @@ def main() -> None:
         if not 0.90 <= auc <= 0.9635:
             print(f"REJECT auc {auc:.6f}  {name}")
             continue
+        # A weak/different-kind member correlates less with the reference on BOTH splits;
+        # misalignment shows as a test rho far below the member's own OOF rho.
         rho = spearmanr(lt[::50], ref_t[::50]).statistic
-        if rho < 0.9:
-            print(f"REJECT test-align rho {rho:.3f}  {name}")
+        rho_o = spearmanr(lo[::50], ref_o[::50]).statistic
+        if rho < 0.9 and rho < rho_o - 0.03:
+            print(f"REJECT test-align rho {rho:.3f} (oof {rho_o:.3f})  {name}")
             continue
         z = (lo - lo.mean()) / lo.std()
         if any(float(np.mean(z * k)) > 0.99999 for k in kept_o):
