@@ -919,6 +919,44 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   within-route-centred features, split-half correlation over 462 routes with ≥ 300 rows: every
   correlation ≤ 0 (−0.003…−0.33; the negative ones are the OOF-TE artifact of 10-11) → no replicable
   route-specific slope left for a hierarchical member; closed.
+- **PR-39 — stacker penalty geometry (registered before any number).** Every stack of ours standardises
+  each member before an L2 LR (C 0.1; the 10-09 C grid was flat *in that geometry*). The public recipes
+  fit on **raw clipped logits** (flat C 0.003), and the top public LB file (0.96188) adds family scaling
+  (TabPFN columns ×3, other foundation models ×1.5 = 1/9 and 1/2.25 of the penalty). One writeup reports
+  pooled nested 0.962203 with 252 members in raw geometry vs our 0.962169-0.962177 single LR on a similar
+  pool — a −0.00003 hint. `src/stack_geometry.py` (single LR, nested on the base folds, same members =
+  current pool + 6 fwd own legs): `std:0.1` (control) vs `raw:0.003`, `raw:0.001`, `fam:0.002`, `fam:0.003`.
+  Bar: best geometry ≥ **+0.00003** pooled over the std control → build its member-bagged version (PR-34b
+  recipe) and submit-bar it vs pr34b (≥ +0.00003). Prior ~25%.
+- **PR-38 — bagged no-MLP hedge (PR-34b recipe, current pool minus every public NN-type member:
+  realmlp/rmlp/mlp/deepfm/gl_e/gl_n/danet/kava_nn; own honest RealMLP legs kept; 212 members):**
+  1/4/8/16 bags 0.962121/0.962176/0.962181/**0.962193** → `submissions/pr38_bagstack_nomlp.csv`.
+  The single-LR hedge of 10-09 paid −0.000055 for the same exclusion; bagged, it pays nothing
+  (pr34b 0.962196 / seed-1 0.962184). ⇒ the inflation hedge is now free on OOF — the more robust final.
+- **PR-37 xrank_b** (lr 0.01, depth 6, mcw 200, 32 pairs/row; 18 min GPU): solo 0.96062, corr 0.9904,
+  screen −0.000013 → null. PR-37 closed (DART killed unfinished, lowest prior).
+- **PR-39 results (single LR, 290 members, pooled nested OOF):** std:0.1 **0.962181** (control);
+  raw:0.003 **0.962208 (+0.000027)**; fam:0.003 0.962207 (family scaling adds nothing over raw).
+  Just under the +0.00003 bar on a single LR, but the geometry is the first combiner change since
+  10-10 that moves the stack by more than its noise. **PR-39b (registered before its number):**
+  member-bagged raw-geometry stack (PR-34b recipe: 16 bags, frac 0.5, seed 0, nest 10, C 0.003, current
+  pool + 6 fwd own legs). Submit bar ≥ **0.962226** (pr34b 0.962196 + 0.00003); seed-1 replicate
+  required before it counts.
+  More single-LR configs: raw:0.001 0.962209, fam:0.002 **0.962213**, std:0.03 0.962207, std:0.01 0.962210.
+  ⇒ **the mechanism is regularisation strength, not geometry**: σ of almost every member's logit is
+  ≈ 3.0, so raw C 0.003 ≈ standardised C 0.027. C 0.1 was set on the 199-member pool (10-09 grid flat
+  there) and is under-regularised at 290 members; the plateau is std C 0.003-0.03 ≈ 0.96221 (+0.00003).
+  Family scaling ≤ +0.000005 (noise).
+- **PR-39b RESULT: FAIL** — bagged raw geometry (C 0.003) 1/4/8/16 bags 0.962176/0.962206/0.962202/
+  **0.962201** < 0.962226 bar (and < its own single LR 0.962208): at strong C, member-bagging adds nothing.
+- **PR-39c (no-MLP hedge, bagged, std C 0.01): 0.962152** vs the same recipe at C 0.1 (PR-38) 0.962193 →
+  inside half-member bags, C 0.01 over-shrinks. **Bagging and L2 are substitutes**: bagged → C 0.1,
+  single LR → C 0.003-0.03.
+- **PR-40 (exploratory; follows from PR-39): single LR std C 0.01 over the pool + ALL 80 honest own legs
+  with OOF+test on disk** (70 GBDT/kNN/EBM/TabICL/TabM/view legs + 10 `realmlp_honest_*`; 364 members):
+  **0.962221** (fold-mean 0.962227) — best honest OOF of the campaign; +0.000011 over pool + 6 fwd legs at
+  the same C, +0.000025 over pr34b. At C 0.1-1 the long tail of own legs was flat or harmful (10-10
+  forward selection); strong shrinkage makes it usable. Still < the 0.962226 submit bar.
 
 ## Next steps (remove each item when implemented)
 

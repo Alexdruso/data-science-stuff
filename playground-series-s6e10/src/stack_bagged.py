@@ -28,13 +28,20 @@ from data_science_stuff.kaggle.io import competition_dirs, write_submission
 DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 
 
-def one_bag(O, T, y, cols, C, nest=5):
+def one_bag(O, T, y, cols, C, nest=5, geom="std"):
     oof, test = np.zeros(len(y)), np.zeros(len(T))
     for tr, va in StratifiedKFold(nest, shuffle=True, random_state=42).split(O, y):
-        sc = StandardScaler().fit(O[tr][:, cols])
-        lr = LogisticRegression(C=C, max_iter=3000).fit(sc.transform(O[tr][:, cols]), y[tr])
-        oof[va] = lr.decision_function(sc.transform(O[va][:, cols]))
-        test += lr.decision_function(sc.transform(T[:, cols])) / nest
+        if geom == "std":
+            sc = StandardScaler().fit(O[tr][:, cols])
+            f = sc.transform
+            lr = LogisticRegression(C=C, max_iter=3000)
+        else:  # raw / family-scaled logits (scaling already applied to O and T)
+            def f(x):
+                return x
+            lr = LogisticRegression(C=C, tol=1e-6, max_iter=20000)
+        lr.fit(f(O[tr][:, cols]), y[tr])
+        oof[va] = lr.decision_function(f(O[va][:, cols]))
+        test += lr.decision_function(f(T[:, cols])) / nest
     mu, sd = oof.mean(), oof.std()
     return (oof - mu) / sd, (test - mu) / sd
 
@@ -52,6 +59,8 @@ def main() -> None:
     p.add_argument("--jobs", type=int, default=10)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--nest", type=int, default=5, help="stacker nesting folds (rows' OOF stays honest)")
+    p.add_argument("--geom", choices=["std", "raw", "fam"], default="std",
+                   help="PR-39: standardised members (default) / raw clipped logits / family-scaled raw")
     p.add_argument("--write", default="")
     a = p.parse_args()
     y = build_features(pl.read_csv(DATA_DIR / "train.csv"))[TARGET].to_numpy()
@@ -59,10 +68,16 @@ def main() -> None:
     keep = [i for i, n in enumerate(names) if not any(e in n for e in a.exclude)
             and not ("/" in n and any(e in n for e in a.exclude_public))]
     O, T = O[:, keep], T[:, keep]
+    if a.geom != "std":
+        from stack_geometry import family_scale
+        O, T = np.clip(O, -30, 30), np.clip(T, -30, 30)
+        if a.geom == "fam":
+            sc = family_scale([names[i] for i in keep])
+            O, T = O * sc, T * sc
     print(f"{len(keep)} members", flush=True)
     rng = np.random.default_rng(a.seed)
     subsets = [np.sort(rng.choice(len(keep), int(len(keep) * a.frac), replace=False)) for _ in range(a.bags)]
-    res = Parallel(n_jobs=a.jobs)(delayed(one_bag)(O, T, y, c, a.C, a.nest) for c in subsets)
+    res = Parallel(n_jobs=a.jobs)(delayed(one_bag)(O, T, y, c, a.C, a.nest, a.geom) for c in subsets)
     oof = np.mean([r[0] for r in res], axis=0)
     test = np.mean([r[1] for r in res], axis=0)
     for k in (1, 4, 8, 16, len(res)):
