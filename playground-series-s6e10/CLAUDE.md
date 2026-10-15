@@ -992,6 +992,16 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   hybrid 1009 0.962162 / 0.99902; 1009_nomlp 0.962107 / 0.99854; own-only own_lrstack_1010 0.961861 / 0.99432.
   Recommended finals (decide at the end with `select-finals`): **pr42** + **pr42n** (best OOF + the same
   recipe without the possibly epoch-inflated public NN members).
+- nest 20 C 0.02: 0.962232 (< C 0.01) → C 0.01 confirmed; stacker knobs closed for today.
+- **18:35 notebook-output sweep** (outputs of notebooks run since 10-12): kava1 LGBM v15 ×3 (0.9595-0.9602) and
+  amanatar CPU RealMLP rider (0.96068) carry OOF/test pairs (id order verified); full-row `screen_pool.py` vs
+  pr42: −0.000002…−0.000001 (noise −0.000001) → null, removed from `_pool` (284 pairs = the pr42 pool).
+- **Decomposition at C 0.01 / nest 10:** pool only (284) **0.962219**; + 80 own legs 0.962237 (own = +0.000018);
+  no public NN + own 0.962220. **Own-only fallback** (80 honest own legs, no public predictions): C 0.01
+  **0.961892** / C 0.1 0.961882 / C 1 0.961874 (was own_lrstack_1010 0.961861, 6 forward-selected legs) →
+  `submissions/own_lr_all80_c01_n10.csv` (written, not submitted). The 80-leg lists are saved as
+  `results/ours_all80_{nonnn,nn}.txt` (every oof_/test_ pair on disk minus stacks/blends/probes;
+  RealMLPs only `realmlp_honest_*`) — pass both to `--ours` to rebuild pr42.
 
 ## Next steps (remove each item when implemented)
 
