@@ -883,6 +883,43 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   −0.000035 overall, −0.00005 to −0.0015 for rows with ≥ 15 / 17 / 19 matches) → the stack already
   contains the original's per-route information; closed (confirms the 10-08 kNN residual test).
 
+- **PR-36 — new families from pytabkit (registered before any full number): xRFM and RealTabR**
+  (`src/pytabkit_leg.py` on the 69 fold-safe exported columns; NaN → training-fold medians;
+  pytabkit early-stops on its own split of the training rows, so the scored fold selects nothing).
+  Neither family is in the public pool. Same bars as PR-27: full-fold-1 `screen_member.py` ≥ +0.00002
+  (null ≈ −0.00002) → 5 folds; submit only if the PR-34b stack gains ≥ +0.00003. Prior ~10% each
+  (every new family since 10-09 has been absorbed). xRFM smoke (20k training rows): 0.95592 in 7 s.
+  **PR-36 results (full fold 1, `screen_member.py` vs pr34b; null ≈ −0.00002):** xRFM (leaf 8000, soft-tree
+  predict chunked to fit 6 GB; 12 min) solo 0.95631, corr 0.974, screen **−0.000020** → null.
+  RandomForest (300 trees, leaf 30, max_features 0.33, `src/rf_leg.py`, 10 min CPU) solo **0.95978**,
+  corr 0.9915, screen −0.000021 → null; ExtraTrees (leaf 20, 0.5) 0.95976, −0.000019 → null. Bagged
+  deep trees are a strong solo kind here but carry nothing new to the stack.
+
+### 2026-10-15 (session until 20:00)
+
+- **13:30 re-pull:** updated datasets since 10-12 carry no new base members except najiama
+  `07_XGBoost_oof` (0.96087; full-row `screen_pool.py` **+0.000000** → null). goodpjw2008 added only
+  `stack245` (stack-level, excluded); rabari/nina2025 = submission CSVs. Golem library 404s.
+  Public notebooks: top public LB 0.96188 (56-team tie at 0.96187); one writeup reports nested-CV →
+  LB translation −0.00034 for the same logit-LR recipe (nested 0.962203 with 252 members — our
+  pr34b 0.96219 is the same point). Residual autocorrelation by id (lags 1-100) |z| < 1.7 → null.
+- **PR-37 — boosted members with a different inductive bias (registered before any number).**
+  `src/kind_leg.py` on the 69 exported fold-safe columns: `mono` (LGBM-xt + monotone constraints by
+  the training-fold Spearman sign on ratings/teacher/TE/aggregate columns), `dart` (LGBM DART, 1500
+  rounds), `xrank` (XGB `rank:pairwise`, GPU). ES on 5% of the fold's training rows. Bar: full-fold-1
+  `screen_member.py` vs pr34b ≥ **+0.00002** (null ≈ −0.00002) → 5 folds; submit bar unchanged
+  (stack ≥ +0.00003). Prior ~5-10% each (GBDT kinds are 0.998-correlated; mono is the only one that
+  changes the function class).
+  Added before its number: `linear` (LGBM `linear_tree`, 31 leaves, ridge in every leaf).
+  **PR-37 results (full fold 1, `screen_member.py` vs pr34b; null ≈ −0.00002 ± 0.000005):** mono solo
+  0.96000, corr 0.9934, **−0.000015** (repeats the 10-10 monotone null); linear_tree solo **0.96110**
+  (= the best LGBM leg), corr 0.9966, **−0.000018**; xrank (lr 0.03, ES stopped at 65 rounds) solo
+  0.95999, corr **0.9896** (least correlated GBDT so far), **−0.000013** → all null.
+- **Route-specific slopes (`/tmp/slopes.py`):** per-route WLS slope of the pr34b residual on 12
+  within-route-centred features, split-half correlation over 462 routes with ≥ 300 rows: every
+  correlation ≤ 0 (−0.003…−0.33; the negative ones are the OOF-TE artifact of 10-11) → no replicable
+  route-specific slope left for a hierarchical member; closed.
+
 ## Next steps (remove each item when implemented)
 
 **From 10-10 (end of day):** the stack is saturated: 30+ levers today (TFMs ×5 kinds, DAE, NB, label

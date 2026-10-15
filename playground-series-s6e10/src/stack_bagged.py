@@ -44,6 +44,8 @@ def main() -> None:
     p.add_argument("--ours", nargs="*", default=[])
     p.add_argument("--public", default=str(DATA_DIR / "public_oof" / "_pool"))
     p.add_argument("--exclude", nargs="*", default=[], help="substrings of member names to drop")
+    p.add_argument("--exclude-public", nargs="*", default=[],
+                   help="substrings dropped from public members only (own legs are kept)")
     p.add_argument("--bags", type=int, default=32)
     p.add_argument("--frac", type=float, default=0.5)
     p.add_argument("--C", type=float, default=0.1)
@@ -54,7 +56,8 @@ def main() -> None:
     a = p.parse_args()
     y = build_features(pl.read_csv(DATA_DIR / "train.csv"))[TARGET].to_numpy()
     names, O, T = load_pairs(a.ours, [a.public])
-    keep = [i for i, n in enumerate(names) if not any(e in n for e in a.exclude)]
+    keep = [i for i, n in enumerate(names) if not any(e in n for e in a.exclude)
+            and not ("/" in n and any(e in n for e in a.exclude_public))]
     O, T = O[:, keep], T[:, keep]
     print(f"{len(keep)} members", flush=True)
     rng = np.random.default_rng(a.seed)
