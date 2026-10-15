@@ -99,6 +99,10 @@ Original target: bool, 43.4% positive (56,428 / 129,880).
 
 ## Current best
 
+**2026-10-15: `pr42_lr_allown_c01_n10_avg2.csv`, OOF 0.962238 (submitted)** — single LR (standardised
+members, C 0.01, 10 nesting folds × 2 nest seeds) over the public pool (284) + ALL 80 honest own legs.
+The gain over pr34b (+0.00004) is regularisation strength (PR-39/40) + nest 10 (PR-42).
+
 **2026-10-09: `hybrid_lrstack_1009.csv`, OOF 0.962162 (submitted)** — LR stack of 199 public OOF
 pairs + 6 own k10 legs (RealMLPs now honest). Hedge `hybrid_lrstack_1009_nomlp.csv` 0.962107
 (no public MLP members, which are probably epoch-selection-inflated) also submitted.
@@ -957,6 +961,24 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   **0.962221** (fold-mean 0.962227) — best honest OOF of the campaign; +0.000011 over pool + 6 fwd legs at
   the same C, +0.000025 over pr34b. At C 0.1-1 the long tail of own legs was flat or harmful (10-10
   forward selection); strong shrinkage makes it usable. Still < the 0.962226 submit bar.
+  C grid on the 364 members: 0.003 0.962189 / **0.01 0.962221** / 0.03 0.962209. Paired row bootstrap vs
+  pr34b: **+0.000025 ± 0.000013** (P>0 0.98); test Spearman vs pr34b 0.99923. Written
+  `results/{oof,test}_pr40_lr_allown_c01.npy`.
+- **PR-40n (robust twin): same LR, public NN-type members excluded (286 members): 0.962202** — above the
+  bagged hedge (0.962193) and pr34b (0.962196) with no public NN at all. `pr40n_lr_allown_nomlp_c01`.
+- **PR-41 (registered before any number):** the five kinds that were only run on fold 1 (PR-36 RF / ET,
+  PR-37 linear_tree / mono / xrank) completed on folds 2-5 (`src/assemble_pt.py` → `oof_kind_*`) and
+  offered to the PR-40 LR (C 0.01). Each screened at the null vs pr34b, but never against a strongly
+  shrunk LR. Bar: ≥ **0.962226** (pr34b + 0.00003). Prior ~20%.
+  Partial reads (PR-40 LR + one member): + linear_tree 0.962221 (= base); + original-teacher logits
+  (og_xgb/og_lgb, label-free) 0.962218 → null.
+- **PR-42 (registered before its number):** PR-40 with 10 stacker nesting folds (each LR fits 90% of the
+  rows; the 10-10 recipe used nest 10, +0.000008 then). Same bar ≥ 0.962226.
+  **PR-42 RESULT: PASS.** nest 10 (seed 42) **0.962237**; replicate nest seed 7 **0.962235**; mean of the
+  two 0.962238. Paired row bootstrap vs pr34b **+0.000040 ± 0.000013** (P>0 0.99); nest 10 vs nest 5
+  +0.000015 ± 0.000004 (P>0 1.00 — 364 coefficients want the extra 10% of rows). Test Spearman vs pr34b
+  0.99919. **SUBMITTED `pr42_lr_allown_c01_n10_avg2.csv` (17:25; LB not checked by me).**
+  Caveat: C 0.01 was picked from a 3-point grid on the same OOF (optimism a few 1e-6).
 
 ## Next steps (remove each item when implemented)
 

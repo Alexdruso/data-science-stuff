@@ -40,9 +40,9 @@ def family_scale(names: list[str]) -> np.ndarray:
     return np.array([fam(n) for n in names])
 
 
-def fold_fit(X, y, tr, va, T, C):
+def fold_fit(X, y, tr, va, T, C, nest=5):
     m = LogisticRegression(C=C, tol=1e-6, max_iter=20000).fit(X[tr], y[tr])
-    return va, m.decision_function(X[va]), m.decision_function(T) / 5
+    return va, m.decision_function(X[va]), m.decision_function(T) / nest
 
 
 def main() -> None:
@@ -51,15 +51,21 @@ def main() -> None:
     p.add_argument("--public", default=str(DATA_DIR / "public_oof" / "_pool"))
     p.add_argument("--configs", nargs="+", default=["std:0.1", "raw:0.003", "fam:0.003"])
     p.add_argument("--jobs", type=int, default=5)
+    p.add_argument("--nest", type=int, default=5, help="stacker nesting folds (seed 42; 5 = the base folds)")
+    p.add_argument("--nest-seed", type=int, default=42)
+    p.add_argument("--exclude-public", nargs="*", default=[],
+                   help="substrings dropped from public members only (own legs are kept)")
     p.add_argument("--write", default="", help="CONFIG=NAME, e.g. fam:0.003=pr39_fam")
     a = p.parse_args()
     y = build_features(pl.read_csv(DATA_DIR / "train.csv"))[TARGET].to_numpy()
     names, O, T = load_pairs(a.ours, [a.public])
+    keep = [i for i, n in enumerate(names) if not ("/" in n and any(e in n for e in a.exclude_public))]
+    names, O, T = [names[i] for i in keep], O[:, keep], T[:, keep]
     O, T = np.clip(O, -30, 30), np.clip(T, -30, 30)
     sc = family_scale(names)
     print(f"{len(names)} members; family-scaled: {int((sc == 3).sum())} ×3, {int((sc == 1.5).sum())} ×1.5",
           flush=True)
-    folds = list(StratifiedKFold(5, shuffle=True, random_state=42).split(O, y))
+    folds = list(StratifiedKFold(a.nest, shuffle=True, random_state=a.nest_seed).split(O, y))
     wcfg, wname = (a.write.split("=") + [""])[:2] if a.write else ("", "")
     for cfg in a.configs:
         kind, C = cfg.split(":")
@@ -70,7 +76,7 @@ def main() -> None:
             X, XT = O, T
         else:
             X, XT = O * sc, T * sc
-        res = Parallel(n_jobs=a.jobs)(delayed(fold_fit)(X, y, tr, va, XT, float(C)) for tr, va in folds)
+        res = Parallel(n_jobs=a.jobs)(delayed(fold_fit)(X, y, tr, va, XT, float(C), a.nest) for tr, va in folds)
         oof, test = np.zeros(len(y)), np.zeros(len(T))
         for va, ov, tv in res:
             oof[va] = ov
