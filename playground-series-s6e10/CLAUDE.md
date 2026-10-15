@@ -979,6 +979,19 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   +0.000015 ± 0.000004 (P>0 1.00 — 364 coefficients want the extra 10% of rows). Test Spearman vs pr34b
   0.99919. **SUBMITTED `pr42_lr_allown_c01_n10_avg2.csv` (17:25; LB not checked by me).**
   Caveat: C 0.01 was picked from a 3-point grid on the same OOF (optimism a few 1e-6).
+- **PR-42n (robust twin, nest 10, public NN-type members excluded, 286 members): 0.962220** →
+  `submissions/pr42n_lr_allown_nomlp_c01_n10.csv` (written, not submitted) — +0.000024 over pr34b with no
+  public NN member; the natural second final.
+- **PR-41 RESULT: FAIL** — PR-42 LR + kind_linear + kind_mono + kind_xrank (5-fold each; RF/ET killed under
+  memory pressure, both screened null): 0.962238 vs 0.962237 → +0.000001.
+- **PR-43 (exploratory):** nest 20 (C 0.01 / 0.02). nest 20 C 0.01 **0.962235** (= nest 10's 0.962237) → the
+  extra-rows effect saturates at nest 10.
+- **Finals table (18:05; OOF / test Spearman vs the submitted pr42):** pr42 avg2 0.962238 / 1 (submitted);
+  **pr42n (no public NN) 0.962220 / 0.99972**; pr40 (nest 5) 0.962221 / 1.00000; pr34b 0.962196 / 0.99919
+  (submitted 10-10); pr34 0.962189 / 0.99920 (submitted 10-10); pr38 bagged no-MLP 0.962193 / 0.99908;
+  hybrid 1009 0.962162 / 0.99902; 1009_nomlp 0.962107 / 0.99854; own-only own_lrstack_1010 0.961861 / 0.99432.
+  Recommended finals (decide at the end with `select-finals`): **pr42** + **pr42n** (best OOF + the same
+  recipe without the possibly epoch-inflated public NN members).
 
 ## Next steps (remove each item when implemented)
 
