@@ -1152,6 +1152,15 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   Bar: pooled LR+resid − LR ≥ **+0.00002**, ≥ 4/5 folds. Prior ~4%.
 - **PR-50 RESULT: FAIL** (8 min). Nested 5-fold LR 0.962209 → +resid 0.962195 (**−0.000014**, 1/5 folds up); the LGBM
   early-stops at 1-59 iterations in every fold — no residual structure in context features or top-20 logits.
+- **Hidden-key scan (`src/key_scan.py`, exploratory; user pushed for data-level levers):** 246 keys (21 raw singles,
+  210 pairs, wide combos incl. 14-rating profile, ±fd/age/cats, all columns) — out-of-fold shrunk mean of the pr42
+  residual per key value, LR(s, key_te) − LR(s). Controls: noise −0.000000, shuffled keys −0.000003…+0.000001.
+  Every key with flight_distance lights up (fd **+0.000209**, fd×cust +0.000192, fd×delays +0.000143, fd×rating
+  +0.00004-0.00008) — but the coefficient is **negative** (−0.094) and the clean version (leave-one-out within
+  the members' own base fold, whose models never saw the row) is **+0.000003** (coef −0.015): it is the 10-11
+  route-TE leakage artifact (neighbours' route encodings carry the row's own label), not a test-transferable
+  signal. Non-fd keys: max +0.000015 (food_and_drink×gender, card 12) ≈ noise; rating profiles / all-column keys
+  have coverage 0-61% and delta ≤ 0. → no hidden key beyond the route ID.
 
 ## Next steps (remove each item when implemented)
 
