@@ -1133,6 +1133,25 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   when dropped: tfm-oof (−0.000028), oof-dataset (−0.000021), goodpjw2008 extra (−0.000018), own_gbdt
   (−0.000016), kagankoral (−0.000014), kout_norm (−0.000011). No source is being overfit; pm1012 is also the
   one group with shrunk test logits (std ratio 0.966-0.98) — noted, sub-bar, not adopted.
+- **PR-49 — family-wise L2 (per-group penalty scales), honest outer split (registered before any number).**
+  `src/stack_groupl2.py`: scaling a group's standardised columns by s_g = a group-specific L2 of 1/s_g² at the
+  pr42 C. Outer 2-fold split of the rows (seed 0): on half A, coordinate search s_g ∈ {0.5, 1, 2} over the 18
+  PR-48 groups (one pass, scored by 5-fold nested LR on A); then fit LR on all of A with the chosen scales and
+  with uniform scales, score both on half B; swap halves. Bar: mean held-out delta (chosen − uniform) ≥
+  **+0.00002** with both halves > 0. Public ewtherka "family-wise L2 actually helps" (+ PR-39's family scaling
+  +0.00003 on raw logits) is the prior; PR-48 shows group sensitivities differ by 3e-5. Prior ~10%.
+- **PR-49 RESULT: FAIL** (55 min CPU). Inner coordinate search gained +0.000042 (half 0) / +0.000055 (half 1) but
+  held out: half 0 **−0.000018**, half 1 +0.000034, mean **+0.000008**. The chosen scales disagree between halves
+  (e.g. 124-public 1.0 vs 0.5, tfm 2.0 vs 1.0, own_gbdt 0.5 vs 1.0) → selection noise; one global C is right
+  for this pool. Public "family-wise L2 helps" claims are inner-CV numbers of exactly this kind.
+- **11:20 re-pull:** nothing new (no dataset updated since 10-28; notebooks since 08:58 = baselines).
+- **PR-50 — residual LGBM on the pr42-recipe stack (registered before any number).** `src/stack_resid.py
+  --C 0.01 --ours <all80>` (fully nested: inner 4-fold LR logits as init_score for training rows, raw context
+  features + top-20 member logits). Last run 10-09 on the 199-member pool at C 0.3 (−0.00001); never on the
+  364-member strong-C stack, whose residual is different (strong shrinkage leaves more member-level nonlinearity).
+  Bar: pooled LR+resid − LR ≥ **+0.00002**, ≥ 4/5 folds. Prior ~4%.
+- **PR-50 RESULT: FAIL** (8 min). Nested 5-fold LR 0.962209 → +resid 0.962195 (**−0.000014**, 1/5 folds up); the LGBM
+  early-stops at 1-59 iterations in every fold — no residual structure in context features or top-20 logits.
 
 ## Next steps (remove each item when implemented)
 
