@@ -1003,6 +1003,137 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   `results/ours_all80_{nonnn,nn}.txt` (every oof_/test_ pair on disk minus stacks/blends/probes;
   RealMLPs only `realmlp_honest_*`) — pass both to `--ours` to rebuild pr42.
 
+### 2026-10-16 (session until 18:00)
+
+- **08:20 re-pull:** no new public OOF datasets since 10-15 (nina2025 ps-s6e10-7 = submission CSVs).
+  New notebooks read: catsrcul write-up (logit-space LR C 0.003, nested 0.962203 → LB 0.96186;
+  translation −0.00034 on three artefacts), rajathrpai "4.5% noise floor" (≈4-5% label flips among rows
+  the original-trained model is >99% sure about, flat across segments), starkhushi parent-row /
+  "didn't help" ledgers (distance-1/2 original neighbours: −0.000002 at a strong stack; matches our
+  10-12 seed-row screen). Nothing new to pull.
+- **Stacker dispersion correction (exploratory):** LGBM (init = pr42 logit) on [member z-score std,
+  max abs deviation, family-mean gaps (tfm/nn/fm − gbdt)], 5-fold: nl 4 **−0.000022**, nl 8 −0.000032
+  → null (residual of pr42 carries no disagreement-dependent signal).
+- **PR-44 — RealTabR and FT-Transformer members (registered before any number).** The only NN families
+  absent from the public pool (pool: RealMLP ×64, MLP, TabM ×2, DANet, DeepFM, FM, TFMs ×34; no
+  retrieval NN, no feature-attention transformer). `src/pytabkit_leg.py --model tabr|ftt` on the 69
+  exported fold-safe columns (pytabkit early-stops on its own split of the training rows → honest).
+  Bar: full-fold-1 `screen_member.py` vs pr42 ≥ **+0.00002** (null ≈ −0.00002) → 5 folds; adopt only if
+  the pr42 LR (+ member) ≥ **0.962258** (pr42 + 0.00002). Prior ~10% each (every new kind since 10-10
+  absorbed; TabR is the one kind whose mechanism — label-aware retrieval — no member shares).
+
+### 2026-10-19 (session until 20:00)
+
+- **12:30 re-pull:** goodpjw2008 extra-members v3-v6 adds one base member, `tabpfn_ne4` (TabPFN-3.5,
+  n_estimators 4, full 560k ctx; OOF 0.961491) → full-row `screen_pool.py` vs pr42 **−0.000003** (noise
+  −0.000001, in-pool TabPFN-3.5 −0.000000) → null (files kept in the dataset dir, not in `_pool`). The rest
+  of v4-v6 is submission CSVs and a public-LB "surface ascent" direction (LB probing; top public 0.96198 is
+  made of it) — ignored under the LB-blind protocol.
+- **PR-44 TabR (50k-row training subsample, fold 1, from 10-16):** solo 0.95883, corr 0.9877, screen vs
+  pr42 **−0.000017** → null at 50k; the full-data fold-1 run (registered bar unchanged) started 12:25.
+
+### 2026-10-22 (session until 20:00)
+
+- **Box rebooted 08:57** (`/tmp` venvs gone). The full-data TabR fold-1 run had sat in epoch-0
+  validation from 10-19 until its log stopped on 10-21 → **PR-44 TabR closed as infeasible on this hardware**.
+- **09:10 re-pull:** goodpjw2008 v7 adds only stack-level files (`series_stacks_p1_p8`, `stack182_*`,
+  pinned submission CSVs) → excluded; anhadmahajan06 = submission CSVs; beraterolelk "benchmark" = a
+  598 kB summary, not full-row OOF. No new base members.
+- **PR-45 — spline-augmented LR stacker (registered before any number).** `src/stack_spline.py`: the pr42
+  recipe (std, C 0.01, nest 10, seed 42, pool 284 + 80 own legs) plus hinge features max(0, z − q) at the
+  20/40/60/80% quantiles of the top-K members by |coef| (K 20 / 40 / 80). Lets each heavy member enter
+  through an additive piecewise-linear transform (per-member miscalibration/saturation), which neither
+  the LR nor the 10-09/10-16 LGBM-residual stackers (tree on 364 columns) model directly. Control run
+  in the same script must reproduce 0.962237. Bar: best K ≥ **0.962257** (control + 0.00002), then a
+  nest-seed-7 replicate ≥ the same bar before it counts. Prior ~10%.
+- **PR-45 RESULT: FAIL.** Control 0.962237 (reproduced); top-20 ×4 knots 0.962227, top-40 0.962206,
+  top-80 0.962178 — monotone worse with more hinges (added capacity is overfit, not missing shape).
+  Members enter the LR linearly enough; per-member calibration is not where the residual lives.
+
+### 2026-10-23 (session until 20:00)
+
+- **08:40 re-pull:** only goodpjw2008 v8 changed (stack-level `series_*`, revisit/surface submission CSVs;
+  `series_members_p1_p8.npz` being checked for base members).
+- **Inflation scan (`src/inflation_scan.py`, exploratory):** corr(member, honest LGBM ref) on test − on OOF
+  does NOT separate our known-inflated RealMLPs (epoch_select auc) from their honest twins (+0.00111 vs
+  +0.00109) → no label-free inflation detector this way; instrument dropped.
+- **PR-46 — ModernNCA member (registered before any full-run number).** `src/nca_leg.py`: PLR-embedded
+  MLP → 128-d space, prediction = softmax(−distance) label mean over ALL training rows (stochastic
+  neighbourhood sampling, 40k candidates/step); 69 exported fold-safe columns; fixed epochs, last epoch
+  (inner 5% holdout logs only → honest). Label-aware retrieval at full data — TabR was only ever screened
+  at 50k rows. Smoke (1 epoch) solo 0.96010. Bar: full-fold-1 `screen_member.py` vs pr42 ≥ **+0.00002**
+  (null ≈ −0.00002) → 5 folds; adopt only if pr42 LR + member ≥ **0.962258**. Prior ~12%.
+- **PR-46 RESULT: FAIL.** Fold 1 (10 epochs, 740 s; inner AUC peaked 0.96168 at ep 7): solo **0.96073**, corr
+  0.9955 with pr42, `screen_member.py` vs pr42 **−0.000009 ± 0.000004** → null. Full-data label-aware
+  retrieval is absorbed like every other NN kind.
+- **09:30 re-pull:** no dataset updated since 10-22 → nothing new.
+- **PR-44b — FT-Transformer member (registered before any number; the `ftt` half of PR-44, never run).**
+  `src/pytabkit_leg.py --model ftt` (RTDL FT-T, d 192 × 3 layers; bs 1024, lr 3e-4, ≤ 30 epochs,
+  ES patience 4 on pytabkit's own split of the training rows → honest). Feature-attention is the one NN
+  inductive bias absent from the pool. Bar unchanged: full-fold-1 screen vs pr42 ≥ **+0.00002** → 5 folds;
+  adopt only if pr42 LR + member ≥ **0.962258**. Prior ~8%.
+- **Sibling screen (`src/sibling_screen.py`, exploratory, CPU):** PR-6 tested exact twins on ratings/cats/age
+  keys pre-route; the 10-12 seed screen tested ORIGINAL rows. Untested: synthetic↔synthetic near-siblings
+  inside a route (same fd, ≥ m of 21 exact column matches) — if the generator emits several rows per seed
+  and its label noise is shared within a seed, the siblings' stack residuals carry it. Shrunk LOO mean
+  residual, half-split β; bar for building a fold-safe feature: ≥ **+0.00002** both halves.
+  **RESULT: null.** No row has a sibling at ≥ 20/20 matching columns; ≥ 19: 1.8% of rows, ≥ 18: 12%,
+  ≥ 17: 34% (mean 1.2 siblings). Every m × shrinkage k (2/10/50): delta **±0.000000**; corr(sibling residual,
+  own residual) −0.002…−0.004 (the OOF-TE sign artifact). The generator does not emit seed clusters with
+  shared label noise → closed.
+- **PR-47 — label-noise-corrected LR stacker (registered before any number).** `src/stack_noise.py`: the pr42
+  recipe with the forward-corrected likelihood P(y=1|z) = ε + (1−2ε)σ(z) (symmetric flip rate ε; public
+  "4.5% noise floor" + our 10-10 label-cleaning null). The plain logloss spends gradient on
+  confidently-wrong (flipped) rows; the corrected loss caps it, which can move coefficients toward the
+  members that rank the ambiguous middle best. Every stacker variant so far changed the model, not the
+  likelihood. ε = 0 control must reproduce 0.962237. Bar: best ε ≥ **0.962257** (control + 0.00002), then
+  nest-seed-7 replicate ≥ the same margin. Prior ~12%.
+
+### 2026-10-29 (session until 20:00; deadline 10-31 23:59 UTC)
+
+- **Box rebooted again** (10-26 session launched PR-44b FT-T on GPU + PR-47 on CPU together at 09:04 → both
+  logs stop there; matches the load-triggered reboot pattern). Rule today: never a GPU job and a heavy
+  CPU job at the same time. No sudo → GPU power cannot be capped.
+- **08:58 re-pull:** goodpjw2008 v9 (10-28) adds only LB-probe submission CSVs (`meta_part6_probe*`,
+  `mayankraaz_*`, `mehrankazeminia_tabpfn` = test-only); dennis6886 = submission CSVs; 10-26's `_new1026`
+  (areeb empty OOF, den exp046 = hybrid stack OOF without member test preds) unusable. New notebook outputs with
+  OOF/test pairs: johnha9 TabPFN (20k ctx, 0.95641), RealMLP v2 seed-avg (0.96022), tuned LGBM / Cat / XGB
+  (0.9586-0.9590) → new `src/screen_raw.py` (id-aligned CSV pairs, full-row 5-fold LR vs pr42; noise −0.000001):
+  **−0.000003 … +0.000000** → all null. denpugovkin exp052 (XGB offset-correction on a 198-member linear stack)
+  reports per-fold AUC ≈ its linear stack → consistent with our 10-09/10-16 residual-stacker nulls.
+- **Test/OOF scale check (exploratory):** member test logits are fold-averaged, OOF single-model; if the
+  shrinkage were heterogeneous the stacker would re-weight at test. Std ratio test/OOF median 0.9968, 5-95%
+  0.9926-0.9988 (only FM members 0.966-0.98) → negligible; closed without a run.
+- **PR-47 RESULT: FAIL** (registered 10-23, run today, CPU alone, ~3 min/ε). Control ε 0 **0.962236** (reproduces
+  pr42); ε 0.01 0.962211, 0.02 0.962166, 0.04 0.962056 — monotone worse. Capping the gradient of
+  confidently-wrong rows throws away ranking information; the plain logloss is already the right likelihood
+  for the LR stacker (the "noise floor" rows are not separable, not mislabelled-and-recoverable).
+- **PR-44b RESULT: FAIL.** FT-T fold 1 (GPU alone, 09:18-09:42, 70 s/epoch, ES at epoch 16 on pytabkit's own
+  split): solo **0.96040**, corr 0.9945 with pr42, `screen_member.py` vs pr42 **−0.000009 ± 0.000004** (bar +0.00002)
+  → closed. Feature-attention absorbed like every other NN kind (TabR, NCA, DANet, FM, TabM, RealMLP).
+- **Deliverable checks (exploratory):** pr42 nest seed 42 vs 7 test Spearman **1.0000000** (OOF 0.99981) → more
+  nest-seed averaging buys nothing; pr42 × pr34b bagged-stack blend, in-sample weight: +0.000002 at w 0.1-0.2 →
+  null. Finals files `pr42_..._avg2.csv` / `pr42n_...csv` verified: test id order, no NaN, ∈[0,1], Spearman 1.0
+  with their arrays; finals pair Spearman 0.999715.
+- **10:05 notebook read:** yuvrajlamba01 "0.96276" = rank nudge of the goodpjw2008 probe-G anchor (Spearman
+  0.99996; LB-surface work, ignored); its `lookup_long` layer is the 10-08 golem original-lookup dataset (its
+  members are in the pool; 10-11 original-block lookups null). soucleberpaiva "honest ceiling" / areebbb
+  "do you need less": pool saturated ~0.962 CV, negative-weight rank blends of submission files → nothing to use.
+- **PR-48 — per-source ablation of the pr42 stack (registered before any number).** `src/source_ablation.py`: the
+  pr42 recipe (std, C 0.01, nest 10, seed 42; L-BFGS fit of `stack_noise.py`, ε 0, warm-started) with each of
+  the 18 member groups dropped in turn (16 public sources by `_pool` prefix + own non-NN + own NN). Mechanism:
+  with 364 near-collinear columns at one global C, a source whose OOF is mildly optimistic (scored-fold early
+  stopping, the goodpjw2008 trees admit +0.00005) earns weight its test preds don't justify — dropping it can
+  only show up as an OOF *loss*, so the honest read is the other direction: a source whose removal RAISES
+  nested OOF is one the stacker overfits. Bar: drop the union of sources with delta > 0, and that set must
+  reach ≥ **0.962256** (control + 0.00002) at nest seed 42 AND at nest seed 7. Prior ~8%.
+- **PR-48 RESULT: FAIL** (15 min CPU). Control 0.962237. Only one group with delta > 0: **pm1012-new** (ewtherka
+  FMs + DANet + mvm, 11) **+0.000008** → union = that group alone, 0.962245 < bar. Exactly +0.000000:
+  124-public-oof (123 columns!), cz-v12, forge, oof-library, own_nn — redundant, not harmful. Largest losses
+  when dropped: tfm-oof (−0.000028), oof-dataset (−0.000021), goodpjw2008 extra (−0.000018), own_gbdt
+  (−0.000016), kagankoral (−0.000014), kout_norm (−0.000011). No source is being overfit; pm1012 is also the
+  one group with shrunk test logits (std ratio 0.966-0.98) — noted, sub-bar, not adopted.
+
 ## Next steps (remove each item when implemented)
 
 **From 10-10 (end of day):** the stack is saturated: 30+ levers today (TFMs ×5 kinds, DAE, NB, label
