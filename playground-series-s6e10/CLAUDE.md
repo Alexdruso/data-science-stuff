@@ -1161,6 +1161,13 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   route-TE leakage artifact (neighbours' route encodings carry the row's own label), not a test-transferable
   signal. Non-fd keys: max +0.000015 (food_and_drink×gender, card 12) ≈ noise; rating profiles / all-column keys
   have coverage 0-61% and delta ≤ 0. → no hidden key beyond the route ID.
+- **Evening (20:26 box reboot, no job of ours running; session 20:45-22:00, light CPU only).** Re-pull of notebooks
+  run since 11:20: francescoalbanese gbdt v1.3 (LGBM/XGB/Cat OOF+test parquet, solo 0.9603/0.9598/0.9597) and
+  amanatar RealMLP "synthesis view rider" (fixed 4 epochs, no ES → honest, solo 0.95961) → `screen_raw.py` vs pr42:
+  **−0.000001 / +0.000001 / +0.000001 / −0.000001** (noise −0.000001) → null (`logs/screen_raw_1029e.log`).
+  georgymamarin "before you pick your final two": its tabpfn35 member is sha-identical to our pool's
+  `tfm-oof-and-te__tabpfn35` (its +0.001 add-one gain is over a weak 1-4 member base) → nothing new.
+  alipakzad route-geometry XGB = baseline notebook, no output pairs.
 
 ## Next steps (remove each item when implemented)
 
