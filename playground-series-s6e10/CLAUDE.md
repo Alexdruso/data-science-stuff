@@ -1169,6 +1169,37 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   `tfm-oof-and-te__tabpfn35` (its +0.001 add-one gain is over a weak 1-4 member base) → nothing new.
   alipakzad route-geometry XGB = baseline notebook, no output pairs.
 
+### 2026-10-30 (session until 20:00, busy until 22:00; deadline 10-31 23:59 UTC)
+
+- **09:10 re-pull: dry.** New since 10-29 evening: tkms0816 `s6e10-push-singles` (kumolarge / tabpfn35 /
+  xgb_te2f50 + two refs — **test-only CSVs**, no OOF), goodpjw2008 extra v10 (same members + LB-probe
+  submission CSVs), notebook outputs of tkms0816 push/orthogonal, mikhailnaumov single XGB, goodpjw2008
+  meta-stack, mayankraaz mirror-pair, koushikkumardinda = submission files only. Nothing stackable.
+- **Arrival-delay NaN mechanism (closes the EDA TODO):** 292 train / 130 test rows (0.042% / 0.043%), sat rate
+  0.363 vs 0.444, same departure-delay profile in both splits → no mechanism shift; too few rows to matter.
+- **PR-51 — dependency-network generative classifier (registered before any number).** `src/dn_leg.py`: per base
+  fold, for each discrete column (13 ratings, 4 categoricals, age in 10 quantile bins) an XGB (GPU, 300 trees,
+  depth 6) predicts it from the other 20 raw columns + y (fold training rows only); member = Σ_c log P(x_c|x_-c,
+  y=1) − log P(x_c|x_-c, y=0). Own analogue of goodpjw2008's `gen_v1` (chain-rule generative, solo 0.952), the
+  member with the largest gain-alone in their list — a generative route is the one *kind* our 80 legs lack.
+  Bar: full-fold-1 `screen_member.py` vs pr42 ≥ **+0.00002** (null ≈ −0.00002) → 5 folds; adopt only if pr42
+  LR + member ≥ **0.962258**. Prior ~5% (`gen_v1` is in the pool already and earned ~5e-6).
+- **PR-51 RESULT: FAIL.** Dependency network (y as one input): solo 0.8205, corr 0.52, screen **−0.000016**
+  (y gets too few splits). Added (same bar) the exact Bayes chain `--mode chain`: logit P(y | fd, delays) +
+  Σ_j log-ratio of per-class XGBs P(x_j | x_<j, fd, delays) — solo **0.95291** (> gen_v1 0.952), corr 0.94,
+  screen **−0.000010**; `--route` (route TE in the conditioning set) solo 0.95441, **−0.000007**; `--reverse`
+  0.95408, −0.000022; mean of the 3 chains 0.95635, −0.000010. ~3 min GPU per fold-1 run. Generative errors
+  are above the null but absorbed — closed.
+- **PR-52 — generative combiner: shrunk QDA on PCs of the 364 member logits (registered before any number).**
+  `src/stack_qda.py`: pr42 members (std, clipped), pr42 nesting (10 folds, seed 42); per fold PCA(k) + QDA(reg r)
+  → class log-ratio; read = 5-fold 2-feature LR (pr42 logit, QDA score) − (pr42, noise). LR = LDA's discriminative
+  twin; QDA adds class-covariance terms, a nonlinearity none of the spline/MLP/LGBM-residual stackers had in this
+  form. Configs k:r 10:0.1, 30:0.1, 60:0.3. Bar: delta ≥ **+0.00002** → then the proper deliverable (pr42 LR with
+  the QDA score as a 365th column) must reach ≥ **0.962258**. Prior ~4%.
+- **PR-52 RESULT: FAIL** (4 min CPU; ⚠️ 4 jobs × BLAS threads hit load 10.8 — cap threads next time). pr42 +
+  noise 0.962235; k10 r0.1 solo 0.95855 corr 0.955 **−0.000000**; k30 r0.1 0.95851 / 0.943 **+0.000000**; k60 r0.3
+  0.96052 / 0.986 **−0.000000** → class-covariance structure of the member logits carries nothing pr42 lacks.
+
 ## Next steps (remove each item when implemented)
 
 **From 10-10 (end of day):** the stack is saturated: 30+ levers today (TFMs ×5 kinds, DAE, NB, label
