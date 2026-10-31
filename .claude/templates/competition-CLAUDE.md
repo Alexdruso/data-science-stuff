@@ -19,18 +19,18 @@ margin the whole protocol assumed.
 
 ## ⚠️ CRITICAL: Row-order invariant — always load labels and IDs through build_features()
 
-`features.py::build_features()` sorts every dataframe by `<["key1", "key2", ...]>`. All
-`results/oof_<model>.npy` and `results/test_<model>.npy` arrays are stored in this sorted order.
-
-Any script that loads `y` or `test_ids` and combines them with the npy arrays **must** go through
-`build_features()`, or predictions silently misalign (→ ~0.5 AUC / garbage submission):
+`features.py::build_features()` sorts every dataframe by `<["key1", "key2", ...]>`. Predictions
+are saved as keyed parquet (`results/oof_<model>.parquet` with `id`, `fold`, `pred`) through
+`data_science_stuff.kaggle.predictions`, and `load_predictions(results, name, ids)` aligns them by
+id. Any script that loads `y` or ids **must** still go through `build_features()`, or labels and
+predictions silently misalign (→ ~0.5 AUC / garbage submission):
 
 ```python
 # CORRECT
 y = build_features(pl.read_csv(DATA_DIR / "train.csv"))[TARGET].to_numpy()
 test_ids = build_features(pl.read_csv(DATA_DIR / "test.csv"))["id"].to_numpy()
 
-# WRONG — raw CSV order ≠ npy order
+# WRONG — raw CSV order ≠ build_features() order
 y = pl.read_csv(DATA_DIR / "train.csv")[TARGET].to_numpy()
 ```
 
@@ -109,7 +109,8 @@ All features implemented in `src/features.py::build_features()` (+ `compute_grou
   decision / encoding / stacking / screening / shift / models) — import, never copy,
   season-specific scripts.
 - **CV**: `run_cv` from `data_science_stuff.kaggle.cv` (<5-fold stratified, random_state=42>).
-  Scores logged to `results/cv_scores.csv`.
+  Every run is registered by `save_cv_result` in `results/runs.jsonl` (committed) — browse with
+  `python -m data_science_stuff.kaggle runs list results/` or `make mlflow-ui`.
 - **GPU**: <which models use GPU and how>.
 - **GPU memory rule (all PyTorch scripts)**: `del` model + optimizer + tensors before returning
   from each fold; call `torch.cuda.empty_cache()` after each fold/trial in the outer loop.
@@ -140,6 +141,10 @@ CLAUDE.md ("Campaign lessons"); this is where you record *this* competition's nu
 - **Pre-registration.** Before running a candidate, write here: the arm, the instrument, the
   prior (what you honestly expect), and the pass/fail bar. **Bars do not move after the number
   lands.** A clean negative against an unmoved bar is a successful experiment.
+  Commit it before launching:
+  `python -m data_science_stuff.kaggle prereg PR-<n> <competition>/CLAUDE.md -m "<bar>"`, and
+  pass `prereg="PR-<n>"` when registering the run — the registry then records whether the
+  `prereg:` commit predates the run (`prereg_before_run`).
 - **Screening bar.** Screen by the decay exponent
   (`data_science_stuff.kaggle.screening.screen_mechanism`), then by magnitude at the deployed
   ensemble size — never by a single-member read, and never by "significant at every seed".

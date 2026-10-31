@@ -20,7 +20,12 @@ A Python monorepo containing:
   matrix, cascade recombination), `encoding` (fold-safe target encoding, quantile bins,
   frequency features), `stacking` (`stack_oof`, Caruana selection), `screening` (the M-slope
   mechanism instrument, from s6e7), `shift` (adversarial validation + mask-mechanism
-  diagnostics, from s6e7), and `models` (MLP scaffold, RealMLP-TD, imbalance losses).
+  diagnostics, from s6e7), `models` (MLP scaffold, RealMLP-TD, imbalance losses), and the
+  results layer: `predictions` (keyed parquet OOF/test files that carry `id` + `fold`),
+  `registry` (append-only run registry `results/runs.jsonl`: git commit, command, params,
+  config hash, lineage, verdicts), `prereg` (verifiable pre-registration commits) and
+  `tracking` (optional MLflow view; `[tracking]` extra). CLI:
+  `python -m data_science_stuff.kaggle {runs,prereg,mlflow-sync} ...`.
 
 ## Setup
 
@@ -75,7 +80,7 @@ workflows by hand:
   competition `CLAUDE.md` from `.claude/templates/competition-CLAUDE.md`).
 - **`add-model`** — add a `train_<model>.py` (+ optional `tune_<model>.py`) that follows the
   CV/OOF conventions and the PyTorch GPU memory rule.
-- **`ensemble-submit`** — rebuild the ensemble from `oof_*.npy`/`test_*.npy` (Nelder-Mead weights)
+- **`ensemble-submit`** — rebuild the ensemble from saved OOF/test predictions (Nelder-Mead weights)
   and write a submission, enforcing the row-order invariant; covers stacking (LR-on-logits) when
   the scalar blend plateaus.
 - **`select-finals`** — choose the final Kaggle submissions at competition end by CV rather than
@@ -92,18 +97,26 @@ for regression/AUC, `playground-series-s6e6/` for imbalanced multiclass + stacki
 
 ```
 features.py  →  baseline.py / train_<model>.py  →  tune_<model>.py  →  ensemble.py  →  submission
-            (5-fold stratified CV, results/oof_<m>.npy + test_<m>.npy)  (Nelder-Mead)   (kaggle CLI)
+        (5-fold stratified CV, results/oof_<m>.parquet + test_<m>.parquet)  (Nelder-Mead)   (kaggle CLI)
 ```
 
 The pipeline is built on `data_science_stuff.kaggle`: `competition_dirs`/`load_params` →
-`run_cv` → `save_cv_result` + `optimize_thresholds` → `optimize_blend_weights`/`stack_oof` →
-`write_submission`. Competition scripts import these; they never copy them.
+`run_cv` → `save_predictions` + `save_cv_result` (registers the run) + `optimize_thresholds` →
+`load_predictions` → `optimize_blend_weights`/`stack_oof` → `write_submission`. Competition
+scripts import these; they never copy them. Older competitions (≤ s6e10) store positional
+`oof_*.npy`; `load_predictions` still reads them (with a warning) and `migrate_npy` converts.
+
+**What is persisted where:** `results/runs.jsonl` is the record of every run and is
+**committed**; prediction parquet/npy files are gitignored (large); the competition `CLAUDE.md`
+holds the reasoning (pre-registrations, readings) and cites run names. `make mlflow-ui` gives a
+browsable view (`mlflow.db`, gitignored, rebuilt from the JSONL by `make mlflow-sync`).
 
 Three invariants are critical and have each caused (or nearly caused) real failures:
 
 1. **Row-order invariant** — `features.py::build_features()` sorts every dataframe by the
-   competition's key columns, and all `oof_*.npy`/`test_*.npy` arrays are stored in that order.
-   Any code that loads `y` or `test_ids` to combine with those arrays **must** go through
+   competition's key columns. Save predictions with their ids (`save_predictions`) and load
+   them by id (`load_predictions`), which raises on misalignment; legacy `oof_*.npy` arrays are
+   positional in that sort order. Either way, `y` and ids **must** come from
    `build_features()`, or predictions silently misalign (a 0.5-AUC submission once resulted).
 2. **GPU memory rule** — see below; omitting it OOM-crashes multi-fold/multi-trial runs.
 3. **Fold-aware target encoding** — any target-derived feature is fit on the fold's training
@@ -166,8 +179,11 @@ rules that separate the real ones from the rest. Each cost days to learn; none i
 
 10. **Pre-register the bar before the number lands, and do not move it afterwards.** Write the
     arm, the instrument, the prior, and the pass/fail threshold into the competition CLAUDE.md
-    *before* running. State what the honest expected outcome is; a clean negative against an
-    unmoved bar is a successful experiment.
+    *before* running, and commit it with `python -m data_science_stuff.kaggle prereg PR-<n>
+    <competition>/CLAUDE.md` — a registration that shares a commit with its result cannot prove
+    which came first. Register the run with `prereg="PR-<n>"` and the registry records whether
+    the commit predates it. State what the honest expected outcome is; a clean negative against
+    an unmoved bar is a successful experiment.
 11. **Verify inherited facts at their source.** An unsourced deadline propagated through 22 days
     of s6e7 planning and was wrong by two days — which silently deleted the "select finals ≥48 h
     early" margin the whole endgame protocol assumed.

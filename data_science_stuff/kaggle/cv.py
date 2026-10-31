@@ -46,6 +46,36 @@ def _take(x: Matrix, idx: NDArray[Any]) -> Matrix:
     return subset
 
 
+def make_splitter(
+    *, n_splits: int = 5, seed: int = 42, stratified: bool = True
+) -> StratifiedKFold | KFold:
+    """The splitter :func:`run_cv` uses (shuffled, ``random_state=seed``).
+
+    Exposed so fold assignments can be reproduced exactly — see
+    :func:`fold_assignment`.
+    """
+    splitter_cls = StratifiedKFold if stratified else KFold
+    return splitter_cls(n_splits=n_splits, shuffle=True, random_state=seed)
+
+
+def fold_assignment(
+    y: NDArray[Any], *, n_splits: int = 5, seed: int = 42, stratified: bool = True
+) -> NDArray[np.int64]:
+    """1-based validation fold of every training row, exactly as :func:`run_cv`.
+
+    Stored next to OOF predictions (``kaggle.predictions.save_predictions``)
+    so a later reader can verify that two OOF arrays share their folds.
+
+    >>> fold_assignment(np.array([0, 1] * 4), n_splits=2).tolist().count(1)
+    4
+    """
+    folds = np.zeros(len(y), dtype=np.int64)
+    splitter = make_splitter(n_splits=n_splits, seed=seed, stratified=stratified)
+    for fold, (_, va_idx) in enumerate(splitter.split(np.zeros(len(y)), y), 1):
+        folds[va_idx] = fold
+    return folds
+
+
 def run_cv(
     X: Matrix,
     y: NDArray[Any],
@@ -92,8 +122,7 @@ def run_cv(
     test = np.zeros(n_test if n_outputs == 1 else (n_test, n_outputs))
     fold_scores: list[float] = []
 
-    splitter_cls = StratifiedKFold if stratified else KFold
-    splitter = splitter_cls(n_splits=n_splits, shuffle=True, random_state=seed)
+    splitter = make_splitter(n_splits=n_splits, seed=seed, stratified=stratified)
     for fold, (tr_idx, va_idx) in enumerate(splitter.split(np.zeros(n_train), y), 1):
         val_pred, test_pred = fit_fold(
             _take(X, tr_idx), y[tr_idx], _take(X, va_idx), y[va_idx], X_test, fold

@@ -10,19 +10,21 @@ submission. Reference: `playground-series-s6e5/src/ensemble.py`.
 
 ## ⚠️ Row-order invariant — read before touching `y` or `test_ids`
 
-Every `results/oof_<model>.npy` / `results/test_<model>.npy` array is stored in
-`build_features()` sort order. Therefore `y` and `test_ids` **must** be reconstructed through
-`build_features()`, or predictions silently misalign → ~0.5 AUC on the leaderboard. This bug has
-shipped before. The only correct pattern:
+Keyed predictions (`results/oof_<model>.parquet`, written by `kaggle.predictions`) carry their
+ids: `load_predictions(RESULTS_DIR, m, ids)` re-orders to `ids` and raises on any missing, extra
+or duplicate id. Legacy `results/oof_<model>.npy` arrays are positional, stored in
+`build_features()` sort order (they load with a warning). Either way, `y` and `test_ids` **must**
+come from `build_features()`, or predictions silently misalign → ~0.5 AUC on the leaderboard.
+This bug has shipped before. The only correct pattern:
 
 ```python
-# CORRECT — same sort order as the npy arrays
+# CORRECT — same order build_features() gives everywhere
 train = build_features(pl.read_csv(DATA_DIR / "train.csv"))
 y = train[TARGET].to_numpy()
 test_df = build_features(pl.read_csv(DATA_DIR / "test.csv"))
 test_ids = test_df["id"].to_numpy()
 
-# WRONG — raw CSV order ≠ npy order → misaligned submission
+# WRONG — raw CSV order ≠ build_features() order → misaligned submission
 y = pl.read_csv(DATA_DIR / "train.csv")[TARGET].to_numpy()   # do NOT do this
 ```
 
@@ -31,10 +33,17 @@ exactly as the training scripts do so the alignment matches.
 
 ## Steps
 
-1. **Load OOF/test arrays** for every model in the blend, e.g.
-   `MODELS = ["lgbm", "xgboost", "catboost", "mlp"]`, reading
-   `results/oof_<m>.npy` and `results/test_<m>.npy`.
-2. **Reconstruct `y` and `test_ids`** via `build_features()` as above.
+1. **Reconstruct `y`, `train_ids` and `test_ids`** via `build_features()` as above.
+2. **Load OOF/test predictions** for every model in the blend
+   (`list_predictions(RESULTS_DIR)` lists what is on disk):
+   ```python
+   from data_science_stuff.kaggle.predictions import load_folds, load_predictions
+
+   oofs = [load_predictions(RESULTS_DIR, m, train_ids) for m in MODELS]
+   tests = [load_predictions(RESULTS_DIR, m, test_ids, split="test") for m in MODELS]
+   ```
+   Before stacking, check the members share folds:
+   `(load_folds(RESULTS_DIR, a, train_ids) == load_folds(RESULTS_DIR, b, train_ids)).all()`.
 3. **Optimize weights** with the shared Nelder-Mead search:
    ```python
    from data_science_stuff.kaggle.blending import blend, optimize_blend_weights
@@ -52,8 +61,9 @@ exactly as the training scripts do so the alignment matches.
    For multiclass balanced-accuracy tasks, after blending also optimise **per-class threshold
    weights** on the blended OOF and apply the identical weights to test (s6e6: +0.0013):
    `from data_science_stuff.kaggle.decision import optimize_thresholds` → `(weights, score)`.
-4. **Report** the blended OOF score and the per-model weights; log via
-   `cv_results.save_cv_result` if tracking the ensemble run.
+4. **Report** the blended OOF score and the per-model weights, and register the ensemble with
+   its lineage: `save_cv_result(RESULTS_DIR, name, fold_scores, oof, metric_name=...,
+   params={"weights": dict(zip(MODELS, w))}, inputs=MODELS, artifacts=[submission_path])`.
 5. **Write the submission**:
    `write_submission(SUBMISSIONS_DIR, name, test_ids, TARGET, preds)` from
    `data_science_stuff.kaggle.io` (owns the mkdir, returns the path).

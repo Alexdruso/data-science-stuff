@@ -189,3 +189,9 @@ catboost_info/
 
 # competition working caches (TE blocks, fold checkpoints) — 7GB+, never commit
 playground-series-*/results/cache/
+# keyed prediction files (data_science_stuff.kaggle.predictions); runs.jsonl IS committed
+playground-series-*/results/*.parquet
+# local MLflow view over the run registry (make mlflow-sync / mlflow-ui)
+mlflow.db
+mlruns/
+mlartifacts/

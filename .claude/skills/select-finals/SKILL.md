@@ -40,8 +40,9 @@ pick (0.97119) fell to the **worst** private transfer (0.97033), while the CV-ve
    existed. The Python API returns the same value with `tzinfo=None`, so the timezone is *not*
    established by it; Kaggle's convention is UTC, and you should act on the earlier reading.
    Correct every document that carries the wrong date, then plan backwards from the real one.
-1. **Assemble the candidate table** from `results/cv_scores.csv` + the competition `CLAUDE.md`
-   experiments log + `kaggle competitions submissions -c <id>`: for each candidate, OOF CV,
+1. **Assemble the candidate table** from the run registry
+   (`data_science_stuff.kaggle.registry.load_runs(RESULTS_DIR)` — or `cv_scores.csv` for older
+   competitions) + the competition `CLAUDE.md` + `kaggle competitions submissions -c <id>`: for each candidate, OOF CV,
    public LB, and the CV→LB gap. Threshold-weight and cost-matrix candidates (outputs of
    `data_science_stuff.kaggle.decision`) carry post-hoc fitted parameters — flag them for the
    overfit check below.

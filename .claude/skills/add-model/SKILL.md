@@ -27,9 +27,9 @@ the idea is flat — partial reproductions of strong recipes score as noise (s6e
 ## The contract every `train_<model>.py` must honour
 
 1. **Load through `build_features()`** — never read `train.csv`/`test.csv` and pull `y`/`id`
-   directly. The `oof_*.npy` / `test_*.npy` arrays are saved in `build_features()` sort order;
-   bypassing it silently misaligns predictions (see the row-order invariant — caused a 0.5-AUC
-   submission once).
+   directly. Predictions are saved with the ids from `build_features()` output (keyed parquet,
+   below); legacy positional `.npy` arrays depend on its sort order, and bypassing it silently
+   misaligned predictions once (a 0.5-AUC submission).
 2. **CV**: `run_cv(X, y, X_test, fit_fold, ...)` from `data_science_stuff.kaggle.cv` — it owns
    the `StratifiedKFold(n_splits=5, shuffle=True, random_state=42)` skeleton (`stratified=False`
    → `KFold` for regression). The same `random_state=42` across all models keeps OOF folds
@@ -39,17 +39,28 @@ the idea is flat — partial reproductions of strong recipes score as noise (s6e
 3. **Outputs** written to `results/` (paths via
    `DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)` from
    `data_science_stuff.kaggle.io`; submissions via `write_submission(...)`):
-   - `results/oof_<model>.npy` — out-of-fold predictions, length = n_train, in sort order.
-   - `results/test_<model>.npy` — mean of per-fold test predictions, length = n_test.
-   - Append a row via `save_cv_result(RESULTS_DIR, "<model>_vN", fold_scores, oof_score)` — the
+   - **Keyed predictions** via `data_science_stuff.kaggle.predictions.save_predictions` →
+     `results/oof_<model>.parquet` (`id`, `fold`, `pred`) + `results/test_<model>.parquet`
+     (`id`, `pred`; multiclass → `pred_0..k`). The ids travel with the predictions, so readers
+     align by id instead of trusting row order:
+     ```python
+     paths = save_predictions(RESULTS_DIR, name, oof=res.oof, test=res.test,
+                              train_ids=train["id"].to_numpy(), test_ids=test_ids,
+                              folds=fold_assignment(y))          # kaggle.cv, same splits as run_cv
+     ```
+   - **Register the run** via `save_cv_result(RESULTS_DIR, name, fold_scores, oof_score,
+     metric_name="auc", params=params, seed=42, artifacts=list(paths), prereg="PR-n")` — the
      shared helper from `data_science_stuff.kaggle_utils` (re-exported by each competition's
-     `src/cv_results.py`). Pass `metric_name="..."` for non-AUC metrics (e.g. `"balanced_acc"`).
+     `src/cv_results.py`). It appends to `cv_scores.csv` *and* to the run registry
+     `results/runs.jsonl` (git commit + dirty flag, command, params, config hash, inputs,
+     pre-registration check). Pass `inputs=[...]` for anything the run consumed (teacher OOFs,
+     stack members) and `prereg=` when the run answers a pre-registration.
    - Optionally a `submissions/<model>_vN.csv`.
 4. **Exclude** the same columns as the baseline: `{"id", TARGET} | DRIVER_COLS` (or the
    competition's equivalent). Pass string categoricals as `category` dtype to LGBM/XGBoost,
    `cat_features` to CatBoost, OHE to neural nets.
 5. **Multiclass / imbalanced classification** (s6e6 conventions):
-   - `oof_<model>.npy` / `test_<model>.npy` store **raw probabilities** (n × n_classes), never
+   - OOF/test predictions store **raw probabilities** (n × n_classes → `pred_0..k`), never
      argmax labels — stackers and threshold optimization need the full distribution.
    - Target via `LabelEncoder`; always `le.inverse_transform` when writing submissions.
    - Set `class_weight="balanced"` (or the library's equivalent) — biggest cheap win on
@@ -135,6 +146,6 @@ str(Path(__file__).parent))` is only for the competition's own modules (`feature
 ## Verify
 
 `cd <competition> && python src/train_<model>.py` — it should print per-fold + OOF scores and
-write `results/oof_<model>.npy` and `results/test_<model>.npy`. Confirm the arrays have the
-expected lengths (n_train / n_test). Then run the `quality-gate` skill. After adding a model,
+write `results/oof_<model>.parquet` and `results/test_<model>.parquet`, and
+`python -m data_science_stuff.kaggle runs list results/ -n 1` should show the new run. Then run the `quality-gate` skill. After adding a model,
 rerun the `ensemble-submit` skill so the blend includes it.

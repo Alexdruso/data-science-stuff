@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Union, cast
+from typing import Any, Union, cast
 
 import numpy as np
 import pandas as pd
@@ -185,8 +185,11 @@ def save_cv_result(
     fold_scores: list[float],
     oof_score: float,
     metric_name: str = "score",
-) -> None:
-    """Append a CV result row to results_dir/cv_scores.csv.
+    *,
+    register: bool = True,
+    **registry_fields: Any,
+) -> str | None:
+    """Append a CV result row to results_dir/cv_scores.csv and the run registry.
 
     Args:
         results_dir: Directory where cv_scores.csv lives (created if absent).
@@ -194,6 +197,13 @@ def save_cv_result(
         fold_scores: Per-fold metric values.
         oof_score: Overall out-of-fold metric value.
         metric_name: Column suffix, e.g. "auc" → oof_auc / fold_1_auc.
+        register: Also append the run to ``results_dir/runs.jsonl``
+            (:func:`data_science_stuff.kaggle.registry.log_run`).
+        **registry_fields: Passed to ``log_run`` — ``params``, ``inputs``,
+            ``artifacts``, ``prereg``, ``seed``, ``notes``, ``verdict``, ...
+
+    Returns:
+        The registry ``run_id``, or ``None`` when ``register=False``.
     """
     results_dir.mkdir(exist_ok=True)
     path = results_dir / "cv_scores.csv"
@@ -215,3 +225,19 @@ def save_cv_result(
         new_row.to_csv(path, index=False)
 
     print(f"CV result appended → {path}")
+    if not register:
+        return None
+    # Imported here: kaggle.decision imports this module, so a top-level import
+    # of the kaggle package would be circular.
+    from data_science_stuff.kaggle.registry import log_run  # noqa: PLC0415
+
+    record = log_run(
+        results_dir,
+        model,
+        oof_score=oof_score,
+        fold_scores=fold_scores,
+        metric_name=metric_name,
+        **registry_fields,
+    )
+    print(f"run registered → {record.run_id}")
+    return record.run_id

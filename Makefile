@@ -11,6 +11,8 @@ help:
 	@echo "  make dev-setup  - Create virtualenv and install all dependencies with uv"
 	@echo "  make py-fmt     - Format code with ruff"
 	@echo "  make py-static  - Run static type checking with mypy"
+	@echo "  make mlflow-sync - Mirror every competition results/runs.jsonl into mlflow.db"
+	@echo "  make mlflow-ui   - Browse the run registry in MLflow (http://127.0.0.1:5000)"
 	@echo "  make clean      - Remove virtual environment and cache files"
 
 # Ensure virtual environment exists
@@ -35,6 +37,15 @@ py-fmt: $(VENV_DIR)
 .PHONY: py-static
 py-static: $(VENV_DIR)
 	$(VENV_BIN)/mypy .
+
+# Run registry -> local MLflow view (needs the [tracking] extra)
+.PHONY: mlflow-sync
+mlflow-sync: $(VENV_DIR)
+	$(PYTHON) -m data_science_stuff.kaggle mlflow-sync playground-series-*/results playground_series_*/results
+
+.PHONY: mlflow-ui
+mlflow-ui: mlflow-sync
+	$(VENV_BIN)/mlflow ui --backend-store-uri sqlite:///mlflow.db
 
 # Clean up
 .PHONY: clean

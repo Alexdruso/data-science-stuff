@@ -56,8 +56,9 @@ features → train/tune → ensemble → submit pipeline works immediately.
      `from data_science_stuff.kaggle.device import get_lgbm_device`, paths via
      `competition_dirs(__file__)`, tuned params via `load_params(RESULTS_DIR, DEFAULTS, ...)`,
      the fold loop via `run_cv(X, y, X_test, fit_fold, ...)` (stratified seed-42 by default;
-     `stratified=False` for regression), OOF/test saved as `results/oof_lgbm.npy` +
-     `results/test_lgbm.npy`, logging via `save_cv_result`, submission via
+     `stratified=False` for regression), OOF/test saved as keyed parquet via
+     `kaggle.predictions.save_predictions` (ids + `fold_assignment(y)`), logging via
+     `save_cv_result` (also writes the run registry `results/runs.jsonl`), submission via
      `write_submission(SUBMISSIONS_DIR, name, test_ids, TARGET, preds)`.
 
 4. **Write `CLAUDE.md`** from `.claude/templates/competition-CLAUDE.md`, filling the
@@ -80,5 +81,6 @@ features → train/tune → ensemble → submit pipeline works immediately.
 ## Verify
 
 Run `cd <id> && python src/baseline.py` (requires the venv from `make dev-setup`). It should
-print per-fold scores, an OOF score, and write `results/oof_lgbm.npy`, `results/test_lgbm.npy`,
-and a submission CSV. Then run `make py-fmt && make py-static` (see the `quality-gate` skill).
+print per-fold scores, an OOF score, and write `results/oof_lgbm.parquet`,
+`results/test_lgbm.parquet`, a `results/runs.jsonl` line, and a submission CSV. Commit
+`runs.jsonl` with the competition (it is small text; the parquet files are gitignored). Then run `make py-fmt && make py-static` (see the `quality-gate` skill).

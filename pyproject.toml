@@ -63,6 +63,11 @@ development = [
     "bandit>=1.7.0",
 ]
 
+# Optional MLflow UI over results/runs.jsonl (data_science_stuff.kaggle.tracking).
+tracking = [
+    "mlflow>=2.10.0",
+]
+
 docs = [
     "sphinx>=7.0.0,<8.0.0",
     "sphinx-rtd-theme>=1.0.0,<2.0.0",
@@ -138,6 +143,8 @@ ignore = [
 # kaggle_utils exposes interactive reporting helpers whose job is to write to
 # stdout (e.g. print_classification_report, save_cv_result status line).
 "data_science_stuff/kaggle_utils.py" = ["T201"]
+# Run-registry CLI (`python -m data_science_stuff.kaggle <command>`) reports to stdout.
+"data_science_stuff/kaggle/{registry,prereg,tracking,__main__}.py" = ["T201"]
 # The kaggle subpackage follows sklearn-style naming (X_tr, X_test) in
 # signatures and locals — that convention beats PEP8 lowercase for feature
 # matrices in this domain.
@@ -199,7 +206,7 @@ disallow_untyped_defs = false
 # sklearn is covered by scikit-learn-stubs (development extra); scipy-stubs
 # exists but currently requires Python >= 3.12 while CI still tests 3.9-3.11.
 [[tool.mypy.overrides]]
-module = ["scipy.*", "lightgbm.*"]
+module = ["scipy.*", "lightgbm.*", "mlflow.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
