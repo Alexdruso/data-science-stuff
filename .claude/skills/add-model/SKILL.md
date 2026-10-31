@@ -44,9 +44,15 @@ the idea is flat — partial reproductions of strong recipes score as noise (s6e
      (`id`, `pred`; multiclass → `pred_0..k`). The ids travel with the predictions, so readers
      align by id instead of trusting row order:
      ```python
-     paths = save_predictions(RESULTS_DIR, name, oof=res.oof, test=res.test,
-                              train_ids=train["id"].to_numpy(), test_ids=test_ids,
-                              folds=fold_assignment(y))          # kaggle.cv, same splits as run_cv
+     paths = save_predictions(
+         RESULTS_DIR,
+         name,
+         oof=res.oof,
+         test=res.test,
+         train_ids=train["id"].to_numpy(),
+         test_ids=test_ids,
+         folds=fold_assignment(y),
+     )  # kaggle.cv, same splits as run_cv
      ```
    - **Register the run** via `save_cv_result(RESULTS_DIR, name, fold_scores, oof_score,
      metric_name="auc", params=params, seed=42, artifacts=list(paths), prereg="PR-n")` — the
@@ -98,7 +104,7 @@ for fold, (tr_idx, val_idx) in enumerate(skf.split(X, y), 1):
     optimizer = torch.optim.AdamW(model.parameters(), ...)
     ...  # train, collect oof/test predictions
     del model, optimizer, scheduler, X_tr_t, y_tr_t, X_val_t, X_test_t
-    torch.cuda.empty_cache()   # after each fold/trial
+    torch.cuda.empty_cache()  # after each fold/trial
 ```
 
 This applies to both `train_*.py` and `tune_*.py`.

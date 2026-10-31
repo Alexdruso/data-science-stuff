@@ -45,7 +45,7 @@ def paired_seed_deltas(
         baseline itself and for arms sharing no seed with it.
 
     >>> s = {"base": {1: 0.90, 2: 0.92}, "new": {1: 0.91, 2: 0.93}}
-    >>> round(paired_seed_deltas(s, "base").loc["new", "delta"], 6)
+    >>> round(float(paired_seed_deltas(s, "base").loc["new", "delta"]), 6)
     0.01
     """
     if baseline not in scores:

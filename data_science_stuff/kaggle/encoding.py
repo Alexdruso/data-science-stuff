@@ -231,7 +231,7 @@ def rank_gauss(values: NDArray[Any]) -> NDArray[np.float32]:
     an approximately standard-normal column whatever the original shape. Fit
     on train + test together when the transform uses no labels.
 
-    >>> rank_gauss(np.array([1.0, 2.0, 3.0]))[1]
+    >>> float(rank_gauss(np.array([1.0, 2.0, 3.0]))[1])
     0.0
     """
     v = np.asarray(values, dtype=np.float64)

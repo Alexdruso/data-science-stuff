@@ -132,6 +132,7 @@ select = [
 ignore = [
     "E501",    # Line length handled by formatter
     "PLR0913", # Too many arguments to function call
+    "PLR0917", # Too many positional arguments (stable since ruff 0.17; sibling of PLR0913)
     "COM812",  # Trailing comma handled by the formatter (avoids conflicts)
 ]
 
