@@ -259,8 +259,8 @@ def fit_mlp_fold(
     x_test_t = torch.from_numpy(x_test_s).to(dev)
 
     best_score = -np.inf
-    best_val_pred = np.zeros((len(x_va_s), n_classes))
-    best_test_pred = np.zeros((len(x_test_s), n_classes))
+    best_val_pred: NDArray[np.float64] = np.zeros((len(x_va_s), n_classes))
+    best_test_pred: NDArray[np.float64] = np.zeros((len(x_test_s), n_classes))
     patience_counter = 0
     n = len(x_tr_t)
 

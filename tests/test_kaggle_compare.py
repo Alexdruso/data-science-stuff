@@ -1,9 +1,11 @@
 """Tests for data_science_stuff.kaggle.compare."""
 
 import math
+from typing import Any
 
 import numpy as np
 import pytest
+from numpy.typing import NDArray
 from sklearn.metrics import roc_auc_score
 
 from data_science_stuff.kaggle.compare import (
@@ -38,7 +40,10 @@ def test_paired_seed_deltas_unknown_baseline() -> None:
         paired_seed_deltas({"a": {1: 0.5}}, "b")
 
 
-def _toy(seed: int = 0) -> "tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]":
+_Arr = NDArray[Any]
+
+
+def _toy(seed: int = 0) -> "tuple[_Arr, _Arr, _Arr, _Arr]":
     rng = np.random.default_rng(seed)
     n = 4000
     y = rng.integers(0, 2, n)

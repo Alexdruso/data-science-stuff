@@ -14,7 +14,7 @@ import gc
 import json
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import optuna
 
@@ -66,7 +66,7 @@ def run_study(
     *,
     n_trials: int | None = None,
     timeout: float | None = None,
-    direction: str = "maximize",
+    direction: Literal["maximize", "minimize"] = "maximize",
     study_name: str | None = None,
     storage_path: Path | None = None,
     seed: int = 42,
