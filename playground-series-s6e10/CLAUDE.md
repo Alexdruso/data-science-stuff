@@ -1219,11 +1219,27 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   **PR-58 RESULT: FAIL.** logit 0.962237 (reproduced); probit C 0.004 **0.962224** / C 0.01 0.962207; cloglog **0.961780**
   (asymmetric tail badly misfit; L-BFGS 20 min); loglog killed (mirror of cloglog, no rationale at a 44% base rate).
   The logistic link is the right one; the stacker's likelihood is closed (PR-47 + PR-58).
+- **16:45 re-pull:** joeyb114020045 "treebase" notebook output = 4 single-model OOF+test pairs (inner-split early stop →
+  honest; CatBoost 2700 trees solo **0.96063**, LGBM 0.95921, XGB 0.95933, RF 0.95751) → `results/{oof,test}_pub_joeyb_*.npy`.
+  `screen_raw.py` vs pr42 (noise −0.000001): CatBoost **+0.000007** (largest new public member since 10-15), XGB +0.000002,
+  RF +0.000001, LGBM −0.000001. mercurydust = LB-direction bundle (ignored).
+- **PR-59 — add the sub-bar positives (registered 16:50 before any number; the write to this file missed because the
+  "Next steps" heading had been replaced, so it is recorded here after the run with the bars exactly as set).**
+  `source_ablation.py` (pr42 recipe, std C 0.01, nest 10). Arm A (pure additions): pr42 + chain_route + the 4 joeyb
+  members. Arm B: A − pm1012 (that drop was SELECTED from 18 groups on this OOF → stricter bar). Bars: A ≥ **0.962258**
+  at nest seeds 42 AND 7; B ≥ **0.962266** at both seeds. Prior ~20% A / ~10% B.
+  **RESULT: FAIL (both arms, by 1-2e-6).** A: seed 42 **0.962258** (= bar), seed 7 **0.962256** → mean 0.962257; vs pr42 at
+  the same nest seed +0.000021 / +0.000021. B: 0.962265 / 0.962264 (< 0.962266). Bars not moved. Both are the best honest
+  OOF stacks of the campaign; files written for information (`pr59a_*`, `pr59b_*`); finals stay pr42 + pr42n under the
+  protocol (paired private-LB sd between such stacks ≈ 0.000013, so A vs pr42 is a ~1.5 sd coin, not a lever).
+  Written: `submissions/pr59{a,b}_lr_plus_chain_joeyb_avg2.csv` (2 nest seeds, z-avg OOF 0.962259 / 0.962267; test
+  Spearman vs pr42 0.99962 / 0.99959). **pr59a SUBMITTED 17:20** so it is selectable — user's call vs pr42.
 
 ## Status (2026-10-31, deadline day)
 
 Flat since 10-15: PR-43 to PR-58 all failed their pre-registered bars; every honest new member or
-stacker variant since then landed within ±0.00001 of pr42. The only open action is the finals click.
+stacker variant since then landed within ±0.00001 of pr42 (PR-59, 16:50: four additions together +0.000021, missing
+its bar by 2e-6). The only open action is the finals click.
 
 Untested, for the record (lesson 13 — flat closes experiments, not avenues): an own TabPFN-3.5 leg
 (licence never accepted); full-data TabR / fine-tuned TabPFN (infeasible on the 6 GB 2060); a
