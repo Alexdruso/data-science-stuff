@@ -1199,6 +1199,40 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
 - **PR-52 RESULT: FAIL** (4 min CPU; ⚠️ 4 jobs × BLAS threads hit load 10.8 — cap threads next time). pr42 +
   noise 0.962235; k10 r0.1 solo 0.95855 corr 0.955 **−0.000000**; k30 r0.1 0.95851 / 0.943 **+0.000000**; k60 r0.3
   0.96052 / 0.986 **−0.000000** → class-covariance structure of the member logits carries nothing pr42 lacks.
+- **PR-51 deliverable read (exploratory, after the FAIL; bar not moved):** chain `--route` on all 5 folds (GPU ~3 min/fold)
+  OOF **0.95415** (folds 0.9544/0.9537/0.9548/0.9543/0.9536) → `results/{oof,test}_chain_route.npy`; pr42 LR (std C 0.01,
+  nest 10, seed 42) + it as the 365th member **0.962245** vs 0.962237 → +0.000008 (= PR-48's pm1012 drop; < 0.962258) → not
+  adopted. Every honest new member/variant since 10-15 lands in [−0.00001, +0.00001].
+- **Private-LB noise vs candidate gaps (exploratory, 210k-row subsamples of OOF, 200 draws):** absolute AUC sd
+  **0.00037** for any candidate, but the PAIRED sd between near-identical stacks is only **0.000013** (pr42 − pr42n
+  +0.000019, pr42 wins 91%; − pr34b +0.000042, 97%; − own-only +0.00034, 100%). The top of the LB is crowded with
+  clones of the same public-pool stack, so 1-2e-5 honest gains DO move relative rank against them — the +0.00002
+  bars (~1.5 paired sd) are the right size, not too strict.
+- **PR-54 — random-Fourier-feature kernel LR member (registered before any number).** `src/rff_leg.py`: 69 fold-safe
+  columns, train-fold median fill + quantile-normal, D 8192 RBF features (γ 0.05), L2 LR by Adam, 6 fixed epochs,
+  last epoch used (honest). Smooth kernel machine — no such kind in the pool. Bar: full-fold-1 `screen_member.py`
+  vs pr42 ≥ **+0.00002** → 5 folds; adopt only if pr42 LR + member ≥ **0.962258**. Prior ~3%.
+  **PR-54 RESULT: FAIL** (fold 1 from 10-30, screened 10-31): γ 0.05 solo 0.92167 corr 0.80 **−0.000019**; tuned run
+  (fold 2) solo 0.95293 corr 0.95 **−0.000016** → null. A smooth kernel machine is absorbed too.
+
+### 2026-10-31 (final day; deadline 23:59 UTC = 00:59 CET; session to 20:00, busy to 22:00)
+
+- **11:59 re-pull:** new OOF/test pair only from yekenot TabM pytabkit (solo 0.96059) → `screen_raw.py` vs pr42
+  **−0.000002** (noise −0.000001) → null. dennis6886 v11/real225, clarelaurent audit data, areebbb/mayankraaz/
+  liaoguanwei/b05204047elias outputs = submission CSVs / LB-surface work; nothing stackable.
+- **PR-55 — combine the two sub-bar positives (registered before any number).** pr42 recipe (`source_ablation.py`,
+  std C 0.01, nest 10) + `chain_route` as a member, pm1012 group dropped. Each alone was +0.000008 (10-29 PR-48,
+  10-30 PR-51 read); if independent, ≈ +0.000016. The pm1012 drop was SELECTED on this OOF (PR-48 picked it from
+  18 groups) → optimistic by up to its own size. Bar: ≥ **0.962258** at nest seed 42 AND seed 7. Prior ~8%.
+  **PR-55 RESULT: FAIL.** Seed 42: + chain_route 0.962246; then − pm1012 **0.962253** (< 0.962258; the two +0.000008s
+  mostly add, +0.000016 over pr42 seed 42). Seed 7 not run (the bar requires both seeds).
+- **PR-56 — kNN residual corrector in member-logit space (registered before any number).** `src/stack_knnres.py`:
+  standardised member logits → top PCs (16 / 64) → per row the mean pr42 residual of its k (50 / 200) nearest rows
+  within its OWN base fold (no cross-fold neighbour ⇒ no route-TE artifact). Read = 5-fold LR (s, f) − (s, noise).
+  A local nonlinearity in member space none of the residual-LGBM / QDA / spline stackers had. Bar: best config
+  ≥ **+0.00002** → then build it fold-safely for test. Prior ~4%.
+  **PR-56 RESULT: FAIL** (GPU, ~6 min). noise −0.000002; PCs 16/64 × k 50/200: corr(f, residual) +0.001…+0.003, delta
+  **−0.000001** in all four → no local structure in member space; pr42's residual is unstructured there too.
 
 ## Next steps (remove each item when implemented)
 
