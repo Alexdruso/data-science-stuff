@@ -20,6 +20,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
+from scipy.special import erfinv
+from scipy.stats import rankdata
 from sklearn.preprocessing import TargetEncoder
 
 
@@ -219,3 +221,51 @@ def add_frequency_features(
         out[f"{col}_freq"] = freq
         out[f"{col}_freq_log1p"] = np.log1p(freq.to_numpy(np.float32)).astype("float32")
     return out
+
+
+def rank_gauss(values: NDArray[Any]) -> NDArray[np.float32]:
+    """Rank-to-Gaussian transform of one column (NaN filled with the median).
+
+    The standard input transform for denoising autoencoders and MLPs on
+    skewed tabular columns: ranks mapped through the inverse normal CDF give
+    an approximately standard-normal column whatever the original shape. Fit
+    on train + test together when the transform uses no labels.
+
+    >>> rank_gauss(np.array([1.0, 2.0, 3.0]))[1]
+    0.0
+    """
+    v = np.asarray(values, dtype=np.float64)
+    if np.isnan(v).all():
+        return np.zeros(len(v), dtype=np.float32)
+    v = np.where(np.isnan(v), np.nanmedian(v), v)
+    r = (rankdata(v) - 0.5) / len(v)
+    return np.asarray(np.sqrt(2.0) * erfinv(2.0 * r - 1.0), dtype=np.float32)
+
+
+def fourier_features(x: NDArray[Any], n_freqs: int) -> NDArray[np.float64]:
+    """NeRF-style positional encoding: ``sin``/``cos`` of ``pi * 2**k * x``.
+
+    For ordinal/positional columns with periodic or high-frequency structure
+    (s6e5: tyre life, lap windows). Scale ``x`` first — to [0, 1] with a
+    per-fold MinMaxScaler for trees, or standardised for MLPs — or the high
+    frequencies alias.
+
+    Args:
+        x: (n,) or (n, d) array of already-scaled columns.
+        n_freqs: Number of frequencies ``L`` (k = 0..L-1).
+
+    Returns:
+        (n, 2 * L * d) array: all sines, then all cosines; within each
+        block the L frequencies of column 0 come first, then column 1, ...
+        Append it to the feature matrix.
+
+    >>> fourier_features(np.array([0.0, 0.5]), 2).shape
+    (2, 4)
+    """
+    a = np.asarray(x, dtype=np.float64)
+    a = a.reshape(-1, 1) if a.ndim == 1 else a
+    if n_freqs <= 0:
+        return np.zeros((len(a), 0))
+    freqs = np.pi * 2.0 ** np.arange(n_freqs)
+    args = (a[:, :, None] * freqs).reshape(len(a), -1)  # (n, d * L), column-major
+    return np.hstack([np.sin(args), np.cos(args)])

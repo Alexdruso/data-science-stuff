@@ -9,7 +9,7 @@ saving, and submission logic.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any, NamedTuple, Union
 
 import numpy as np
@@ -134,3 +134,106 @@ def run_cv(
         if after_fold is not None:
             after_fold(fold)
     return CVResult(oof, test, fold_scores)
+
+
+class BaggedCVResult(NamedTuple):
+    """Seed-averaged OOF/test predictions plus the per-seed arrays behind them.
+
+    ``per_seed_oof``/``per_seed_test`` have a leading seed axis. Keep them: the
+    M-slope screen (:func:`data_science_stuff.kaggle.screening.screen_mechanism`)
+    needs the paired delta at M = 1, 2, 3, 4 members, which is a prefix mean
+    over this axis.
+    """
+
+    oof: NDArray[np.float64]
+    test: NDArray[np.float64]
+    fold_scores: list[float]
+    per_seed_oof: NDArray[np.float64]
+    per_seed_test: NDArray[np.float64]
+
+
+def run_cv_seeds(
+    X: Matrix,
+    y: NDArray[Any],
+    X_test: Matrix,
+    make_fit_fold: Callable[[int], FitFoldFn],
+    *,
+    seeds: Sequence[int] = (42, 43, 44),
+    resplit: bool = True,
+    n_splits: int = 5,
+    split_seed: int = 42,
+    n_outputs: int = 1,
+    stratified: bool = True,
+    score_fn: ScoreFn | None = None,
+    after_fold: Callable[[int], None] | None = None,
+) -> BaggedCVResult:
+    """Multi-seed bagged CV: :func:`run_cv` once per seed, then averaged.
+
+    Extracted from s6e7's ``train_common.bagged_cv`` (148 importing scripts)
+    and the ``for seed in SEEDS`` loops of s6e6/s6e8. Every row's averaged
+    OOF is still out-of-fold for every seed, so the average is honest.
+
+    Args:
+        X: Training features, in ``build_features()`` order.
+        y: Training target, same order.
+        X_test: Test features.
+        make_fit_fold: ``seed -> fit_fold``; the returned closure is used
+            exactly like :func:`run_cv`'s ``fit_fold``, with the model seeded
+            from ``seed``.
+        seeds: Model seeds (one bagged member each).
+        resplit: When True (s6e7's recipe) each seed also reshuffles the
+            folds (splitter ``random_state=seed``), which decorrelates the
+            members further. When False every seed uses ``split_seed`` —
+            choose this when the per-seed OOF arrays must share folds with
+            other models' OOF (e.g. for a fold-aligned stacker).
+        n_splits: Folds per seed.
+        split_seed: Splitter seed when ``resplit`` is False.
+        n_outputs: As in :func:`run_cv`.
+        stratified: As in :func:`run_cv`.
+        score_fn: As in :func:`run_cv`; scores of all seed x fold fits are
+            concatenated in ``fold_scores``.
+        after_fold: As in :func:`run_cv` (put ``torch.cuda.empty_cache()``
+            here for GPU models).
+
+    Returns:
+        :class:`BaggedCVResult`.
+
+    >>> import numpy as np
+    >>> X = np.arange(40, dtype=float).reshape(20, 2)
+    >>> y = np.array([0, 1] * 10)
+    >>> def make(seed):
+    ...     return lambda xt, yt, xv, yv, xte, f: (
+    ...         np.full(len(xv), yt.mean()), np.full(len(xte), yt.mean())
+    ...     )
+    >>> res = run_cv_seeds(X, y, X[:4], make, seeds=(1, 2), n_splits=2)
+    >>> res.per_seed_oof.shape
+    (2, 20)
+    """
+    if not seeds:
+        msg = "seeds must be non-empty"
+        raise ValueError(msg)
+    results = [
+        run_cv(
+            X,
+            y,
+            X_test,
+            make_fit_fold(seed),
+            n_splits=n_splits,
+            seed=seed if resplit else split_seed,
+            n_outputs=n_outputs,
+            stratified=stratified,
+            score_fn=score_fn,
+            after_fold=after_fold,
+        )
+        for seed in seeds
+    ]
+    per_seed_oof = np.stack([r.oof for r in results])
+    per_seed_test = np.stack([r.test for r in results])
+    fold_scores = [s for r in results for s in r.fold_scores]
+    return BaggedCVResult(
+        per_seed_oof.mean(axis=0),
+        per_seed_test.mean(axis=0),
+        fold_scores,
+        per_seed_oof,
+        per_seed_test,
+    )

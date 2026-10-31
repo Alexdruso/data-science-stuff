@@ -269,3 +269,51 @@ def weighted_balanced_accuracy(
         for c in np.unique(y)
     ]
     return float(np.mean(recalls))
+
+
+def uniform_remask(
+    train: pd.DataFrame,
+    test: pd.DataFrame,
+    columns: Sequence[str],
+    *,
+    mult: float = 1.0,
+    seed: int = 20260707,
+) -> pd.DataFrame:
+    """Re-mask train so its missingness *mechanism* matches a uniform test mask.
+
+    The s6e7 repair: when :func:`mask_mechanism_report` shows train NaNs
+    follow deterministic rules while test NaNs are uniform at the same rate,
+    hide observed train values at random, at each column's test NaN rate
+    times ``mult``. That breaks the train-only coupling between "is NaN" and
+    the rule that produced it. Test is never re-masked.
+
+    Two things to keep in mind:
+
+    - The seed is fixed on purpose: every model and every seed must see the
+      same mask, or their OOF arrays are not blendable.
+    - The result is a different *surface* (root CLAUDE.md, lesson 9): OOF
+      from re-masked train reads lower by construction and may only be
+      compared with or stacked against OOF from the same re-masked train.
+
+    Args:
+        train: Training features.
+        test: Test features (source of the per-column NaN rates).
+        columns: Columns whose mechanism differs; others are left alone.
+            Columns absent from ``train`` are skipped.
+        mult: Scales the re-mask rate. At 1.0 the train NaN volume roughly
+            doubles in those columns (rule NaNs plus random ones); below 1
+            trades weaker decoupling for a closer volume match.
+        seed: RNG seed for the mask.
+
+    Returns:
+        A re-masked copy of ``train``.
+    """
+    rng = np.random.default_rng(seed)
+    out = train.copy()
+    for col in columns:
+        if col not in out.columns:
+            continue
+        rate = float(test[col].isna().mean()) * mult
+        hit = out[col].notna().to_numpy() & (rng.random(len(out)) < rate)
+        out.loc[out.index[hit], col] = np.nan
+    return out

@@ -1,6 +1,6 @@
 """Reusable Kaggle competition machinery.
 
-Extracted from the playground-series competitions (primarily s6e6); see also
+Extracted from the playground-series competitions (s6e5-s6e10); see also
 :mod:`data_science_stuff.kaggle_utils` for the original per-class decision
 weight tuning and CV-result logging helpers.
 """
@@ -13,13 +13,21 @@ from data_science_stuff.kaggle.blending import (
     normalize_weights,
     optimize_blend_weights,
 )
+from data_science_stuff.kaggle.compare import (
+    HonestBlend,
+    honest_blend_delta,
+    honest_blend_score,
+    paired_seed_deltas,
+)
 from data_science_stuff.kaggle.cv import (
+    BaggedCVResult,
     CVResult,
     FitFoldFn,
     Matrix,
     fold_assignment,
     make_splitter,
     run_cv,
+    run_cv_seeds,
 )
 from data_science_stuff.kaggle.decision import (
     bagged_decision_weights,
@@ -31,14 +39,22 @@ from data_science_stuff.kaggle.decision import (
     optimize_thresholds,
     split_half_gate,
     tune_decision_weights_grid,
+    xgb_balanced_error_metric,
 )
-from data_science_stuff.kaggle.device import get_lgbm_device
+from data_science_stuff.kaggle.device import (
+    catboost_gpu_params,
+    get_lgbm_device,
+    get_xgb_device,
+    xgb_device_params,
+)
 from data_science_stuff.kaggle.encoding import (
     add_fold_safe_target_encoding,
     add_frequency_features,
     add_quantile_bin_features,
     cat_key,
+    fourier_features,
     qcut_codes,
+    rank_gauss,
     select_low_cardinality_cols,
     sorted_factorize,
     te_source_columns,
@@ -87,23 +103,35 @@ from data_science_stuff.kaggle.shift import (
     importance_weights,
     mask_frame,
     mask_mechanism_report,
+    uniform_remask,
     unseen_mask_patterns,
     weighted_balanced_accuracy,
 )
 from data_science_stuff.kaggle.stacking import (
     CaruanaResult,
+    ExternalPredictions,
     caruana_select,
     clipped_logit,
+    load_public_predictions,
+    ridge_calibrate,
     stack_oof,
+)
+from data_science_stuff.kaggle.tuning import (
+    best_params_writer,
+    cuda_cleanup_callback,
+    run_study,
 )
 
 __all__ = [
     "AdversarialResult",
+    "BaggedCVResult",
     "CVResult",
     "CaruanaResult",
     "CompetitionDirs",
     "DecisionLayer",
+    "ExternalPredictions",
     "FitFoldFn",
+    "HonestBlend",
     "Matrix",
     "MechanismScreen",
     "Normalize",
@@ -119,23 +147,30 @@ __all__ = [
     "argmax_layer",
     "bagged_decision_weights",
     "balanced_accuracy_fast",
+    "best_params_writer",
     "blend",
     "calibrate_lambda",
     "caruana_select",
     "cascade_combine",
     "cat_key",
+    "catboost_gpu_params",
     "classify_exponent",
     "clipped_logit",
     "commit_prereg",
     "competition_dirs",
     "cost_decide",
+    "cuda_cleanup_callback",
     "decay_exponent",
     "diversity_report",
     "find_prereg",
     "fit_cost_matrix",
     "fold_assignment",
+    "fourier_features",
     "frozen_weight_layer",
     "get_lgbm_device",
+    "get_xgb_device",
+    "honest_blend_delta",
+    "honest_blend_score",
     "honest_weighted_layer",
     "import_cv_scores",
     "importance_weights",
@@ -143,6 +178,7 @@ __all__ = [
     "load_folds",
     "load_params",
     "load_predictions",
+    "load_public_predictions",
     "load_runs",
     "log_run",
     "make_cost_matrix",
@@ -154,9 +190,14 @@ __all__ = [
     "normalize_weights",
     "optimize_blend_weights",
     "optimize_thresholds",
+    "paired_seed_deltas",
     "qcut_codes",
+    "rank_gauss",
     "read_runs",
+    "ridge_calibrate",
     "run_cv",
+    "run_cv_seeds",
+    "run_study",
     "save_predictions",
     "save_threshold_weights",
     "screen_mechanism",
@@ -167,8 +208,11 @@ __all__ = [
     "stack_oof",
     "te_source_columns",
     "tune_decision_weights_grid",
+    "uniform_remask",
     "unseen_mask_patterns",
     "variance_reduction_control",
     "weighted_balanced_accuracy",
     "write_submission",
+    "xgb_balanced_error_metric",
+    "xgb_device_params",
 ]

@@ -154,6 +154,7 @@ def fit_mlp_fold(
     use_class_weights: bool = True,
     logit_adjust: torch.Tensor | None = None,
     score_fn: ScoreFn | None = None,
+    epoch_select: Literal["best", "last"] = "best",
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """Train one MLP fold and return ``(val_proba, test_proba)``.
 
@@ -161,6 +162,12 @@ def fit_mlp_fold(
     Yeo-Johnson on numeric columns, StandardScaler on the OHE block. Early
     stopping tracks ``score_fn`` on the validation split (default: balanced
     accuracy on argmax) and returns the best epoch's predictions.
+
+    **Use** ``epoch_select="last"`` **for any MLP whose OOF feeds a stacker.**
+    Picking the best epoch on the validation fold and then scoring that same
+    fold inflates OOF (s6e10 measured +0.00014 AUC, and the stacker
+    over-weighted the leg). ``"last"`` trains all ``epochs`` and keeps the
+    final model, so OOF is honest; tune ``epochs`` in the inner search.
 
     For imbalanced targets pick ONE lever: ``use_class_weights=True``
     (inverse-frequency CE weights), or pass ``logit_adjust`` from
@@ -191,10 +198,15 @@ def fit_mlp_fold(
         use_class_weights: Weight the CE loss by inverse class frequency.
         logit_adjust: Optional (n_classes,) logit-adjustment offsets.
         score_fn: Early-stopping metric ``(y_va, val_proba) -> float``.
+        epoch_select: ``"best"`` (early stopping on ``score_fn``) or
+            ``"last"`` (no selection; ``patience`` and ``score_fn`` unused).
 
     Returns:
-        ``(val_proba, test_proba)`` from the best-scoring epoch.
+        ``(val_proba, test_proba)`` from the selected epoch.
     """
+    if epoch_select not in ("best", "last"):
+        msg = f"epoch_select must be 'best' or 'last', got {epoch_select!r}"
+        raise ValueError(msg)
     dev = (
         device
         if device is not None
@@ -267,6 +279,8 @@ def fit_mlp_fold(
             optimizer.step()
         scheduler.step()
 
+        if epoch_select == "last":
+            continue
         model.eval()
         val_proba = _predict_batched(model, x_va_t, batch_size)
         epoch_score = float(score(y_va, val_proba))
@@ -279,6 +293,11 @@ def fit_mlp_fold(
             patience_counter += 1
             if patience_counter >= patience:
                 break
+
+    if epoch_select == "last":
+        model.eval()
+        best_val_pred = _predict_batched(model, x_va_t, batch_size)
+        best_test_pred = _predict_batched(model, x_test_t, batch_size)
 
     del model, optimizer, scheduler, criterion, weight_t, adj
     del x_tr_t, y_tr_t, x_va_t, x_test_t

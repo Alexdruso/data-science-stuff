@@ -14,14 +14,18 @@ A Python monorepo containing:
 - **`data_science_stuff/`** — Shared installable package (versioned via git tags through
   setuptools_scm). `kaggle_utils.py` holds the original helpers (`save_cv_result`,
   `tune_decision_weights`, ...); the `kaggle/` subpackage holds the competition machinery
-  extracted from s6e5/s6e6: `io` (paths/params/submissions), `device` (LightGBM CUDA probe),
-  `cv` (`run_cv` fold loop), `blending` (Nelder-Mead blend weights, diversity report),
-  `decision` (threshold weights — grid and Nelder-Mead fitters, bootstrap bagging, Bayes cost
-  matrix, cascade recombination), `encoding` (fold-safe target encoding, quantile bins,
-  frequency features), `stacking` (`stack_oof`, Caruana selection), `screening` (the M-slope
-  mechanism instrument, from s6e7), `shift` (adversarial validation + mask-mechanism
-  diagnostics, from s6e7), `models` (MLP scaffold, RealMLP-TD, imbalance losses), and the
-  results layer: `predictions` (keyed parquet OOF/test files that carry `id` + `fold`),
+  extracted from s6e5–s6e10: `io` (paths/params/submissions), `device` (LightGBM CUDA probe,
+  XGBoost device params, CatBoost 6 GB-GPU params), `cv` (`run_cv` fold loop, `run_cv_seeds`
+  multi-seed bagging), `tuning` (`run_study` Optuna scaffold → `best_params*.json`),
+  `blending` (Nelder-Mead blend weights, diversity report), `decision` (threshold weights —
+  grid and Nelder-Mead fitters, bootstrap bagging, Bayes cost matrix, cascade recombination,
+  XGBoost balanced-error eval metric), `encoding` (fold-safe target encoding, quantile bins,
+  frequency features, rank-gauss, Fourier features), `stacking` (`stack_oof`, Caruana
+  selection, per-base ridge calibration, public-notebook OOF loading), `compare` (seed-paired
+  arm deltas, honest split-half blend reads), `screening` (the M-slope mechanism instrument,
+  from s6e7), `shift` (adversarial validation, mask-mechanism diagnostics, uniform re-mask
+  repair, from s6e7), `models` (MLP scaffold, RealMLP-TD, swap-noise DAE, imbalance losses),
+  and the results layer: `predictions` (keyed parquet OOF/test files that carry `id` + `fold`),
   `registry` (append-only run registry `results/runs.jsonl`: git commit, command, params,
   config hash, lineage, verdicts), `prereg` (verifiable pre-registration commits) and
   `tracking` (optional MLflow view; `[tracking]` extra). CLI:
@@ -90,6 +94,32 @@ workflows by hand:
 A SessionStart hook (`.claude/hooks/session-start.sh`) installs dependencies automatically in
 Claude Code on the web so the venv, linters, and tests are ready at session start.
 
+## Shared code first
+
+`data_science_stuff` is where reusable code lives. Two rules, both mandatory:
+
+1. **Check the package before writing a helper.** Before adding any function to a competition
+   script, search `data_science_stuff/` (`grep -rn "def " data_science_stuff/kaggle` or the
+   module list above) for one that already does it, and import it. Re-written copies are the
+   common failure: at the s6e10 audit there were 19 local `logit`/`softmax` copies
+   (→ `stacking.clipped_logit`), 3 `inv_freq_weights` (→ `models.mlp.class_weights`),
+   9 `ba`/`bacc` (→ `decision.balanced_accuracy_fast`) and 3 `weighted_bacc`
+   (→ `shift.weighted_balanced_accuracy`). If the shared version is close but not quite
+   right, extend it (a keyword argument with a backward-compatible default) rather than
+   forking it locally.
+2. **Promote code the second time it is needed.** When a helper is about to be copied into a
+   second script of a different competition, or is imported by several scripts inside one
+   competition (a `*_common.py`), move it into the package instead: generalise the
+   competition-specific constants into arguments, add type hints (mypy strict) and tests
+   in `tests/`, export it from the subpackage `__init__.py`, run the `quality-gate` skill,
+   and update the module list in "What This Repo Is". Keep the competition's lesson in the
+   docstring (what was measured, why the default is what it is), since it is the part that
+   is expensive to rediscover.
+
+Competition-specific feature engineering (`features.py`, domain keys, one-off probes) stays
+in the competition directory. Finished competitions are not rewritten to use new shared
+code; new scripts use it.
+
 ## Competition Workflow
 
 Each Kaggle competition follows the same pipeline (mature references: `playground-series-s6e5/`
@@ -101,7 +131,7 @@ features.py  →  baseline.py / train_<model>.py  →  tune_<model>.py  →  ens
 ```
 
 The pipeline is built on `data_science_stuff.kaggle`: `competition_dirs`/`load_params` →
-`run_cv` → `save_predictions` + `save_cv_result` (registers the run) + `optimize_thresholds` →
+`run_cv` (or `run_cv_seeds`; `run_study` in `tune_*.py`) → `save_predictions` + `save_cv_result` (registers the run) + `optimize_thresholds` →
 `load_predictions` → `optimize_blend_weights`/`stack_oof` → `write_submission`. Competition
 scripts import these; they never copy them. Older competitions (≤ s6e10) store positional
 `oof_*.npy`; `load_predictions` still reads them (with a warning) and `migrate_npy` converts.
