@@ -1247,6 +1247,16 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   before its number):** the other direction, depth 4 × 400.
   **PR-57b RESULT: FAIL.** depth 4 × 400: solo **0.95477** (best chain), corr 0.953, screen **−0.000015** → a better
   generative solo is more correlated with the stack, as every other kind. Chain capacity closed (d4/d6/d8 all ≤ −0.000007).
+- **14:15 re-pull: dry.** No dataset updated since 07:59; notebooks run since noon (xxxogan, atifkhan12, anthonytherrien,
+  obiaf88, sarveshchhetri, casati8) = submission CSVs only. (obiaf88's output redistributes the licence-gated TabPFN-3.5
+  checkpoint — not used: licence not accepted, and the pool already has full-context TabPFN-3.5 members.)
+- **PR-58 — link function of the stacker (registered before any number).** `src/stack_link.py`: pr42 recipe (std, nest 10,
+  seed 42, L2, L-BFGS) with probit (C 0.004 ≈ logit C 0.01 after the 1.6× coefficient scale, and 0.01), cloglog and
+  loglog (C 0.01; asymmetric tails). Logit control must reproduce 0.962237. Bar: best link ≥ **0.962257** → nest-seed-7
+  replicate ≥ the same margin. Prior ~3% (PR-47 showed the logit likelihood is already right in the tails).
+  **PR-58 RESULT: FAIL.** logit 0.962237 (reproduced); probit C 0.004 **0.962224** / C 0.01 0.962207; cloglog **0.961780**
+  (asymmetric tail badly misfit; L-BFGS 20 min); loglog killed (mirror of cloglog, no rationale at a 44% base rate).
+  The logistic link is the right one; the stacker's likelihood is closed (PR-47 + PR-58).
 
 ## Next steps (remove each item when implemented)
 
