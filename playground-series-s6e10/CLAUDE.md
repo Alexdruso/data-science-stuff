@@ -1233,6 +1233,20 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   ≥ **+0.00002** → then build it fold-safely for test. Prior ~4%.
   **PR-56 RESULT: FAIL** (GPU, ~6 min). noise −0.000002; PCs 16/64 × k 50/200: corr(f, residual) +0.001…+0.003, delta
   **−0.000001** in all four → no local structure in member space; pr42's residual is unstructured there too.
+- **⚠️ Finals check (12:35):** the Kaggle submissions list showed `pr42n_lr_allown_nomlp_c01_n10.csv` had NEVER been
+  submitted (10-29/10-30 "finals pr42 + pr42n" referred to the files on disk) → **SUBMITTED 12:36** so it can be
+  selected. Files re-verified (test id order, no NaN, ∈[0,1], pair Spearman 0.99972). The user must still tick both
+  finals on Kaggle (auto-select would take the best PUBLIC scores).
+- **PR-57 — higher-capacity generative chain (registered before any number).** `dn_leg.py --mode chain --route --depth 8
+  --trees 600` (10-30 run: depth 6 × 300). The chain is the only member kind with a positive deliverable read
+  (+0.000008); a better density model is more of the thing that differs in kind. Fold-1 `screen_member.py` vs pr42
+  must beat the depth-6 chain's **−0.000007** by ≥ +0.00001 → 5 folds; adopt only if pr42 + member ≥ **0.962258** at
+  nest seeds 42 and 7. Prior ~4%.
+  **PR-57 RESULT: FAIL.** depth 8 × 600: solo **0.94680** (depth 6: 0.95441), corr 0.90, screen **−0.000017** (depth 6
+  −0.000007 on the same rows) → more capacity overfits the per-class conditionals. **PR-57b (same bar, registered
+  before its number):** the other direction, depth 4 × 400.
+  **PR-57b RESULT: FAIL.** depth 4 × 400: solo **0.95477** (best chain), corr 0.953, screen **−0.000015** → a better
+  generative solo is more correlated with the stack, as every other kind. Chain capacity closed (d4/d6/d8 all ≤ −0.000007).
 
 ## Next steps (remove each item when implemented)
 
