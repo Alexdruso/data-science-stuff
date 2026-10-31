@@ -2,41 +2,17 @@
 
 **Task**: binary classification — predict `satisfaction` (passenger satisfied vs neutral/dissatisfied)
 **Metric**: ROC AUC on the predicted probability. Submission: `id,satisfaction` (probability).
-**Deadline**: 2026-10-31 23:59 UTC — **queried from the source** (`kaggle competitions list -s
-playground-series-s6e10` and the competition's Timeline page) on 2026-10-05. Start date
-2026-10-01. Never carry a deadline that no document sourced: an unsourced "~Aug 2" ran through
-22 days of s6e7 planning and the real date was Jul 31.
+**Deadline**: 2026-10-31 23:59 UTC (start 2026-10-01) — verified at the source (`kaggle competitions
+list -s playground-series-s6e10` + Timeline page) on 2026-10-05.
 
----
+The repo-wide invariants (row order, fold-aware target encoding, GPU memory rule) are in the root
+`CLAUDE.md`. s6e10 specifics:
 
-## ⚠️ CRITICAL: Row-order invariant — always load labels and IDs through build_features()
-
-`features.py::build_features()` sorts every dataframe by `["id"]`. All
-`results/oof_<model>.npy` and `results/test_<model>.npy` arrays are stored in this sorted order.
-
-`build_features()` also **renames the raw headers to snake_case** and **coerces the target to
-Int8 0/1**, so reading `TARGET` from a raw CSV is wrong twice over (order *and* encoding).
-
-```python
-# CORRECT
-y = build_features(pl.read_csv(DATA_DIR / "train.csv"))[TARGET].to_numpy()
-test_ids = build_features(pl.read_csv(DATA_DIR / "test.csv"))["id"].to_numpy()
-
-# WRONG — raw CSV order ≠ npy order, and the raw target may not be 0/1
-y = pl.read_csv(DATA_DIR / "train.csv")[TARGET].to_numpy()
-```
-
----
-
-## ⚠️ No data leakage — fold-aware rules
-
-1. **Target encoding is fold-aware, NEVER global.** Fit any target-derived feature on the
-   fold's training split only (`data_science_stuff.kaggle.encoding`).
-2. **Group stats over feature columns** (no per-row targets) may use the full raw train CSV as
-   global priors — if used, document that choice here explicitly.
-3. **Original-data augmentation** (`data/original/data.csv`): rows may be appended to each
-   fold's *training* split only — never to the validation split, or OOF stops measuring the
-   synthetic distribution the LB is scored on.
+- `build_features()` sorts by `["id"]`, **renames the raw headers to snake_case** and **coerces the
+  target to Int8 0/1** — reading `TARGET` from a raw CSV is wrong twice over (order *and* encoding):
+  `y = build_features(pl.read_csv(DATA_DIR / "train.csv"))[TARGET].to_numpy()`.
+- Original rows (`data/original/data.csv`) may be appended to a fold's *training* split only.
+- Label-free group stats (no targets) may use the full raw train CSV as global priors.
 
 ---
 
@@ -54,79 +30,80 @@ Synthetic, generated from the [Airline satisfaction dataset](https://www.kaggle.
 Download: `kaggle competitions download -c playground-series-s6e10 -p data/ && cd data &&
 unzip -q playground-series-s6e10.zip && rm playground-series-s6e10.zip`. Synthetic headers are
 identical to the original's (different column order); target ships as `True`/`False` —
-**train positive rate 44.36%** (original 43.45%). Nulls: only `arrival_delay_in_minutes`
-(292 train / 130 test). `baggage_handling` has no 0 in train (range 1-5).
+**train positive rate 44.36%** (original 43.45%, 56,428 / 129,880). Nulls: only
+`arrival_delay_in_minutes` (292 train / 130 test; 393 in the original). `baggage_handling` has no
+0 in train (range 1-5).
 
 ### Raw features (snake_case after `build_features`)
 
 - Categorical: `gender` (M/F), `customer_type` (Loyal / disloyal), `type_of_travel`
   (Business / Personal), `class` (Business / Eco / Eco Plus)
 - Numeric: `age`, `flight_distance`, `departure_delay_in_minutes`, `arrival_delay_in_minutes`
-  (393 NaN in the original)
 - 13 service ratings, 0-5: `inflight_wifi_service`, `departure_arrival_time_convenient`,
   `ease_of_online_booking`, `gate_location`, `food_and_drink`, `online_boarding`,
   `seat_comfort`, `inflight_entertainment`, `on_board_service`, `leg_room_service`,
   `baggage_handling`, `checkin_service`, `cleanliness`
 
-Original target: bool, 43.4% positive (56,428 / 129,880).
-
 ---
 
 ## Key EDA findings
 
+- **`flight_distance` is a route ID** (3,521 values, all of them original values; per-route sat
+  rates correlate 0.865 with the original's). Route TE was the campaign's largest lever (PR-12,
+  +0.0015 on LGBM). No other column is a hidden key (10-10 hidden-ID screen, 10-29 key scan).
 - **Original:** a 0 rating means "not applicable", not "worst" — mean 0.15 zero-ratings per row.
   Kept raw (trees split on it) and counted as `n_zero_ratings`.
-- **Original is near-separable:** the v1 baseline scores **OOF AUC 0.99491** on a 100k/30k split
-  of the *original* data (pipeline smoke test, 2026-10-05) — not a guide to the synthetic
-  set (see next bullet).
-- **Synthetic ≠ original — much harder.** Same baseline: 0.99491 on original vs **0.95874** on
-  synthetic. The generator destroyed most of the near-deterministic structure (~0.04 AUC of
-  label noise / smoothing).
+- **Synthetic ≠ original — much harder.** The v1 baseline scores 0.99491 on a 100k/30k split of
+  the original vs **0.95874** on synthetic: the generator destroyed most of the near-deterministic
+  structure (~0.04 AUC of label noise / smoothing).
 - **Delays collapsed ~12×:** mean departure delay 1.18 min (train) vs 14.7 (original);
   `dep == 0` on 90.8% of train rows vs 56.5%; `arr == dep` on 86.9% vs 47.2%. Delay is a weak
   signal here (sat rate 0.448 at dep=0 vs 0.400 at dep>0). Flight distance also drifted
-  (mean 1354 vs 1190); ratings are shifted up ~0.1 across the board. ⇒ original rows are
-  off-distribution on delays; augmentation must carry an `is_original` flag and be screened,
-  not assumed.
+  (mean 1354 vs 1190); ratings are shifted up ~0.1 across the board.
 - **No train/test shift:** adversarial validation AUC **0.4994** (raw columns, 5-fold LGBM).
   Category marginals match to 3 decimals. OOF should rank candidates well, down to its noise floor.
-- Only 17 train rows exactly duplicate an original row — no lookup leak.
-- Zero ratings ("N/A"): 6.4% of train rows have ≥1 vs 7.9% in original.
-- TODO: missingness *mechanism* of `arrival_delay_in_minutes` (`kaggle.shift.mask_mechanism_report`
-  — s6e7 lesson 8) — only 292 rows, so low priority.
+- Only 17 train rows exactly duplicate an original row — no lookup leak. Zero ratings ("N/A"):
+  6.4% of train rows have ≥1 vs 7.9% in original.
+- `arrival_delay_in_minutes` NaN mechanism: same in train and test, too few rows to matter (10-30).
 
 ---
 
-## Current best
+## Current best and finals
 
-**2026-10-15: `pr42_lr_allown_c01_n10_avg2.csv`, OOF 0.962238 (submitted)** — single LR (standardised
-members, C 0.01, 10 nesting folds × 2 nest seeds) over the public pool (284) + ALL 80 honest own legs.
-The gain over pr34b (+0.00004) is regularisation strength (PR-39/40) + nest 10 (PR-42).
+**`pr42_lr_allown_c01_n10_avg2.csv`, OOF 0.962238 (submitted 10-15)** — single LR stack
+(standardised member logits, C 0.01, 10 nesting folds × 2 nest seeds) over the public pool (284
+pairs, `data/public_oof/_pool`) + all 80 honest own legs (`results/ours_all80_{nonnn,nn}.txt` — pass
+both to `--ours` to rebuild). The gain over pr34b is regularisation strength (PR-39/40) + nest 10 (PR-42).
 
-**2026-10-09: `hybrid_lrstack_1009.csv`, OOF 0.962162 (submitted)** — LR stack of 199 public OOF
-pairs + 6 own k10 legs (RealMLPs now honest). Hedge `hybrid_lrstack_1009_nomlp.csv` 0.962107
-(no public MLP members, which are probably epoch-selection-inflated) also submitted.
+**Finals: pr42 + pr42n** (`pr42n_lr_allown_nomlp_c01_n10.csv`, 0.962220 — same recipe without the
+public NN-type members, which may be epoch-selection-inflated; submitted 10-31). The user must tick
+both on Kaggle: auto-select takes the best *public* scores. Own-only fallback (no public
+predictions): `own_lr_all80_c01_n10.csv` 0.961892, not submitted.
 
-**2026-10-08: `blend_own_1008b.csv`, honest OOF 0.961695 (submitted)** — adds the original-data
-teacher logit + route profile (PR-19) and aux-task expected ratings (PR-20) to the tree legs,
-aux features to RealMLP. Own work only. A hybrid with the public OOF library
-(`hybrid_lrstack_v1.csv`, 0.962101) is written but not submitted (PR-21, user's call).
+Score history: README chart (`figures/score_progress.svg`, `src/plot_progress.py`) and the log below.
 
-**2026-10-07 (end of day): `blend_final_1007_orig2.csv`, honest OOF 0.961435** — route
-features (PR-12) + residual route TE (PR-13) + RealMLP fd/age embeddings (PR-15) + original
-rows appended to training folds (PR-16) in both legs. See the submission log.
+### Submission log
 
-Earlier on 10-07: rank-blend 0.475·`lgbm_pr12_route` + 0.525·`realmlp_route` — OOF 0.960932
-(honest +0.00176 over the row below; PR-12). Legs: RealMLP+route 0.96065, tuned LGBM+route
-0.960522, XGB+route 0.96020. The table below predates PR-12.
+All LB-blind: no public score was checked. OOF = honest (half-split or nested) where it differs.
 
-Previous:
+| Date | File | Recipe | OOF |
+|---|---|---|---|
+| 10-05 | `blend_lgbmt65_realmlp35.csv` | 0.65·rank(tuned LGBM) + 0.35·rank(RealMLP v1) | 0.959169 |
+| 10-07 | `blend_route_lgbm_realmlp_w52.csv` | PR-12 route features in both legs, rank blend | 0.960932 |
+| 10-07 | `blend_lgbmresid35_mlpage30_mlpdelay35.csv` | resid-route LGBM + 2 RealMLP embedding variants | 0.961243 |
+| 10-07 | `blend_final_1007.csv` | 8-leg honest-NM rank blend (RealMLP route breadth) | 0.961277 |
+| 10-07 | `blend_final_1007_orig.csv` | 9 legs, RealMLP with original rows (PR-16) | 0.961395 |
+| 10-07 | `blend_final_1007_orig2.csv` | 5 legs, original rows in LGBM and RealMLP | 0.961435 |
+| 10-08 | `blend_own_1008b.csv` | 10 legs + teacher/route profile (PR-19) + aux tasks (PR-20) | 0.961695 |
+| 10-09 | `hybrid_lrstack_1009.csv` | LR (C 0.3) on 199 public pairs + 6 own k10 legs | 0.962162 |
+| 10-09 | `hybrid_lrstack_1009_nomlp.csv` | same without the 53 public MLP members | 0.962107 |
+| 10-09 | `hybrid_lrstack_1009b_nomlp.csv` | pool 214 without public MLPs, C 0.1 | 0.962135 |
+| 10-10 | `pr34_bagstack_nest10.csv` | member-bagged LR, 16 bags, nest 10 (PR-34) | 0.962189 |
+| 10-10 | `pr34b_bagstack_fwdlegs.csv` | PR-34 with 6 forward-selected own legs | 0.962196 |
+| 10-15 | `pr42_lr_allown_c01_n10_avg2.csv` | single LR, C 0.01, nest 10 × 2 seeds, pool + 80 own | **0.962238** |
+| 10-31 | `pr42n_lr_allown_nomlp_c01_n10.csv` | pr42 without public NN-type members | 0.962220 |
 
-**Rank-blend 0.65·tuned LGBM (`lgbm_pr5_tuned`) + 0.35·RealMLP OOF AUC: 0.959169**
-(2026-10-05) ← current best. `w=0.35` was fit (honest half-split) against the GBDT blend in
-PR-2 and carried over, not refit. Best single: tuned LGBM 0.959002. No lever has cleared the
-+0.0005 bar; this is the sum of two sub-bar but consistent gains (PR-2 + PR-5).
-Previous: equal rank-blend LGBM+XGB+CatBoost 0.95894.
+### v1 legs (10-05, before route features)
 
 | Model | OOF AUC | Script | Notes |
 |---|---|---|---|
@@ -135,10 +112,10 @@ Previous: equal rank-blend LGBM+XGB+CatBoost 0.95894.
 | XGBoost v1 | 0.95862 | `src/train_xgboost.py` | GPU, ~1 min total; best_iter 550-820 |
 | CatBoost v1 | 0.95822 | `src/train_catboost.py` | GPU, fixed 2000 iters, no ES |
 | LGBM PR-5 tuned | 0.959002 | `src/tune_lgbm.py --evaluate` | CPU, lr 0.0135, ~700-1050 trees |
-| RealMLP v1 | 0.95863 | `src/train_realmlp.py` | GPU, 16 epochs (best at 4-5), ~3.5 min/fold; corr 0.972 with GBDTs; PR-2 sub-bar (+0.00017 honest) |
+| RealMLP v1 | 0.95863 | `src/train_realmlp.py` | GPU; corr 0.972 with GBDTs; PR-2 sub-bar (+0.00017 honest) |
 
 OOF correlations: LGBM↔XGB 0.9987, LGBM↔Cat 0.9975, XGB↔Cat 0.9981 — the three GBDTs are
-near-copies; blending buys only +0.0002. Diversity has to come from a different *kind* of leg.
+near-copies; diversity has to come from a different *kind* of leg.
 
 ---
 
@@ -146,14 +123,16 @@ near-copies; blending buys only +0.0002. Diversity has to come from a different 
 
 `src/features.py::build_features()` (v1): raw columns + `rating_mean/min/max`,
 `n_zero_ratings`, `n_high_ratings` (≥4), `delay_recovered` (arr − dep), `delay_max`,
-`delay_per_mile`.
+`delay_per_mile`. Route features: `src/route.py` (every leg takes `--route`); original-data teacher:
+`src/og_model.py`; aux-task expected ratings: `src/aux_feats.py`. The 69 fold-safe columns used by
+the TFM/kind legs are exported per fold by `src/export_tfm.py` (`tfm_fold{k}.npz`).
 
 ---
 
 ## Modelling notes
 
-- **Shared utilities live in `data_science_stuff.kaggle`** — import, never copy.
-- **CV**: `run_cv` (5-fold stratified, random_state=42). Scores logged to `results/cv_scores.csv`.
+- **CV**: `run_cv` (5-fold stratified, random_state=42 — the public OOF datasets use the same folds).
+  Scores logged to `results/cv_scores.csv`.
 - **OOF/test arrays store the positive-class probability** (1-D). AUC is rank-based: no
   threshold/decision layer.
 - **GPU**: LightGBM via `get_lgbm_device()` (CUDA probe, CPU fallback). XGBoost `device=cuda`
@@ -161,16 +140,14 @@ near-copies; blending buys only +0.0002. Diversity has to come from a different 
   `S6E10_CATBOOST_GPU_RAM_PART`, default 0.5) — runs at ~84% util / 4.5 GB with 0.8.
 - **Shared matrices**: every leg builds X / y / X_test via `src/matrices.py::build_matrices()`
   (identical features + category codes; `is_original` column constant 0 unless augmenting).
-- **GPU memory rule (all PyTorch scripts)**: `del` model + optimizer + tensors before returning
-  from each fold; `torch.cuda.empty_cache()` after each fold/trial.
 - **Categoricals**: pandas `category` with a shared train∪test level set for LGBM/XGB;
   `cat_features` for CatBoost; OHE for nets.
-
----
-
-## Final submission selection
-
-Use the `select-finals` skill: rank by **OOF CV, not public LB**; two diverse finals.
+- **NN legs feeding a stack use `epoch_select="last"`** (10-09: selecting the epoch on the scored
+  fold inflated RealMLP OOF by ~+0.0002).
+- **One heavy job at a time** — a GPU job plus a heavy CPU job together has rebooted the box (10-26, 10-29).
+- **Instruments**: `src/blend_nm.py` (honest half-split blend), `src/stack_public.py` (nested LR
+  stack), `src/screen_member.py` (fold-1 member screen, null ≈ −0.00002), `src/screen_raw.py` /
+  `screen_pool.py` (full-row screens of public pairs vs pr42), `src/pool_build.py` (rebuilds `_pool`).
 
 ---
 
@@ -316,21 +293,6 @@ first because each one *bounds* the effect (gate on magnitude, not on "the struc
   *last* epoch (its boundary binds), but gate on magnitude: all of v1 bought +0.00017 at the
   blend, so even a solo gain several times the observed spread cannot reach +0.0005 there.
   **Closed: RealMLP hyperparameter tuning** (schedule, width, lr, regularisation).
-
-### Submission log
-
-| Date | File | Recipe | OOF | Note |
-|---|---|---|---|---|
-| 2026-10-09 | `hybrid_lrstack_1009.csv` | LR (C 0.3) on 199 public pairs + 6 own k10 legs (honest RealMLP) | 0.962162 | first submission using public predictions (user: objective winning); LB not checked |
-| 2026-10-09 | `hybrid_lrstack_1009b_nomlp.csv` | hedge v2: pool 214 (+15 members from public notebook outputs, `data/public_oof/kout_norm`) without public MLPs + 6 own legs, C 0.1 | 0.962135 | best robust candidate; full-pool version `hybrid_lrstack_1009b.csv` 0.962161 = unchanged, not submitted |
-| 2026-10-09 | `hybrid_lrstack_1009_nomlp.csv` | same, without the 53 public MLP members (inflation hedge) | 0.962107 | robust candidate; LB not checked |
-| 2026-10-08 | `blend_own_1008b.csv` | honest-NM 10 legs: + teacher/route-profile LGBM, aux-task LGBMs (incl. extra-trees), RealMLP + aux / + og,agg (`blend_nm.py`) | 0.961717 | honest **0.961695** (+0.00026 vs 10-07); own work only, no public predictions; LB not checked |
-| 2026-10-05 | `blend_lgbmt65_realmlp35.csv` | 0.65·rank(`test_lgbm_pr5_tuned`) + 0.35·rank(`test_realmlp_v1`) | 0.959169 | first submission; LB not checked (LB-blind) |
-| 2026-10-07 | `blend_final_1007_orig2.csv` | honest-NM: `realmlp_route_ls0_emb4_fdcat_agecat_orig` 0.52 + `lgbm_pr13_resid_orig` 0.17 + `lgbm_pr12_route_orig` 0.17 + ls0_emb4_fdclass 0.10 + ls0 0.05 | 0.961441 | honest **0.961435** — current best; LB not checked |
-| 2026-10-07 | `blend_final_1007_orig.csv` | 9-leg honest-NM: `realmlp_route_ls0_emb4_fdcat_agecat_orig` 0.54 + `lgbm_pr13_resid` 0.26 + 7 RealMLP variants (≤0.07 each) | 0.961401 | honest **0.961395** (+0.000118 vs `blend_final_1007`); LB not checked |
-| 2026-10-07 | `blend_final_1007.csv` | 8-leg rank blend, honest-NM weights (avg of halves): `lgbm_pr13_resid` 0.30 + RealMLP route variants (ls0_emb4 0.16, delaycat 0.12, ls0_emb4_fdclass 0.11, ls0 0.10, ls0_emb2 0.09, fdclass 0.07, emb24 0.05) | 0.961284 | honest 0.961277 (+0.000034 vs submission 3 — NN-variant breadth); LB not checked |
-| 2026-10-07 | `blend_lgbmresid35_mlpage30_mlpdelay35.csv` | 0.35·rank(`lgbm_pr13_resid`) + 0.30·rank(`realmlp_route_fdcat_agecat`) + 0.35·rank(`realmlp_route_fdcat_agecat_delaycat`) | 0.961247 | honest 4-leg fit 0.961243 (+0.00031 vs submission 2); LB not checked |
-| 2026-10-07 | `blend_route_lgbm_realmlp_w52.csv` | 0.475·rank(`test_lgbm_pr12_route`) + 0.525·rank(`test_realmlp_route`) | 0.960932 | PR-12 route features in both legs; honest delta +0.001761 vs the 10-05 recipe (w 0.55/0.50 per half) |
 
 ### PR-8 — TabM leg (registered 2026-10-05, before any number)
 
@@ -1258,57 +1220,12 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   (asymmetric tail badly misfit; L-BFGS 20 min); loglog killed (mirror of cloglog, no rationale at a 44% base rate).
   The logistic link is the right one; the stacker's likelihood is closed (PR-47 + PR-58).
 
-## Next steps (remove each item when implemented)
+## Status (2026-10-31, deadline day)
 
-**From 10-10 (end of day):** the stack is saturated: 30+ levers today (TFMs ×5 kinds, DAE, NB, label
-cleaning, distillation (leak!), partial views, 8 combiner variants, k20 legs) were all ≤ +0.00003. Best
-honest candidates: `pr34b_bagstack_fwdlegs` 0.962196 / `pr34_bagstack_nest10` 0.962189 (both unsubmitted,
-just under the +0.00003 bar). Real remaining sources: (1) new public members (re-pull daily; the pool
-moved +0.00001 today); (2) TabPFN-3.5 own runs only if the user accepts the licence; (3) finals choice
-between the full stack and the hedges.
+Flat since 10-15: PR-43 to PR-58 all failed their pre-registered bars; every honest new member or
+stacker variant since then landed within ±0.00001 of pr42. The only open action is the finals click.
 
-
-**From 10-09 (do these first):** (a) RESOLVED — public pool is used (user: "objective is
-winning"). The work is "find members that move the pool": honest NN breadth, kNN, residual
-stacker and teacher variants all failed today; the only member class with large stack weights
-we lack is a TabPFN-3.5 leg (needs the user's Prior Labs license, see 10-09). (a2) Finals:
-`hybrid_lrstack_1009.csv` (0.962162) vs the inflation hedge `_nomlp` (0.962107) — decide with
-`select-finals`; re-pull the public pool before the end (new members keep appearing). (b) Final-submission refit: legs on 10 folds (90% data) or
-a 100% refit for the test predictions (PR-18 learning curve: ~+0.0008 AUC per data doubling
-for LGBM ⇒ ~+0.00015 for 80→90%) — do it once the leg set is frozen. (c) TFMs earn the
-largest pool weights; ours (TabICL ctx 100k) did not — a TabPFN leg needs the Prior Labs token.
-Done 10-08 from the 10-07 list: orig ×2 (worse), orig without delays (flat, killed), XGB/Cat
-with route+orig (XGB +0.00026 solo, 0 at the blend); LGBM re-tune with orig not run (PR-14
-showed the optimum did not move).
-
-Closed so far: original as rows (PR-1) and as features (PR-3); pairwise rating TE (PR-4a);
-categorical ratings (PR-4b); duplicate/frequency structure (PR-6, by screen); RealMLP tuning (PR-7); TabM (PR-8); LR stack (PR-9). Sub-bar but real: RealMLP (PR-2), LGBM tuning (PR-5).
-**Untested lever classes:**
-1. Tune XGB / CatBoost — but PR-9 says the combiner gives the GBDTs little weight; price at the
-   blend before spending GPU hours.
-2. Information levers not yet tried: per-row rating-profile features (z-scores within row,
-   dispersion, rank of each rating within the row), class/travel-type × rating interactions,
-   kNN-distance features. PR-4 suggests trees already resolve pairwise structure, so screen
-   cheaply first.
-3. Multi-seed bagging of the two submitted legs — variance reduction; screen by the M-slope
-   (lesson 1) before trusting any per-seed gain.
-
----
-
-## Experiments log
-
-| Date | Run | Description | OOF AUC |
-|---|---|---|---|
-| 2026-10-05 | scaffold | Seeded dir; pipeline smoke-tested on the original data (not the competition data) | (0.99491, original only) |
-| 2026-10-05 | lgbm_v1 | `baseline.py` on the competition data, v1 features, untuned defaults | 0.95874 |
-| 2026-10-05 | lgbm_pr1_base / _aug | PR-1 original augmentation, paired on CPU — **FAIL**, delta −0.000004 | 0.95877 / 0.95876 |
-| 2026-10-05 | xgb_v1 | XGBoost GPU, s6e8 hand-set params | 0.95862 |
-| 2026-10-05 | catboost_v1 | CatBoost GPU, 2000 iters, border 254, max_ctr 1 | 0.95822 |
-| 2026-10-05 | blend (OOF only) | equal rank-blend of the three | 0.95894 |
-| 2026-10-05 | lgbm_arm_orig | PR-3 original-derived features — **FAIL** (+0.000041, 2/5) | 0.958809 |
-| 2026-10-05 | lgbm_arm_te_pairs | PR-4a fold-safe TE on 78 rating pairs — **FAIL**, harmful (−0.000341, 0/5) | 0.958427 |
-| 2026-10-05 | lgbm_arm_cat_ratings | PR-4b ratings as category — **FAIL** (−0.000049, 1/5) | 0.958719 |
-| 2026-10-05 | lgbm_pr5_tuned | PR-5 Optuna 40 trials — **FAIL** on magnitude (+0.000234, 5/5) | 0.959002 |
-| 2026-10-05 | blend (OOF only) | 0.65·lgbm_pr5_tuned + 0.35·realmlp_v1 (rank) | **0.959169** |
-| 2026-10-05 | PR-7 sweep | RealMLP fold-1 sweep, 8 configs + seed control — **FAIL**, all within seed noise (±0.00013) | (fold 1 only) |
-| 2026-10-05 | realmlp_v1 | PR-2 RealMLP-TD, 16 ep — **FAIL** vs bar, honest blend +0.000166 at w=0.35 | 0.95863 |
+Untested, for the record (lesson 13 — flat closes experiments, not avenues): an own TabPFN-3.5 leg
+(licence never accepted); full-data TabR / fine-tuned TabPFN (infeasible on the 6 GB 2060); a
+100%-data refit of the own legs for the test predictions (PR-18; the 10-09 `--fullfit` check moved
+the test file by Spearman 0.99998, so not pursued).
