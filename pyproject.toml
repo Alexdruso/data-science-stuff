@@ -36,6 +36,7 @@ dependencies = [
     "scipy>=1.11.0",
     "matplotlib>=3.7.0",
     "scikit-learn>=1.3.0",
+    "joblib>=1.3.0",
     "jupyter>=1.0.0",
     "seaborn>=0.13.0",
     "kaggle>=1.6.0",
@@ -206,14 +207,18 @@ disallow_untyped_defs = false
 # sklearn is covered by scikit-learn-stubs (development extra); scipy-stubs
 # exists but currently requires Python >= 3.12 while CI still tests 3.9-3.11.
 [[tool.mypy.overrides]]
-module = ["scipy.*", "lightgbm.*", "mlflow.*"]
+module = ["scipy.*", "lightgbm.*", "joblib.*", "mlflow.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "7.0"
 addopts = "-ra -q --doctest-modules --cov=data_science_stuff --cov-report=xml --cov-report=term-missing --cov-fail-under=80"
+# `data_science_stuff` is listed so the `--doctest-modules` above actually reaches
+# the package: with `tests` alone, collection never walks it and every docstring
+# example goes unexecuted (which is how a wrong one shipped once).
 testpaths = [
     "tests",
+    "data_science_stuff",
 ]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*", "*Test"]

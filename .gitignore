@@ -191,6 +191,9 @@ catboost_info/
 playground-series-*/results/cache/
 # keyed prediction files (data_science_stuff.kaggle.predictions); runs.jsonl IS committed
 playground-series-*/results/*.parquet
+# fold feature matrices / exported arrays (GBs) and downloaded public OOF datasets
+playground-series-*/results/*.npz
+playground-series-*/data/public_oof/
 # local MLflow view over the run registry (make mlflow-sync / mlflow-ui)
 mlflow.db
 mlruns/
