@@ -1234,6 +1234,8 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   protocol (paired private-LB sd between such stacks ≈ 0.000013, so A vs pr42 is a ~1.5 sd coin, not a lever).
   Written: `submissions/pr59{a,b}_lr_plus_chain_joeyb_avg2.csv` (2 nest seeds, z-avg OOF 0.962259 / 0.962267; test
   Spearman vs pr42 0.99962 / 0.99959). **pr59a SUBMITTED 17:20** so it is selectable — user's call vs pr42.
+- **19:12 re-pull: dry** (no dataset updated since 07:59; amansharma1812 / yuvrajlamba01 / alipakzad / mohamedabder /
+  saifaallah outputs = submission CSVs or CatBoost logs only).
 
 ## Status (2026-10-31, deadline day)
 
