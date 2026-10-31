@@ -1238,12 +1238,22 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   saifaallah outputs = submission CSVs or CatBoost logs only).
 - **PR-59 decomposition (exploratory, seed 42):** pr42 + 4 joeyb trees only **0.962250** (+0.000013); + chain_route → 0.962258
   (+0.000008 more) — the two additions are additive; most of the gain is the honest public CatBoost, nothing OOF-selected.
+- **21:15 re-pull:** new `xiffly/s6e10-112-stack-inputs-20261031` (112 OOF+test pairs, one npz) → `src/screen_npz.py` vs pr42
+  (noise base 0.962235): no solo > 0.9635, max corr with the pool 0.98-0.997; top **r6_tabpfn_classctxbag +0.000011** (solo
+  0.96125), r6_tabpfn_classctx +0.000006, combo_p22 GBDTs +0.000003-4, rest ≤ +0.000002 (`logs/screen_xiffly.log`).
+- **PR-60 (registered 21:52 before any number):** pr59a + the two r6 TabPFN class-context members. They are the top 2 of
+  112 screened → selection optimism ≈ the max of 112 null draws (~+0.000005) → bar raised: ≥ **0.962263** at nest seeds
+  42 AND 7 (pr42 + 0.00002 + 0.000005). Pass → submit and recommend in place of pr42. Prior ~25%.
+  **PR-60 RESULT: PASS.** seed 42 **0.962267**, seed 7 **0.962265** (both ≥ 0.962263); z-avg of the two 0.962268 (+0.00003 vs
+  pr42). Test Spearman vs pr42 0.99950, vs pr59a 0.99987; seed 42 vs 7 1.0. **SUBMITTED 22:05
+  `pr60_lr_plus_chain_joeyb_xtabpfn_avg2.csv`.** Recommended finals: **pr60 + pr42n** (best OOF + the no-public-NN hedge).
 
 ## Status (2026-10-31, deadline day)
 
 Flat since 10-15: PR-43 to PR-58 all failed their pre-registered bars; every honest new member or
 stacker variant since then landed within ±0.00001 of pr42 (PR-59, 16:50: four additions together +0.000021, missing
-its bar by 2e-6). The only open action is the finals click.
+its bar by 2e-6; PR-60, 22:00: + 2 xiffly TabPFN members = +0.00003, PASS → pr60 submitted). The only open action
+is the finals click: **pr60 + pr42n**.
 
 Untested, for the record (lesson 13 — flat closes experiments, not avenues): an own TabPFN-3.5 leg
 (licence never accepted); full-data TabR / fine-tuned TabPFN (infeasible on the 6 GB 2060); a
