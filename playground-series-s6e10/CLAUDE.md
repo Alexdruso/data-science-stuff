@@ -1236,6 +1236,8 @@ fit on a fixed half, scored on the other, both directions; reproduces the submit
   Spearman vs pr42 0.99962 / 0.99959). **pr59a SUBMITTED 17:20** so it is selectable — user's call vs pr42.
 - **19:12 re-pull: dry** (no dataset updated since 07:59; amansharma1812 / yuvrajlamba01 / alipakzad / mohamedabder /
   saifaallah outputs = submission CSVs or CatBoost logs only).
+- **PR-59 decomposition (exploratory, seed 42):** pr42 + 4 joeyb trees only **0.962250** (+0.000013); + chain_route → 0.962258
+  (+0.000008 more) — the two additions are additive; most of the gain is the honest public CatBoost, nothing OOF-selected.
 
 ## Status (2026-10-31, deadline day)
 
