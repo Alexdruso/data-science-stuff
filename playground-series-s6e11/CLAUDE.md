@@ -91,3 +91,13 @@ See results/runs.jsonl / experiments log below.
 
 - **Fine binning matters**: max_bin 256→512→2048 kept improving XGB d2 (tuner picked 512 from
   {64..512}); the shape functions have sharp local structure (possibly values copied from orig).
+| 11-01 | xgbt2_b2048 s3 / lr 0.01 | 0.94810 / 0.94804 | lr 0.01 no gain |
+| 11-01 | per-value residual TE (fold-honest, every numeric) on xgbt2_b2048 | +0.00000 | no exact-value memorisation signal; fine-bin gain is threshold precision |
+| 11-01 | **ebm_i30** (5 folds) | **0.94824** | best single; folds .94688/.94955/.95278/.94782/.94430 |
+| 11-01 | **stack_v1** LR(ebm_i30, b2048×4) | **0.94842** | EBM weight .67; submitted. Adding lr01/lrspl/realmlp: same 0.94842 |
+| 11-01 | lgbm_d2_b2048 / xgbt3_b2048 | 0.94802 / 0.94787 | stack with them: 0.94842 (flat) → tree legs are absorbed |
+
+**Lever direction (end of Day 1):** EBM carries the stack (weight ~.67); every extra tree leg is
+absorbed. Next: EBM variants (more interactions `ebm_i60` running, more outer bags, other seeds,
+`smoothing_rounds`, `max_interaction_bins`), and EBM on more cores. A GReaT label-first GPT-2
+leg (root lesson 14) is the untested different-kind lever — needs cloud GPU.
