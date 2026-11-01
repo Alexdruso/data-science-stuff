@@ -35,7 +35,7 @@ def make(model: str, seed: int) -> Any:
     if model == "realmlp":
         from pytabkit import RealMLP_TD_Classifier
 
-        return RealMLP_TD_Classifier(device="cuda", random_state=seed, n_cv=1,
+        return RealMLP_TD_Classifier(device="cuda", random_state=seed, n_cv=1, n_epochs=48, batch_size=1024,
                                      val_metric_name="cross_entropy", verbosity=0)
     if model == "tabm":
         from pytabkit import TabM_D_Classifier

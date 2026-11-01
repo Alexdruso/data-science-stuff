@@ -62,3 +62,32 @@ See results/runs.jsonl / experiments log below.
 | 11-01 | xgb_orig_s42 | 0.94676 | + orig rows: flat |
 | 11-01 | xgb_d4 | 0.94726 | |
 | 11-01 | xgb_d3 | 0.94758 | shallower is better |
+| 11-01 | xgb_d2 (lr .05, col .8) | **0.94763** | best single so far |
+| 11-01 | xgb_d1 | 0.94710 | pure additive is short: pairwise interactions matter |
+| 11-01 | xgb_d3_fe (value counts in train+test & orig, amt/bal) | killed | fold1 −0.00035, fold2 −0.00066 vs d3 |
+| 11-01 | lrspl_k10 (quantile splines + one-hot) | 0.94361 | stack weight ≈0 over XGB legs |
+| 11-01 | stack LR(xgb d2,d3,d4,d6) | 0.94770 | |
+| 11-01 | cat d6 lr .06 | fold1 0.94432 | deep trees again weaker |
+
+- "Value absent from orig" flags carry little signal (amount: 2.4% vs 1.65% fraud on 2.6% of
+  rows); no exact orig rows in train.
+| 11-01 | tune_xgb (40 TPE trials, folds 1-2) | 0.94799 (f1-2) | best d2, gamma .73, max_bin 512, colsample ~1, lambda .03 → `results/best_params_xgb.json` |
+| 11-01 | xgbt2_s42 (tuned d2) | **0.94788** | submitted |
+| 11-01 | xgbt3_s42 (best d3 trial) | 0.94774 | |
+| 11-01 | cat d6 | killed after 3 folds | ~−0.0015 vs XGB per fold; CPU better spent on EBM |
+| 11-01 | realmlp 48 ep bs1024 | f1 0.93640, f2 0.93583 | weak NN (256-ep default would take 2.5 h) |
+| 11-01 | **ebm_i30** (interpret EBM, 30 pairs, 4 bags) | f1 **0.94688** | best single on fold 1 (xgbt2 f1 0.94624); ~30 min/fold at 2 jobs |
+| 11-01 | stack LR(xgbt2,d2,d3,d4,lrspl) | 0.94787 | |
+
+- **GA2M structure**: d2 > d1 and EBM (additive + pairwise) > every tree model → the label
+  generator is additive + a few pairwise interactions. Lever direction: better shape functions
+  (EBM more bags / interactions, smoothing), not deeper trees.
+| 11-01 | xgbt2 seeds 1,2 (max_bin 512) | 0.94790 / 0.94782 | |
+| 11-01 | **xgbt2_b2048** (tuned d2, max_bin 2048) | **0.94807** | +0.0002 over 512, all 5 folds up; 8192 identical (0.94807) → saturated |
+| 11-01 | xgbt2_b2048 s1 / s2 | 0.94812 / 0.94805 | |
+| 11-01 | realmlp_s42 (48 ep) | 0.93243 | weak; stack weight ≈ −0.06 |
+| 11-01 | ebm_i30 folds 1,2,4 | 0.94688 / 0.94955 / 0.94782 | vs b2048 0.94652 / 0.94991 / 0.94804 → level, different kind |
+| 11-01 | stack LR(b2048×3, xgbt2, d3, lrspl, realmlp) | 0.94810 | before EBM |
+
+- **Fine binning matters**: max_bin 256→512→2048 kept improving XGB d2 (tuner picked 512 from
+  {64..512}); the shape functions have sharp local structure (possibly values copied from orig).
