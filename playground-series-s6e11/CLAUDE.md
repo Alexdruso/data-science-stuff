@@ -107,9 +107,17 @@ absorbed. Next: EBM variants (more interactions `ebm_i60` running, more outer ba
 `smoothing_rounds`, `max_interaction_bins`), and EBM on more cores. A GReaT label-first GPT-2
 leg (root lesson 14) is the untested different-kind lever — needs cloud GPU.
 | 11-01 | ebm_i60 | 0.94827 | folds vs i30: −.00011/+.00009/+.00003/+.00002/+.00014 |
+| 11-01 | xgbt2_b2048_orig (+20k orig rows) | 0.94793 | −0.00014 vs 0.94807 → orig rows hurt at d2 |
+| 11-01 | xgbt2_b2048_oh (max_cat_to_onehot 16) | 0.94798 | −0.00009 → keep partition splits |
 | 11-01 | **stack_v2** (+ebm_i60, lgbm) | **0.94843** | EBM weights .34/.33; submitted. Stacker C 0.01-100 insensitive |
 
 **Next session:** (1) assemble/stack `ebm_i30_s7`; (2) EBM knobs not yet tried — outer_bags 8+,
 `max_interaction_bins`, `smoothing_rounds`, `learning_rate`; give it all cores, one heavy job at
 a time; (3) day-1 GReaT fingerprint check (root lesson 14) and plan a cloud-GPU label-first
 GPT-2 leg — 29 days remain.
+
+- **GReaT fingerprint (partial, 11-01):** train values copy orig's text formatting exactly
+  (e.g. amount: 92% 2-decimal / 8% 1-decimal, i.e. trailing zero dropped, in train *and*
+  orig; velocity/merchant_risk 1 decimal everywhere; one 2-decimal merchant_risk in 700k).
+  Consistent with a text LM generator. The GPT-2 tokenizer / label-first checks are still
+  TODO (`transformers` is not in the venv).
