@@ -29,6 +29,7 @@ artifacts remain reproducible.
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -442,3 +443,27 @@ def cascade_combine(
         rest = rest * (1.0 - p_arr)
     out[:, class_order[-1]] = rest
     return out
+
+
+def xgb_balanced_error_metric(
+    n_classes: int,
+) -> Callable[..., float]:
+    """XGBoost sklearn-API ``eval_metric``: ``1 - balanced accuracy`` on argmax.
+
+    Lets XGBoost early-stop on the competition metric instead of logloss
+    (s6e6 Deotte recipe). XGBoost minimises custom metrics, hence the error
+    form. A ``sample_weight`` passed by XGBoost is deliberately ignored:
+    early stopping tracks the unweighted metric that is actually scored.
+
+    Usage: ``XGBClassifier(eval_metric=xgb_balanced_error_metric(3), ...)``.
+    """
+
+    def balanced_error(
+        y_true: NDArray[Any], y_pred: NDArray[Any], sample_weight: Any = None
+    ) -> float:
+        del sample_weight
+        proba = np.asarray(y_pred).reshape(-1, n_classes)
+        pred = np.argmax(proba, axis=1)
+        return 1.0 - float(balanced_accuracy_score(np.asarray(y_true, int), pred))
+
+    return balanced_error

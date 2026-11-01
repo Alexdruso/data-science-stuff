@@ -6,6 +6,7 @@ fold/trial loop must call ``torch.cuda.empty_cache()`` after each iteration —
 omitting this OOM-crashes multi-fold/multi-trial runs.
 """
 
+from data_science_stuff.kaggle.models.dae import SwapNoiseDAE, fit_dae_features
 from data_science_stuff.kaggle.models.losses import logit_adjustment, smooth_ce_loss
 from data_science_stuff.kaggle.models.mlp import (
     MLP,
@@ -23,8 +24,10 @@ __all__ = [
     "MLP",
     "REALMLP_TD_CONFIG",
     "RealMLP_TD_Classifier",
+    "SwapNoiseDAE",
     "build_layer_sizes",
     "class_weights",
+    "fit_dae_features",
     "fit_mlp_fold",
     "logit_adjustment",
     "ohe_feature_matrix",

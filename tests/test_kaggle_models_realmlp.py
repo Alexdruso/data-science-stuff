@@ -295,4 +295,5 @@ def test_realmlp_epoch_select_last_keeps_final_epoch(tmp_path: Path) -> None:
 
     # The "score" is the epoch index, so the last epoch (index 2) is kept.
     assert clf.best_score_ == 2.0
+    assert clf.best_val_probs_ is not None
     np.testing.assert_allclose(clf.predict_proba(x_va), clf.best_val_probs_, atol=1e-5)

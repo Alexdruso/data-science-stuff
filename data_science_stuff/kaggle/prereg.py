@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from data_science_stuff.kaggle._git import git
+from data_science_stuff.kaggle._git import git, parse_iso
 
 PREREG_PREFIX = "prereg: "
 _LOG_FIELDS = 3  # sha, commit date, subject
@@ -73,7 +73,7 @@ def find_prereg(pr_id: str, cwd: Path | str | None = None) -> PreregCommit | Non
     if not hits:
         return None
     sha, when, _ = hits[-1]  # git log is newest-first
-    return PreregCommit(pr_id, sha, datetime.fromisoformat(when))
+    return PreregCommit(pr_id, sha, parse_iso(when))
 
 
 def commit_prereg(
@@ -129,7 +129,7 @@ def commit_prereg(
     if sha is None or when is None:  # pragma: no cover - HEAD exists after a commit
         msg = "could not read back the pre-registration commit"
         raise RuntimeError(msg)
-    return PreregCommit(pr_id, sha, datetime.fromisoformat(when))
+    return PreregCommit(pr_id, sha, parse_iso(when))
 
 
 def main(argv: list[str] | None = None) -> int:

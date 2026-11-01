@@ -25,7 +25,7 @@ test_df = build_features(pl.read_csv(DATA_DIR / "test.csv"))
 test_ids = test_df["id"].to_numpy()
 
 # WRONG — raw CSV order ≠ build_features() order → misaligned submission
-y = pl.read_csv(DATA_DIR / "train.csv")[TARGET].to_numpy()   # do NOT do this
+y = pl.read_csv(DATA_DIR / "train.csv")[TARGET].to_numpy()  # do NOT do this
 ```
 
 If the competition uses `compute_group_features` (or similar) after `build_features`, apply it
@@ -48,7 +48,7 @@ exactly as the training scripts do so the alignment matches.
    ```python
    from data_science_stuff.kaggle.blending import blend, optimize_blend_weights
 
-   w = optimize_blend_weights(oofs, y, score_fn, normalize="clip")   # or "softmax"
+   w = optimize_blend_weights(oofs, y, score_fn, normalize="clip")  # or "softmax"
    blended_oof = blend(oofs, w)
    ```
    `score_fn(y, blended) -> float` (higher is better) carries the metric — AUC on 1-D probas,
@@ -84,9 +84,14 @@ column". When the blend stops moving:
    ```python
    from data_science_stuff.kaggle.stacking import stack_oof
 
-   oof, test = stack_oof(base_oofs, base_tests, y,
-                         lambda: LogisticRegression(C=1.0, class_weight="balanced", max_iter=2000),
-                         seeds=(2024, 7, 13, 42, 99), use_logits=True)
+   oof, test = stack_oof(
+       base_oofs,
+       base_tests,
+       y,
+       lambda: LogisticRegression(C=1.0, class_weight="balanced", max_iter=2000),
+       seeds=(2024, 7, 13, 42, 99),
+       use_logits=True,
+   )
    ```
    Any fit/predict_proba meta works (Ridge-on-one-hot via a small wrapper, a regularized GBDT).
    Worked example: `playground-series-s6e6/src/build_lr_stack.py` (broke a 0.9662 plateau →

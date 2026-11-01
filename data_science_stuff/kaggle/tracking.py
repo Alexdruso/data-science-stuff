@@ -20,10 +20,10 @@ from __future__ import annotations
 import argparse
 import json
 from collections.abc import Iterable, Mapping
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from data_science_stuff.kaggle._git import parse_iso
 from data_science_stuff.kaggle.registry import read_runs
 
 DEFAULT_URI = "sqlite:///mlflow.db"
@@ -34,7 +34,7 @@ _MAX_PARAM = 6000  # MLflow's per-value limit
 def _ms(stamp: str | None) -> int | None:
     if not stamp:
         return None
-    return int(datetime.fromisoformat(stamp).timestamp() * 1000)
+    return int(parse_iso(stamp).timestamp() * 1000)
 
 
 def _flatten(params: Mapping[str, Any], prefix: str = "") -> dict[str, str]:

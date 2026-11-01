@@ -18,12 +18,15 @@ Honesty rules baked in:
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from pathlib import Path
 from typing import Any, NamedTuple
 
 import numpy as np
 from numpy.typing import NDArray
+from sklearn.linear_model import Ridge
 from sklearn.metrics import balanced_accuracy_score
 from sklearn.model_selection import StratifiedKFold
+from sklearn.preprocessing import StandardScaler
 
 from data_science_stuff.kaggle.blending import ScoreFn
 
@@ -194,3 +197,127 @@ def caruana_select(
     )
     full_score = float(score(y, oofs[full_picks].sum(axis=0)))
     return CaruanaResult(holdout_scores, full_picks, full_score)
+
+
+def ridge_calibrate(
+    per_base_tr: Sequence[NDArray[np.float64]],
+    eval_sets: Sequence[Sequence[NDArray[np.float64]]],
+    y_tr: NDArray[np.int64],
+    *,
+    alpha: float = 10.0,
+    n_classes: int | None = None,
+    balanced: bool = True,
+) -> list[NDArray[np.float64]]:
+    """Per-base ridge map from a model's outputs to one-hot targets.
+
+    Each base model's (n, k) block (logits or probabilities) is standardised
+    and mapped to the one-hot target by a ridge fit **on the training split
+    only**; the calibrated blocks are then hstacked as meta-features. This
+    puts differently-calibrated bases on a common scale before a meta-learner
+    (s6e6/s6e7 ``build_alt_meta.py``). Call it inside the meta-learner's fold
+    loop: fitting on the rows being scored leaks.
+
+    Args:
+        per_base_tr: One (n_train, k) block per base model.
+        eval_sets: Further row sets to transform with the same fitted maps,
+            each a list aligned with ``per_base_tr`` (e.g. ``[val_blocks,
+            test_blocks]``).
+        y_tr: Integer labels of the training rows.
+        alpha: Ridge strength.
+        n_classes: Defaults to ``y_tr.max() + 1``.
+        balanced: Weight rows by inverse class frequency (sklearn
+            "balanced") so minority classes are not ignored.
+
+    Returns:
+        ``[X_tr, X_eval_1, ...]``: one hstacked (n, n_bases * n_classes)
+        matrix per input row set.
+    """
+    k = int(n_classes if n_classes is not None else y_tr.max() + 1)
+    target = np.eye(k)[y_tr]
+    weights = None
+    if balanced:
+        counts = np.maximum(np.bincount(y_tr, minlength=k), 1).astype(float)
+        weights = (len(y_tr) / (k * counts))[y_tr]
+    for es in eval_sets:
+        if len(es) != len(per_base_tr):
+            msg = (
+                f"every eval set needs one block per base: got {len(es)}, "
+                f"expected {len(per_base_tr)}"
+            )
+            raise ValueError(msg)
+    outs: list[list[NDArray[np.float64]]] = [[] for _ in range(1 + len(eval_sets))]
+    for i, block in enumerate(per_base_tr):
+        scaler = StandardScaler().fit(_as_columns(block))
+        ridge = Ridge(alpha=alpha).fit(
+            scaler.transform(_as_columns(block)), target, sample_weight=weights
+        )
+        outs[0].append(ridge.predict(scaler.transform(_as_columns(block))))
+        for j, es in enumerate(eval_sets, 1):
+            outs[j].append(ridge.predict(scaler.transform(_as_columns(es[i]))))
+    return [np.hstack(o) for o in outs]
+
+
+class ExternalPredictions(NamedTuple):
+    """OOF/test pairs read from external (e.g. public-notebook) output dirs."""
+
+    names: list[str]
+    oof: list[NDArray[np.float64]]
+    test: list[NDArray[np.float64]]
+    skipped: dict[str, str]
+
+
+def load_public_predictions(
+    dirs: Sequence[Path],
+    *,
+    n_train: int,
+    n_test: int,
+    oof_glob: str = "oof_*.npy",
+) -> ExternalPredictions:
+    """Collect ``oof_<x>.npy``/``test_<x>.npy`` pairs from downloaded notebook outputs.
+
+    Extracted from s6e10's ``stack_public.load_pairs``. Every pair is checked
+    before use and rejected (with the reason in ``skipped``) when its test
+    file is missing, its row counts don't match ``n_train``/``n_test``, the
+    two arrays disagree on output width, or it contains NaN/inf.
+
+    **Row order is not checked and cannot be:** external arrays are in their
+    author's row order (usually sorted by ``id``), not necessarily
+    ``build_features()`` order. Confirm both orders agree before stacking —
+    a misaligned pair still has the right shape and silently scores ~0.5.
+
+    Args:
+        dirs: Directories, one per external source (``kaggle kernels output``).
+        n_train: Expected OOF rows.
+        n_test: Expected test rows.
+        oof_glob: Pattern for the OOF files; the test file name replaces the
+            leading ``oof_`` with ``test_``.
+
+    Returns:
+        :class:`ExternalPredictions`; names are ``<dir name>/<stem>``.
+    """
+    names: list[str] = []
+    oofs: list[NDArray[np.float64]] = []
+    tests: list[NDArray[np.float64]] = []
+    skipped: dict[str, str] = {}
+    for d in dirs:
+        for oof_path in sorted(Path(d).glob(oof_glob)):
+            name = f"{Path(d).name}/{oof_path.stem.removeprefix('oof_')}"
+            test_path = oof_path.with_name(oof_path.name.replace("oof_", "test_", 1))
+            if not test_path.exists():
+                skipped[name] = "no matching test file"
+                continue
+            oof = np.asarray(np.load(oof_path), dtype=np.float64)
+            test = np.asarray(np.load(test_path), dtype=np.float64)
+            if len(oof) != n_train or len(test) != n_test:
+                skipped[name] = (
+                    f"rows {len(oof)}/{len(test)}, expected {n_train}/{n_test}"
+                )
+            elif oof.shape[1:] != test.shape[1:]:
+                skipped[name] = f"width mismatch {oof.shape} vs {test.shape}"
+            elif not (np.isfinite(oof).all() and np.isfinite(test).all()):
+                skipped[name] = "non-finite values"
+            else:
+                names.append(name)
+                oofs.append(oof)
+                tests.append(test)
+    return ExternalPredictions(names, oofs, tests, skipped)

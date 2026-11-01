@@ -44,7 +44,7 @@ Violating these produces inflated OOF scores that do not transfer to the leaderb
    target-rate feature on the fold's training split only, then `transform` the val split:
    ```python
    # CORRECT                                  # WRONG — leaks val targets
-   te.fit_transform(X_tr[["c"]], y_tr)        # te.fit(X[["c"]], y)
+   te.fit_transform(X_tr[["c"]], y_tr)  # te.fit(X[["c"]], y)
    te.transform(X_val[["c"]])
    ```
 2. **Group stats over feature columns** (no per-row targets) may use the full raw train CSV as
