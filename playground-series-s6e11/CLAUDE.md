@@ -110,6 +110,7 @@ leg (root lesson 14) is the untested different-kind lever — needs cloud GPU.
 | 11-01 | xgbt2_b2048_orig (+20k orig rows) | 0.94793 | −0.00014 vs 0.94807 → orig rows hurt at d2 |
 | 11-01 | xgbt2_b2048_oh (max_cat_to_onehot 16) | 0.94798 | −0.00009 → keep partition splits |
 | 11-01 | xgbt2_b2048_spw5 (scale_pos_weight 5) | 0.94790 | −0.00017 |
+| 11-01 | ebm_i30_s7 (seed 7) | fold4 0.94793 | (i30 0.94782, i60 0.94784); remaining folds finish after 22:00 |
 | 11-01 | **stack_v2** (+ebm_i60, lgbm) | **0.94843** | EBM weights .34/.33; submitted. Stacker C 0.01-100 insensitive |
 
 **Next session:** (1) assemble/stack `ebm_i30_s7`; (2) EBM knobs not yet tried — outer_bags 8+,
