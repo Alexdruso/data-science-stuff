@@ -50,9 +50,14 @@ No nulls anywhere.
 - No hidden-ID numerics: per-column target encoding never beats the raw monotone AUC.
 - Appending the original rows to training folds: flat (+0.00001, XGB d6).
 
-## Current best
+## Current best (2026-11-01 21:25)
 
-See results/runs.jsonl / experiments log below.
+- **stack_v2** = LR-on-logits(ebm_i30, ebm_i60, xgbt2_b2048 ×4 seeds, lgbm_d2_b2048), OOF
+  **0.94843** — submitted. stack_v1 (no i60/lgbm) 0.94842 also submitted. Best single: ebm_i60
+  0.94827 / ebm_i30 0.94824. Submissions so far: xgb_s42, xgbt2_s42, stack_v1, stack_v2.
+- Running at hand-off: `ebm_i30_s7` (seed-7 EBM, procs logs/q17.log folds 1-3, q18.log folds
+  4-5; the last process assembles `oof_ebm_i30_s7.parquet`; re-run
+  `python src/ebm_leg.py --inter 30 --seed 7` to assemble if needed). Add it to the stack.
 
 ## Experiments log
 
@@ -101,3 +106,10 @@ See results/runs.jsonl / experiments log below.
 absorbed. Next: EBM variants (more interactions `ebm_i60` running, more outer bags, other seeds,
 `smoothing_rounds`, `max_interaction_bins`), and EBM on more cores. A GReaT label-first GPT-2
 leg (root lesson 14) is the untested different-kind lever — needs cloud GPU.
+| 11-01 | ebm_i60 | 0.94827 | folds vs i30: −.00011/+.00009/+.00003/+.00002/+.00014 |
+| 11-01 | **stack_v2** (+ebm_i60, lgbm) | **0.94843** | EBM weights .34/.33; submitted. Stacker C 0.01-100 insensitive |
+
+**Next session:** (1) assemble/stack `ebm_i30_s7`; (2) EBM knobs not yet tried — outer_bags 8+,
+`max_interaction_bins`, `smoothing_rounds`, `learning_rate`; give it all cores, one heavy job at
+a time; (3) day-1 GReaT fingerprint check (root lesson 14) and plan a cloud-GPU label-first
+GPT-2 leg — 29 days remain.

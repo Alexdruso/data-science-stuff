@@ -32,8 +32,9 @@ def main() -> None:
     ap.add_argument("--inter", type=int, default=30)
     ap.add_argument("--jobs", type=int, default=3)
     ap.add_argument("--bags", type=int, default=4)
+    ap.add_argument("--seed", type=int, default=42)
     a = ap.parse_args()
-    name = f"ebm_i{a.inter}"
+    name = f"ebm_i{a.inter}" + (f"_s{a.seed}" if a.seed != 42 else "")
     out = RESULTS_DIR / f"_{name}"
     out.mkdir(exist_ok=True)
     train = build_features(pl.read_csv(DATA_DIR / "train.csv")).to_pandas()
@@ -47,7 +48,7 @@ def main() -> None:
         t0 = time.time()
         tr, va = folds != k, folds == k
         m = ExplainableBoostingClassifier(interactions=a.inter, outer_bags=a.bags, n_jobs=a.jobs,
-                                          random_state=42 + k)
+                                          random_state=a.seed + k)
         m.fit(train.loc[tr, feats], y[tr])
         pv = m.predict_proba(train.loc[va, feats])[:, 1]
         print(f"  fold {k}: auc {roc_auc_score(y[va], pv):.5f} ({time.time() - t0:.0f}s)", flush=True)
