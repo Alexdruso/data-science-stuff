@@ -193,6 +193,27 @@ rules that separate the real ones from the rest. Each cost days to learn; none i
 13. **Flat closes an experiment, not an avenue.** Do not report a plateau as a ceiling; say what
     was measured and what class of lever remains untested.
 
+**The generator (lost s6e10 to it; Deotte won S6E9 and S6E10 with it)**
+
+14. **Model the generator, in its own model family.** Playground data is sampled by GReaT
+    (Borisov et al. 2023): GPT-2 fine-tuned on the original rows as `"col is value, ..."` text
+    in random column order, sampled at about temperature 0.7 / top-k 50, **label generated
+    first**. Check it on day 1: with the GPT-2 tokenizer, 3-digit numbers are one token and
+    4-digit numbers are two, and a label-first prompt reproduces the train label rate. The
+    winning leg is a label-first GPT-2 "Storyteller":
+    - Fine-tune a GReaT replica on the original data (about 60 epochs).
+    - Continue per fold on train, label first, columns shuffled each step (8 epochs, lr 5e-5,
+      bf16).
+    - Score each row as `log P(x | y=1) − log P(x | y=0)` with logsumexp over about 30 column
+      orders, then add the prior log-odds.
+
+    In s6e10 that one leg scored 0.9624 OOF, above our whole 364-member stack (0.96224), and
+    added +5e-4 CV to the public pool. We had found that a generative leg was the missing kind
+    (s6e10 PR-51/57) but built it from trees (0.954 solo). Write values the way the original
+    data writes them (`36`, `0.0`, `None`, `True`/`False`). Budget about 2 A100-hours per fold,
+    so plan Kaggle or cloud GPUs early, because 6 GB local is too slow. A label-last GPT-2
+    ("Detective", about 0.961) is a cheaper second leg that makes different errors.
+
 ## Architecture Conventions
 
 ### Data Science Preferences (from `.cursor/rules/`)
