@@ -143,6 +143,7 @@ GPT-2 leg — 29 days remain.
 | 11-02 | **stack_v3** LR(5 EBMs, 3 trees, lm_distilgpt2) | **0.94920** | same legs without LM 0.94851 → **+0.00069**; LM weight .39; submitted |
 | 11-02 | lm_distilgpt2_orig10 (replica: 10 ep on 20k orig rows, then 2 ep/fold) | f1 0.94550 | fold-1 stack gain +0.00074 vs +0.00071 plain → orig pre-fit ≈ noise; both LMs together +0.00076 (a 2nd LM run adds little). `src/lm_fold_eval.py` |
 | 11-02 | **lm_distilgpt2_ep5** (5 epochs instead of 2) | f1 **0.94733** | solo ≈ best EBM on fold 1 (.94706); fold-1 stack gain **+0.00159** (2 ep: +0.00071) → **training length is the lever**; loss 1.1395 still falling. Full 5-fold run started 17:50 (~80 min/fold, ends ~23:45) |
+| 11-02 | lm_distilgpt2_ep5 fold 2 | f2 0.94963 | ≈ EBM f2 (.94955); fold-2 stack gain **+0.00117** (2 ep: +0.00060) → replicated |
 
 - **LM leg mechanics** (`src/lm_leg.py`, overlay venv `~/venvs/lm` = main venv + transformers):
   rows as `" short-name value,"` segments (CSV text formatting kept, names shortened to halve
