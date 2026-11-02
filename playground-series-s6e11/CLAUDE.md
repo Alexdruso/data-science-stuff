@@ -56,6 +56,10 @@ No nulls anywhere.
   xgbt2_b2048, xgbt2_b2048_s1, lgbm_d2_b2048, **lm_distilgpt2**), OOF **0.94920** — submitted.
   The label-first GPT-2 leg is the lever (+0.0007); EBM/tree variants are saturated.
 
+**Next:** when `lm_distilgpt2_ep5` assembles (`logs/lm_ep5_full.log`; re-run the same command
+to resume — folds are cached), restack as stack_v4 (swap lm_distilgpt2 → ep5, or keep both) and
+submit. Then pilot fold 1 at 10 epochs and/or `gpt2` (124M) — the curve 2→5 ep doubled the gain.
+
 ## Previous best (2026-11-01 21:25)
 
 - **stack_v2** = LR-on-logits(ebm_i30, ebm_i60, xgbt2_b2048 ×4 seeds, lgbm_d2_b2048), OOF
@@ -137,6 +141,8 @@ GPT-2 leg — 29 days remain.
 | 11-02 | **lm_distilgpt2** (5 folds) | 0.94657 | folds .94536/.94776/.95173/.94678/.94167; corr with EBM 0.925 |
 | 11-02 | ebm_i30_s7_mib256 (8 bags) | **0.94846** | best single EBM |
 | 11-02 | **stack_v3** LR(5 EBMs, 3 trees, lm_distilgpt2) | **0.94920** | same legs without LM 0.94851 → **+0.00069**; LM weight .39; submitted |
+| 11-02 | lm_distilgpt2_orig10 (replica: 10 ep on 20k orig rows, then 2 ep/fold) | f1 0.94550 | fold-1 stack gain +0.00074 vs +0.00071 plain → orig pre-fit ≈ noise; both LMs together +0.00076 (a 2nd LM run adds little). `src/lm_fold_eval.py` |
+| 11-02 | **lm_distilgpt2_ep5** (5 epochs instead of 2) | f1 **0.94733** | solo ≈ best EBM on fold 1 (.94706); fold-1 stack gain **+0.00159** (2 ep: +0.00071) → **training length is the lever**; loss 1.1395 still falling. Full 5-fold run started 17:50 (~80 min/fold, ends ~23:45) |
 
 - **LM leg mechanics** (`src/lm_leg.py`, overlay venv `~/venvs/lm` = main venv + transformers):
   rows as `" short-name value,"` segments (CSV text formatting kept, names shortened to halve

@@ -231,6 +231,18 @@ def main() -> None:
 
     for k in a.folds:
         if (out / f"f{k}_val.npy").exists():
+            if (not a.no_test and not (out / f"f{k}_test.npy").exists()
+                    and (out / f"f{k}_model.pt").exists()):
+                tr_k = folds != k
+                prior_k = np.log(y[tr_k].mean() / (1 - y[tr_k].mean()))
+                model = GPT2LMHeadModel.from_pretrained(a.model).cuda()
+                model.load_state_dict(torch.load(out / f"f{k}_model.pt"))
+                st = score_rows(model, voc, seg_te, np.arange(seg_te.n), pre, a.k_test,
+                                4 * a.bs, seed=100 + k) + prior_k
+                np.save(out / f"f{k}_test.npy", st)
+                print(f"  fold {k}: test scored from saved model", flush=True)
+                del model
+                torch.cuda.empty_cache()
             continue
         rng = np.random.default_rng(1000 + k)
         tr_idx = np.where(folds != k)[0]
