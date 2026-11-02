@@ -118,6 +118,22 @@ leg (root lesson 14) is the untested different-kind lever — needs cloud GPU.
 a time; (3) day-1 GReaT fingerprint check (root lesson 14) and plan a cloud-GPU label-first
 GPT-2 leg — 29 days remain.
 
+## Day 2 (2026-11-02)
+
+| Date | Run | OOF AUC | Notes |
+|---|---|---|---|
+| 11-02 | ebm_i30_s7 assembled | **0.94837** | best single; stack (3 EBMs + 4 b2048 + lgbm) 0.94847 (+0.00004 ≈ noise) |
+| 11-02 | ebm_i30_mib256 | f1 0.94699 | (i30 f1 .94688, s7 .94706 — seed noise ~2e-4/fold) |
+| 11-02 | ebm_i30_mb4096 | f1 0.94659 | killed — finer main bins don't help EBM |
+| 11-02 | **lm_distilgpt2 pilot** (label-first GPT-2 Storyteller, `src/lm_leg.py`, 2 ep, 25% negs) | sub 0.94331 | fold-1 30k-row subset: EBM 0.94334, base3 stack 0.94343 → **+LM 0.94479 (+0.0014)**; corr(LM, EBM) 0.936 → different kind. `src/lm_sub_eval.py` |
+
+- **LM leg mechanics** (`src/lm_leg.py`, overlay venv `~/venvs/lm` = main venv + transformers):
+  rows as `" short-name value,"` segments (CSV text formatting kept, names shortened to halve
+  tokens), label first (`fraud 1,`), column order shuffled per step; softmax restricted to the
+  ~used tokens (full 50k-vocab logits OOM on 6 GB). distilgpt2 fp16 trains ~245 rows/s
+  (~10 min/epoch at 147k rows), scores ~800 seq/s. Score = logsumexp over K orders of
+  log P(x|1) − log P(x|0) + prior. Full run: 2 ep, K=3 val+test, ~70 min/fold.
+
 - **GReaT fingerprint (partial, 11-01):** train values copy orig's text formatting exactly
   (e.g. amount: 92% 2-decimal / 8% 1-decimal, i.e. trailing zero dropped, in train *and*
   orig; velocity/merchant_risk 1 decimal everywhere; one 2-decimal merchant_risk in 700k).

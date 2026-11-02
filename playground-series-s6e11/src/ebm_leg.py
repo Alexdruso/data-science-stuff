@@ -33,8 +33,14 @@ def main() -> None:
     ap.add_argument("--jobs", type=int, default=3)
     ap.add_argument("--bags", type=int, default=4)
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--mb", type=int, default=1024, help="max_bins")
+    ap.add_argument("--mib", type=int, default=64, help="max_interaction_bins")
+    ap.add_argument("--lr", type=float, default=0.015)
+    ap.add_argument("--leaves", type=int, default=2)
+    ap.add_argument("--smooth", type=int, default=75)
+    ap.add_argument("--tag", default="")
     a = ap.parse_args()
-    name = f"ebm_i{a.inter}" + (f"_s{a.seed}" if a.seed != 42 else "")
+    name = f"ebm_i{a.inter}" + (f"_s{a.seed}" if a.seed != 42 else "") + a.tag
     out = RESULTS_DIR / f"_{name}"
     out.mkdir(exist_ok=True)
     train = build_features(pl.read_csv(DATA_DIR / "train.csv")).to_pandas()
@@ -48,7 +54,9 @@ def main() -> None:
         t0 = time.time()
         tr, va = folds != k, folds == k
         m = ExplainableBoostingClassifier(interactions=a.inter, outer_bags=a.bags, n_jobs=a.jobs,
-                                          random_state=a.seed + k)
+                                          random_state=a.seed + k, max_bins=a.mb,
+                                          max_interaction_bins=a.mib, learning_rate=a.lr,
+                                          max_leaves=a.leaves, smoothing_rounds=a.smooth)
         m.fit(train.loc[tr, feats], y[tr])
         pv = m.predict_proba(train.loc[va, feats])[:, 1]
         print(f"  fold {k}: auc {roc_auc_score(y[va], pv):.5f} ({time.time() - t0:.0f}s)", flush=True)
