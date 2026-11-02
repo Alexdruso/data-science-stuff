@@ -50,7 +50,13 @@ No nulls anywhere.
 - No hidden-ID numerics: per-column target encoding never beats the raw monotone AUC.
 - Appending the original rows to training folds: flat (+0.00001, XGB d6).
 
-## Current best (2026-11-01 21:25)
+## Current best (2026-11-02 15:56)
+
+- **stack_v3** = LR-on-logits(ebm_i30_s7, ebm_i30_mib256, ebm_i30_s7_mib256, ebm_i30, ebm_i60,
+  xgbt2_b2048, xgbt2_b2048_s1, lgbm_d2_b2048, **lm_distilgpt2**), OOF **0.94920** — submitted.
+  The label-first GPT-2 leg is the lever (+0.0007); EBM/tree variants are saturated.
+
+## Previous best (2026-11-01 21:25)
 
 - **stack_v2** = LR-on-logits(ebm_i30, ebm_i60, xgbt2_b2048 ×4 seeds, lgbm_d2_b2048), OOF
   **0.94843** — submitted. stack_v1 (no i60/lgbm) 0.94842 also submitted. Best single: ebm_i60
@@ -123,9 +129,14 @@ GPT-2 leg — 29 days remain.
 | Date | Run | OOF AUC | Notes |
 |---|---|---|---|
 | 11-02 | ebm_i30_s7 assembled | **0.94837** | best single; stack (3 EBMs + 4 b2048 + lgbm) 0.94847 (+0.00004 ≈ noise) |
-| 11-02 | ebm_i30_mib256 | f1 0.94699 | (i30 f1 .94688, s7 .94706 — seed noise ~2e-4/fold) |
+| 11-02 | ebm_i30_mib256 | 0.94832 | +0.00008 vs i30, every fold ≥ i30 |
+| 11-02 | ebm_i30_mib128_sm150 | 0.94827 | flat; stack of 5 EBMs + 5 trees 0.94848 → EBM side saturated |
 | 11-02 | ebm_i30_mb4096 | f1 0.94659 | killed — finer main bins don't help EBM |
 | 11-02 | **lm_distilgpt2 pilot** (label-first GPT-2 Storyteller, `src/lm_leg.py`, 2 ep, 25% negs) | sub 0.94331 | fold-1 30k-row subset: EBM 0.94334, base3 stack 0.94343 → **+LM 0.94479 (+0.0014)**; corr(LM, EBM) 0.936 → different kind. `src/lm_sub_eval.py` |
+| 11-02 | **lm_distilgpt2** fold 1 (full 140k val, K=3) | f1 0.94536 | below EBM f1 .947 solo, but fold-1 LR stack of 6 legs 0.94711 → **+LM 0.94780 (+0.0007)**, LM weight .39 (largest) |
+| 11-02 | **lm_distilgpt2** (5 folds) | 0.94657 | folds .94536/.94776/.95173/.94678/.94167; corr with EBM 0.925 |
+| 11-02 | ebm_i30_s7_mib256 (8 bags) | **0.94846** | best single EBM |
+| 11-02 | **stack_v3** LR(5 EBMs, 3 trees, lm_distilgpt2) | **0.94920** | same legs without LM 0.94851 → **+0.00069**; LM weight .39; submitted |
 
 - **LM leg mechanics** (`src/lm_leg.py`, overlay venv `~/venvs/lm` = main venv + transformers):
   rows as `" short-name value,"` segments (CSV text formatting kept, names shortened to halve

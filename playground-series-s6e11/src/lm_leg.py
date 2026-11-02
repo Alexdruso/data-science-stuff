@@ -136,6 +136,49 @@ def score_rows(model: GPT2LMHeadModel, voc: Vocab, segs: Segs, rows: np.ndarray,
     return lse[1] - lse[0]
 
 
+def fit_lm(model: GPT2LMHeadModel, voc: Vocab, segs: Segs, rows_all: np.ndarray,
+           labels: np.ndarray, pre: dict[int, list[int]], epochs: float, lr: float, bs: int,
+           rng: np.random.Generator) -> None:
+    """Label-first LM fit with a fresh random column order per row per step."""
+    n_cols = len(RAW_COLS)
+    opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
+    steps = int(epochs * len(rows_all) / bs)
+    sched = torch.optim.lr_scheduler.OneCycleLR(opt, lr, total_steps=steps, pct_start=0.05)
+    scaler = torch.amp.GradScaler()
+    print(f"  fit {len(rows_all)} rows ({int(labels.sum())} pos), {steps} steps", flush=True)
+    model.train()
+    t0 = time.time()
+    step, run_loss = 0, 0.0
+    while step < steps:
+        perm = rng.permutation(len(rows_all))
+        for b in range(0, len(perm) - bs + 1, bs):
+            if step >= steps:
+                break
+            sel = perm[b : b + bs]
+            rows = rows_all[sel]
+            orders = np.array([rng.permutation(n_cols) for _ in rows])
+            ids, att, _ = segs.batch(rows, orders, [pre[int(v)] for v in labels[sel]])
+            ids, att = ids.cuda(), att.cuda()
+            lp = voc.token_logp(model, ids, att)
+            m = att[:, 1:].float()
+            loss = -(lp * m).sum() / m.sum()
+            scaler.scale(loss).backward()
+            scaler.unscale_(opt)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            scaler.step(opt)
+            scaler.update()
+            opt.zero_grad(set_to_none=True)
+            sched.step()
+            run_loss += loss.item()
+            step += 1
+            del ids, att, lp, m, loss
+            if step % 500 == 0:
+                print(f"  step {step}/{steps} loss {run_loss / 500:.4f} "
+                      f"({time.time() - t0:.0f}s)", flush=True)
+                run_loss = 0.0
+    del opt, scaler
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--folds", type=int, nargs="+", default=[1, 2, 3, 4, 5])
@@ -149,6 +192,8 @@ def main() -> None:
     ap.add_argument("--no_test", action="store_true")
     ap.add_argument("--val_sub", type=int, default=0, help="score only N val rows (pilot)")
     ap.add_argument("--tag", default="")
+    ap.add_argument("--orig_epochs", type=float, default=0.0,
+                    help="first fit a GReaT replica on the 20k original rows (all of them)")
     a = ap.parse_args()
     name = f"lm_{a.model}{a.tag}"
     out = RESULTS_DIR / f"_{name}"
@@ -167,11 +212,22 @@ def main() -> None:
     seg_tr, seg_te = Segs(tr_s, tok), Segs(te_s, tok)
     print(f"tokenized in {time.time() - t0:.0f}s", flush=True)
     pre = prefixes(tok)
-    n_cols = len(RAW_COLS)
-    used = np.unique(np.concatenate([*[a.ravel() for a in seg_tr.arr + seg_te.arr],
+    or_s = pl.read_csv(DATA_DIR / "orig" / "credit_card_fraud_2026.csv", infer_schema=False)
+    seg_or = Segs(or_s, tok)
+    y_or = or_s[TARGET].cast(pl.Float64).cast(pl.Int64).to_numpy()
+    used = np.unique(np.concatenate([*[a.ravel() for a in seg_tr.arr + seg_te.arr + seg_or.arr],
                                      *[np.asarray(p) for p in pre.values()]]))
     voc = Vocab(used[used >= 0])
     print(f"restricted vocab: {len(voc.used)} tokens", flush=True)
+    orig_ckpt = RESULTS_DIR / f"_lm_{a.model}_orig_e{a.orig_epochs:g}.pt"
+    if a.orig_epochs and not orig_ckpt.exists():
+        print("replica on original rows:", flush=True)
+        model = GPT2LMHeadModel.from_pretrained(a.model).cuda()
+        fit_lm(model, voc, seg_or, np.arange(seg_or.n), y_or, pre, a.orig_epochs, a.lr, a.bs,
+               np.random.default_rng(0))
+        torch.save(model.state_dict(), orig_ckpt)
+        del model
+        torch.cuda.empty_cache()
 
     for k in a.folds:
         if (out / f"f{k}_val.npy").exists():
@@ -183,41 +239,10 @@ def main() -> None:
         fit_idx = tr_idx[keep]
         prior = np.log(y[tr_idx].mean() / (1 - y[tr_idx].mean()))
         model = GPT2LMHeadModel.from_pretrained(a.model).cuda()
-        opt = torch.optim.AdamW(model.parameters(), lr=a.lr, weight_decay=0.01)
-        steps = int(a.epochs * len(fit_idx) / a.bs)
-        sched = torch.optim.lr_scheduler.OneCycleLR(opt, a.lr, total_steps=steps, pct_start=0.05)
-        scaler = torch.amp.GradScaler()
-        print(f"fold {k}: fit {len(fit_idx)} rows ({y[fit_idx].sum()} pos), {steps} steps",
-              flush=True)
-        model.train()
-        t0 = time.time()
-        step, run_loss = 0, 0.0
-        while step < steps:
-            perm = rng.permutation(fit_idx)
-            for b in range(0, len(perm) - a.bs + 1, a.bs):
-                if step >= steps:
-                    break
-                rows = perm[b : b + a.bs]
-                orders = np.array([rng.permutation(n_cols) for _ in rows])
-                ids, att, _ = seg_tr.batch(rows, orders, [pre[int(y[r])] for r in rows])
-                ids, att = ids.cuda(), att.cuda()
-                lp = voc.token_logp(model, ids, att)
-                m = att[:, 1:].float()
-                loss = -(lp * m).sum() / m.sum()
-                scaler.scale(loss).backward()
-                scaler.unscale_(opt)
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-                scaler.step(opt)
-                scaler.update()
-                opt.zero_grad(set_to_none=True)
-                sched.step()
-                run_loss += loss.item()
-                step += 1
-                del ids, att, lp, m, loss
-                if step % 500 == 0:
-                    print(f"  step {step}/{steps} loss {run_loss / 500:.4f} "
-                          f"({time.time() - t0:.0f}s)", flush=True)
-                    run_loss = 0.0
+        if a.orig_epochs:
+            model.load_state_dict(torch.load(orig_ckpt))
+        print(f"fold {k}:", flush=True)
+        fit_lm(model, voc, seg_tr, fit_idx, y[fit_idx], pre, a.epochs, a.lr, a.bs, rng)
         sub = va_idx if not a.val_sub else np.random.default_rng(5).choice(va_idx, a.val_sub,
                                                                              replace=False)
         t0 = time.time()
@@ -234,7 +259,7 @@ def main() -> None:
                                 seed=100 + k) + prior
                 np.save(out / f"f{k}_test.npy", st)
             torch.save(model.state_dict(), out / f"f{k}_model.pt")
-        del model, opt
+        del model
         torch.cuda.empty_cache()
 
     if all((out / f"f{k}_val.npy").exists() and (out / f"f{k}_test.npy").exists()

@@ -23,7 +23,7 @@ DATA_DIR, RESULTS_DIR, _ = competition_dirs(__file__)
 
 
 def logit(p: np.ndarray) -> np.ndarray:
-    p = np.clip(p, 1e-7, 1 - 1e-7)
+    p = np.clip(p, 1e-15, 1 - 1e-15)
     return np.log(p / (1 - p))
 
 
