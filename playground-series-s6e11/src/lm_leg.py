@@ -45,6 +45,10 @@ SHORT = {
 }
 
 
+GREAT_FMT = "--great_format" in sys.argv  # GReaT's own "column_name is value," text
+SEG_FMT = " {name} is {v}," if GREAT_FMT else " {name} {v},"
+
+
 class Segs:
     """Token ids of every " name value," segment, per row and column (padded with -1)."""
 
@@ -54,7 +58,8 @@ class Segs:
         for c in RAW_COLS:
             vals = df[c].to_numpy()
             uniq, inv = np.unique(vals, return_inverse=True)
-            toks = [tok(f" {SHORT[c]} {v},").input_ids for v in uniq]
+            toks = [tok(SEG_FMT.format(name=c if GREAT_FMT else SHORT[c], v=v)).input_ids
+                    for v in uniq]
             width = max(len(t) for t in toks)
             table = np.full((len(uniq), width), -1, dtype=np.int64)
             for i, t in enumerate(toks):
@@ -117,7 +122,8 @@ def seq_logprob(model: GPT2LMHeadModel, voc: Vocab, ids: torch.Tensor, att: torc
 
 def prefixes(tok: AutoTokenizer) -> dict[int, list[int]]:
     bos = tok.bos_token_id
-    return {"bos": [bos], **{y: [bos, *tok(f"fraud {y},").input_ids] for y in (0, 1)}}
+    lab = "is_fraud is {y}," if GREAT_FMT else "fraud {y},"
+    return {"bos": [bos], **{y: [bos, *tok(lab.format(y=y)).input_ids] for y in (0, 1)}}
 
 
 def suffixes(tok: AutoTokenizer) -> dict[int, list[int]]:
@@ -232,6 +238,7 @@ def main() -> None:
     ap.add_argument("--no_test", action="store_true")
     ap.add_argument("--val_sub", type=int, default=0, help="score only N val rows (pilot)")
     ap.add_argument("--tag", default="")
+    ap.add_argument("--great_format", action="store_true", help="full names, 'name is value,'")
     ap.add_argument("--label_last", action="store_true", help="Detective: P(y|x), label last")
     ap.add_argument("--orig_epochs", type=float, default=0.0,
                     help="first fit a GReaT replica on the 20k original rows (all of them)")

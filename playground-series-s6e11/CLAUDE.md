@@ -57,14 +57,21 @@ No nulls anywhere.
   submitted. LM ep10 solo 0.94987, stack weight .65. Earlier: stack_v4 (ep5 LM) 0.95024,
   stack_v3 (2-ep LM) 0.94920.
 
-**Next (in flight at hand-off 11-03 evening):** `lm_distilgpt2_ep20` — fold 1 local
-(`logs/lm_ep20_f1.log`, ends ~20:45), folds 2-3 Kaggle `s6e11-lm-ep20a` (ends ~23:00),
-folds 4-5 Kaggle `s6e11-lm-ep20b` (ends ~05:00 11-04). Download each with
-`kaggle kernels output alessandrosanvito/<slug> -p kaggle_out/<slug>`, copy
-`_lm_distilgpt2_ep20/*` into `results/_lm_distilgpt2_ep20/`, then
-`python src/lm_assemble.py lm_distilgpt2_ep20` → stack_v6 = v5 legs + ep20 (fold-1 pilot:
-ep10 + ep20 together +0.0004 over ep10 alone). Untested: lr 5e-4 at 10-20 epochs (5e-4 at ep5
-≈ ep10 at 2e-4); more column orders at scoring (`src/lm_rescore.py`, never run).
+**Best public: stack_ext1** (public goodpjw digit-TE OOF bank + our LM ep10, `src/ext_stack.py`),
+OOF 0.95194, **LB 0.95212** (top 0.95229 on 11-03). See "11-03 evening" below.
+
+**Next (in flight at hand-off 11-03 ~21:00):**
+- Local GPU queue: `lm_distilgpt2_ep10_lr5` fold-1 pilot (`logs/lm_ep10_lr5_f1.log`) →
+  column-order rescore K=1..16 of the ep10 f1 model (`logs/lm_rescore_ep10_f1.log`) →
+  GReaT-format LM pilot (`--great_format`: full names, "name is value,", label "is_fraud is y,";
+  bs 32, `logs/lm_great_ep5_f1.log`). Read each with `src/lm_fold_eval.py` **and** in the
+  ext stack (folds-subset snippet logged 11-03), since gains inside our own stack did not
+  transfer (ep20: +0.0002 in ours, 0 in ext).
+- Kaggle `s6e11-lm-ep20b` (ep20 folds 4-5) finishes ~23:00; low priority now (ep20 adds 0 in the
+  ext stack). Kaggle weekly GPU quota is nearly used (~25 h of 30).
+- Levers: more LM *kinds* (format, tokenisation, label-first variants) priced inside the ext
+  stack; re-pull public OOF banks every day (new members appear); our own digit-TE trees are
+  redundant with the bank unless we add something new to them.
 
 ## Previous best (2026-11-01 21:25)
 
@@ -212,3 +219,4 @@ GPT-2 leg — 29 days remain.
 | 11-03 | **stack_ext1** = goodpjw bank + our ebm×2, xgbt2_b2048, lm_distilgpt2_ep10 | **0.95194** | LM weight .50 (largest) → LM is the different-kind leg; **LB 0.95212** (v5 0.95110); submitted |
 | 11-03 | + 96-key bank (5 members) | 0.95192 | flat — same kind |
 | 11-03 | lm_distilgpt2_ep20 folds 2, 3 (Kaggle) | .94832 / .95334 | solo below ep10 (.94953/.95518) |
+| 11-03 | ext stack, folds 1-3 only, members rank-logit within subset | base .95314 | ext bank alone −0.00028; ext + LM ep10 alone = base (our EBM/tree legs add 0 over the bank); **+ ep20: −0.00002, ep10→ep20 −0.00007** → ep20 does not help in the ext stack; LM length saturated at ep10 there |
