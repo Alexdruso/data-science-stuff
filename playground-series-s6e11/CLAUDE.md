@@ -180,3 +180,8 @@ GPT-2 leg — 29 days remain.
 | 11-03 | lm_distilgpt2_last_ep5 (Detective, label-last) fold 1 | f1 0.94317 | stack gain **+0.00001** → absorbed; dead |
 | 11-03 | **lm_distilgpt2_ep5** (5 folds) | **0.94904** | best single leg; f5 .94513 (stack gain +.00192) |
 | 11-03 | **stack_v4** (stack_v3 legs, LM 2ep → ep5) | **0.95024** | +0.00104 over v3; submitted |
+| 11-03 | lm_distilgpt2_ep10 fold 1 (local) | f1 **0.94846** | stack gain **+0.00230** (Kaggle pilot run of the same config +0.00199: seed noise ~.0003); averaging the two runs (corr .9925) +0.00225 → not variance, capacity/length is the lever |
+| 11-03 | stack C 0.01-10, or 3 legs (best EBM + xgb + LM) | 0.95024-0.95025 | stack is just EBM + LM; only a better LM moves it |
+| 11-03 | lm_gpt2_ep5 (124M) fold 1 (Kaggle) | f1 0.94756 | stack gain +0.00166 ≈ distilgpt2 ep5 (+0.00159) at 2× cost → capacity is not the lever |
+| 11-03 | lm_distilgpt2_ep20 fold 1 (Kaggle) | f1 0.94745 | solo below ep10 but stack gain **+0.00254** (ep10 +0.00230); ep10 + ep20 + gpt2 together +0.00269 → full ep20 run (Kaggle `s6e11-lm-ep20a` folds 2-3, later folds 4-5; fold 1 local) |
+| 11-03 | lm_distilgpt2_ep5_lr5 (lr 5e-4) fold 1 | f1 0.94793 | stack gain +0.00199 (lr 2e-4: +.00159; ep10: +.00199/+.00230) → higher lr substitutes ~half the epochs |
