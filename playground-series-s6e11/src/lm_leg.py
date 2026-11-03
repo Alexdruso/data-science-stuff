@@ -63,13 +63,16 @@ class Segs:
             self.len.append(np.array([len(t) for t in toks])[inv])
         self.n = len(df)
 
-    def batch(self, rows: np.ndarray, orders: np.ndarray, prefix: list[list[int]]
+    def batch(self, rows: np.ndarray, orders: np.ndarray, prefix: list[list[int]],
+              suffix: list[list[int]] | None = None
               ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Sequences [prefix | segments in order]; returns ids, attention mask, score mask."""
+        """Sequences [prefix | segments in order | suffix]; ids, attention mask, score mask."""
         seqs, starts = [], []
-        for r, o, p in zip(rows, orders, prefix):
+        suffix = suffix or [[]] * len(rows)
+        for r, o, p, q in zip(rows, orders, prefix, suffix):
             body = [self.arr[c][r, : self.len[c][r]] for c in o]
-            seqs.append(np.concatenate([np.asarray(p, dtype=np.int64), *body]))
+            seqs.append(np.concatenate([np.asarray(p, dtype=np.int64), *body,
+                                        np.asarray(q, dtype=np.int64)]))
             starts.append(len(p))
         width = max(len(s) for s in seqs)
         ids = np.zeros((len(seqs), width), dtype=np.int64)
@@ -114,7 +117,40 @@ def seq_logprob(model: GPT2LMHeadModel, voc: Vocab, ids: torch.Tensor, att: torc
 
 def prefixes(tok: AutoTokenizer) -> dict[int, list[int]]:
     bos = tok.bos_token_id
-    return {y: [bos, *tok(f"fraud {y},").input_ids] for y in (0, 1)}
+    return {"bos": [bos], **{y: [bos, *tok(f"fraud {y},").input_ids] for y in (0, 1)}}
+
+
+def suffixes(tok: AutoTokenizer) -> dict[int, list[int]]:
+    """Label-last ("Detective"): ' fraud y,' appended after the features."""
+    return {y: tok(f" fraud {y},").input_ids for y in (0, 1)}
+
+
+@torch.no_grad()
+def score_rows_last(model: GPT2LMHeadModel, voc: Vocab, segs: Segs, rows: np.ndarray,
+                    pre: dict, last: dict[int, list[int]], k_orders: int, bs: int, seed: int
+                    ) -> np.ndarray:
+    """Mean over k orders of logit P(' 1') - logit P(' 0') after '... fraud'."""
+    model.eval()
+    rng = np.random.default_rng(seed)
+    n_cols = len(RAW_COLS)
+    t1, t0 = (int(voc.remap[last[y][1]]) for y in (1, 0))
+    stem = last[1][:1]
+    out = np.zeros(len(rows))
+    for _ in range(k_orders):
+        orders = np.array([rng.permutation(n_cols) for _ in range(len(rows))])
+        for b in range(0, len(rows), bs):
+            sl = slice(b, b + bs)
+            n = len(rows[sl])
+            ids, att, _ = segs.batch(rows[sl], orders[sl], [pre["bos"]] * n, [stem] * n)
+            ids, att = ids.cuda(), att.cuda()
+            pos = att.sum(1) - 1
+            with torch.autocast("cuda", dtype=torch.float16):
+                h = model.transformer(input_ids=ids, attention_mask=att).last_hidden_state
+                h = h[torch.arange(n, device=h.device), pos]
+                lg = (h @ model.lm_head.weight[voc.used[[t1, t0]]].T).float()
+            out[sl] += (lg[:, 0] - lg[:, 1]).cpu().numpy() / k_orders
+            del ids, att, h, lg
+    return out
 
 
 @torch.no_grad()
@@ -138,7 +174,7 @@ def score_rows(model: GPT2LMHeadModel, voc: Vocab, segs: Segs, rows: np.ndarray,
 
 def fit_lm(model: GPT2LMHeadModel, voc: Vocab, segs: Segs, rows_all: np.ndarray,
            labels: np.ndarray, pre: dict[int, list[int]], epochs: float, lr: float, bs: int,
-           rng: np.random.Generator) -> None:
+           rng: np.random.Generator, last: dict[int, list[int]] | None = None) -> None:
     """Label-first LM fit with a fresh random column order per row per step."""
     n_cols = len(RAW_COLS)
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
@@ -157,7 +193,11 @@ def fit_lm(model: GPT2LMHeadModel, voc: Vocab, segs: Segs, rows_all: np.ndarray,
             sel = perm[b : b + bs]
             rows = rows_all[sel]
             orders = np.array([rng.permutation(n_cols) for _ in rows])
-            ids, att, _ = segs.batch(rows, orders, [pre[int(v)] for v in labels[sel]])
+            if last is None:
+                ids, att, _ = segs.batch(rows, orders, [pre[int(v)] for v in labels[sel]])
+            else:
+                ids, att, _ = segs.batch(rows, orders, [pre["bos"]] * len(rows),
+                                         [last[int(v)] for v in labels[sel]])
             ids, att = ids.cuda(), att.cuda()
             lp = voc.token_logp(model, ids, att)
             m = att[:, 1:].float()
@@ -192,10 +232,11 @@ def main() -> None:
     ap.add_argument("--no_test", action="store_true")
     ap.add_argument("--val_sub", type=int, default=0, help="score only N val rows (pilot)")
     ap.add_argument("--tag", default="")
+    ap.add_argument("--label_last", action="store_true", help="Detective: P(y|x), label last")
     ap.add_argument("--orig_epochs", type=float, default=0.0,
                     help="first fit a GReaT replica on the 20k original rows (all of them)")
     a = ap.parse_args()
-    name = f"lm_{a.model}{a.tag}"
+    name = f"lm_{a.model}{'_last' if a.label_last else ''}{a.tag}"
     out = RESULTS_DIR / f"_{name}"
     out.mkdir(exist_ok=True)
 
@@ -212,11 +253,20 @@ def main() -> None:
     seg_tr, seg_te = Segs(tr_s, tok), Segs(te_s, tok)
     print(f"tokenized in {time.time() - t0:.0f}s", flush=True)
     pre = prefixes(tok)
+    last = suffixes(tok) if a.label_last else None
+
+    def scorer(model: GPT2LMHeadModel, segs: Segs, rows: np.ndarray, k_ord: int, seed: int,
+               prior: float) -> np.ndarray:
+        if last is None:
+            return score_rows(model, voc, segs, rows, pre, k_ord, 4 * a.bs, seed) + prior
+        return score_rows_last(model, voc, segs, rows, pre, last, k_ord, 4 * a.bs, seed) + (
+            np.log(a.neg_frac))
     or_s = pl.read_csv(DATA_DIR / "orig" / "credit_card_fraud_2026.csv", infer_schema=False)
     seg_or = Segs(or_s, tok)
     y_or = or_s[TARGET].cast(pl.Float64).cast(pl.Int64).to_numpy()
     used = np.unique(np.concatenate([*[a.ravel() for a in seg_tr.arr + seg_te.arr + seg_or.arr],
-                                     *[np.asarray(p) for p in pre.values()]]))
+                                     *[np.asarray(p) for p in pre.values()],
+                                     *[np.asarray(q) for q in suffixes(tok).values()]]))
     voc = Vocab(used[used >= 0])
     print(f"restricted vocab: {len(voc.used)} tokens", flush=True)
     orig_ckpt = RESULTS_DIR / f"_lm_{a.model}_orig_e{a.orig_epochs:g}.pt"
@@ -237,8 +287,7 @@ def main() -> None:
                 prior_k = np.log(y[tr_k].mean() / (1 - y[tr_k].mean()))
                 model = GPT2LMHeadModel.from_pretrained(a.model).cuda()
                 model.load_state_dict(torch.load(out / f"f{k}_model.pt"))
-                st = score_rows(model, voc, seg_te, np.arange(seg_te.n), pre, a.k_test,
-                                4 * a.bs, seed=100 + k) + prior_k
+                st = scorer(model, seg_te, np.arange(seg_te.n), a.k_test, 100 + k, prior_k)
                 np.save(out / f"f{k}_test.npy", st)
                 print(f"  fold {k}: test scored from saved model", flush=True)
                 del model
@@ -254,23 +303,22 @@ def main() -> None:
         if a.orig_epochs:
             model.load_state_dict(torch.load(orig_ckpt))
         print(f"fold {k}:", flush=True)
-        fit_lm(model, voc, seg_tr, fit_idx, y[fit_idx], pre, a.epochs, a.lr, a.bs, rng)
+        fit_lm(model, voc, seg_tr, fit_idx, y[fit_idx], pre, a.epochs, a.lr, a.bs, rng, last)
         sub = va_idx if not a.val_sub else np.random.default_rng(5).choice(va_idx, a.val_sub,
                                                                              replace=False)
         t0 = time.time()
-        sv = score_rows(model, voc, seg_tr, sub, pre, a.k_val, 4 * a.bs, seed=k) + prior
+        sv = scorer(model, seg_tr, sub, a.k_val, k, prior)
         print(f"  fold {k}: val auc {roc_auc_score(y[sub], sv):.5f} on {len(sub)} rows "
               f"({time.time() - t0:.0f}s)", flush=True)
         if a.val_sub:
             np.save(out / f"f{k}_valsub_idx.npy", sub)
             np.save(out / f"f{k}_valsub.npy", sv)
         else:
+            torch.save(model.state_dict(), out / f"f{k}_model.pt")  # before val: resumable
             np.save(out / f"f{k}_val.npy", sv)
             if not a.no_test:
-                st = score_rows(model, voc, seg_te, np.arange(seg_te.n), pre, a.k_test, 4 * a.bs,
-                                seed=100 + k) + prior
+                st = scorer(model, seg_te, np.arange(seg_te.n), a.k_test, 100 + k, prior)
                 np.save(out / f"f{k}_test.npy", st)
-            torch.save(model.state_dict(), out / f"f{k}_model.pt")
         del model
         torch.cuda.empty_cache()
 

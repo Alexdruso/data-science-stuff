@@ -159,3 +159,16 @@ GPT-2 leg — 29 days remain.
   orig; velocity/merchant_risk 1 decimal everywhere; one 2-decimal merchant_risk in 700k).
   Consistent with a text LM generator. The GPT-2 tokenizer / label-first checks are still
   TODO (`transformers` is not in the venv).
+
+## Day 3 (2026-11-03)
+
+- The 11-02 23:08 shutdown hit fold 4 during test scoring: `f4_val.npy` existed but no model /
+  test preds, and the resume logic would have skipped the fold. Fixed (`lm_leg.py` now saves the
+  model *before* scoring); fold 4 is retrained (orphan val kept as `f4_val_orphan.npy`).
+- `lm_leg.py --label_last` adds the Detective (label-last, P(y|x) read at `" fraud"`, mean
+  logit over K orders). `src/kaggle_lm_build.py` packages `lm_leg.py` as a private Kaggle
+  T4×2 kernel running one job per GPU (outputs → `results/_<name>/`, assemble locally).
+
+| Date | Run | OOF AUC | Notes |
+|---|---|---|---|
+| 11-03 | meta-learner over stack_v3 legs (`src/meta_eval.py`) | LR 0.94921 / LGBM d2 0.94873 / LGBM d2 + raw 0.94875 | GBDT meta loses 0.0005; raw features add nothing → keep LR |
