@@ -50,15 +50,18 @@ No nulls anywhere.
 - No hidden-ID numerics: per-column target encoding never beats the raw monotone AUC.
 - Appending the original rows to training folds: flat (+0.00001, XGB d6).
 
-## Current best (2026-11-02 15:56)
+## Current best (2026-11-03 12:35)
 
-- **stack_v3** = LR-on-logits(ebm_i30_s7, ebm_i30_mib256, ebm_i30_s7_mib256, ebm_i30, ebm_i60,
-  xgbt2_b2048, xgbt2_b2048_s1, lgbm_d2_b2048, **lm_distilgpt2**), OOF **0.94920** — submitted.
-  The label-first GPT-2 leg is the lever (+0.0007); EBM/tree variants are saturated.
+- **stack_v4** = LR-on-logits(ebm_i30_s7, ebm_i30_mib256, ebm_i30_s7_mib256, ebm_i30, ebm_i60,
+  xgbt2_b2048, xgbt2_b2048_s1, lgbm_d2_b2048, **lm_distilgpt2_ep5**), OOF **0.95024** —
+  submitted. LM ep5 solo 0.94904 = best single leg, stack weight .59.
+- Previous: stack_v3 (same legs with the 2-ep LM) 0.94920, submitted 11-02.
 
-**Next:** when `lm_distilgpt2_ep5` assembles (`logs/lm_ep5_full.log`; re-run the same command
-to resume — folds are cached), restack as stack_v4 (swap lm_distilgpt2 → ep5, or keep both) and
-submit. Then pilot fold 1 at 10 epochs and/or `gpt2` (124M) — the curve 2→5 ep doubled the gain.
+**Next:** `lm_distilgpt2_ep10` — folds 2-5 on Kaggle (`s6e11-lm-ep10`, download with
+`kaggle kernels output alessandrosanvito/s6e11-lm-ep10 -p kaggle_out/ep10` and copy
+`_lm_distilgpt2_ep10/*` into `results/`), fold 1 locally (`logs/lm_ep10_f1.log`); then re-run
+`lm_leg.py --epochs 10 --k_val 3 --k_test 3 --tag _ep10` to assemble → stack_v5. Pilots
+gpt2-124M ep5 and distilgpt2 ep20 on Kaggle (`s6e11-lm-pilots2`).
 
 ## Previous best (2026-11-01 21:25)
 
@@ -172,3 +175,8 @@ GPT-2 leg — 29 days remain.
 | Date | Run | OOF AUC | Notes |
 |---|---|---|---|
 | 11-03 | meta-learner over stack_v3 legs (`src/meta_eval.py`) | LR 0.94921 / LGBM d2 0.94873 / LGBM d2 + raw 0.94875 | GBDT meta loses 0.0005; raw features add nothing → keep LR |
+| 11-03 | lm_distilgpt2_ep5 fold 4 retrained | f4 0.94915 | lost run gave .95000 (GPU nondeterminism); fold gains f1-f4 +.00159/.00117/.00192/.00202; adding the 2-ep LM on top: +.00003 avg → drop it |
+| 11-03 | **lm_distilgpt2_ep10** fold 1 (Kaggle T4) | f1 **0.94794** | fold-1 stack gain **+0.00199** (ep5 +0.00159, ep2 +0.00071) → still climbing; full run on Kaggle (folds 2-5, `s6e11-lm-ep10`), fold 1 locally |
+| 11-03 | lm_distilgpt2_last_ep5 (Detective, label-last) fold 1 | f1 0.94317 | stack gain **+0.00001** → absorbed; dead |
+| 11-03 | **lm_distilgpt2_ep5** (5 folds) | **0.94904** | best single leg; f5 .94513 (stack gain +.00192) |
+| 11-03 | **stack_v4** (stack_v3 legs, LM 2ep → ep5) | **0.95024** | +0.00104 over v3; submitted |
