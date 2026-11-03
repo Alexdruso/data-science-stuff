@@ -185,3 +185,5 @@ GPT-2 leg — 29 days remain.
 | 11-03 | lm_gpt2_ep5 (124M) fold 1 (Kaggle) | f1 0.94756 | stack gain +0.00166 ≈ distilgpt2 ep5 (+0.00159) at 2× cost → capacity is not the lever |
 | 11-03 | lm_distilgpt2_ep20 fold 1 (Kaggle) | f1 0.94745 | solo below ep10 but stack gain **+0.00254** (ep10 +0.00230); ep10 + ep20 + gpt2 together +0.00269 → full ep20 run (Kaggle `s6e11-lm-ep20a` folds 2-3, later folds 4-5; fold 1 local) |
 | 11-03 | lm_distilgpt2_ep5_lr5 (lr 5e-4) fold 1 | f1 0.94793 | stack gain +0.00199 (lr 2e-4: +.00159; ep10: +.00199/+.00230) → higher lr substitutes ~half the epochs |
+| 11-03 | **lm_distilgpt2_ep10** (5 folds; f2-5 Kaggle T4, f1 local) | **0.94987** | folds .94846/.94953/.95518/.95013/.94611 — every fold > ep5. CPU assembly: `src/lm_assemble.py` |
+| 11-03 | **stack_v5** (stack_v4 legs, LM ep5 → ep10) | **0.95085** | +0.00061 over v4; + ep5 as an extra leg: 0.95085 (flat); submitted |
