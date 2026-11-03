@@ -50,18 +50,21 @@ No nulls anywhere.
 - No hidden-ID numerics: per-column target encoding never beats the raw monotone AUC.
 - Appending the original rows to training folds: flat (+0.00001, XGB d6).
 
-## Current best (2026-11-03 12:35)
+## Current best (2026-11-03 17:30)
 
-- **stack_v4** = LR-on-logits(ebm_i30_s7, ebm_i30_mib256, ebm_i30_s7_mib256, ebm_i30, ebm_i60,
-  xgbt2_b2048, xgbt2_b2048_s1, lgbm_d2_b2048, **lm_distilgpt2_ep5**), OOF **0.95024** —
-  submitted. LM ep5 solo 0.94904 = best single leg, stack weight .59.
-- Previous: stack_v3 (same legs with the 2-ep LM) 0.94920, submitted 11-02.
+- **stack_v5** = LR-on-logits(ebm_i30_s7, ebm_i30_mib256, ebm_i30_s7_mib256, ebm_i30, ebm_i60,
+  xgbt2_b2048, xgbt2_b2048_s1, lgbm_d2_b2048, **lm_distilgpt2_ep10**), OOF **0.95085** —
+  submitted. LM ep10 solo 0.94987, stack weight .65. Earlier: stack_v4 (ep5 LM) 0.95024,
+  stack_v3 (2-ep LM) 0.94920.
 
-**Next:** `lm_distilgpt2_ep10` — folds 2-5 on Kaggle (`s6e11-lm-ep10`, download with
-`kaggle kernels output alessandrosanvito/s6e11-lm-ep10 -p kaggle_out/ep10` and copy
-`_lm_distilgpt2_ep10/*` into `results/`), fold 1 locally (`logs/lm_ep10_f1.log`); then re-run
-`lm_leg.py --epochs 10 --k_val 3 --k_test 3 --tag _ep10` to assemble → stack_v5. Pilots
-gpt2-124M ep5 and distilgpt2 ep20 on Kaggle (`s6e11-lm-pilots2`).
+**Next (in flight at hand-off 11-03 evening):** `lm_distilgpt2_ep20` — fold 1 local
+(`logs/lm_ep20_f1.log`, ends ~20:45), folds 2-3 Kaggle `s6e11-lm-ep20a` (ends ~23:00),
+folds 4-5 Kaggle `s6e11-lm-ep20b` (ends ~05:00 11-04). Download each with
+`kaggle kernels output alessandrosanvito/<slug> -p kaggle_out/<slug>`, copy
+`_lm_distilgpt2_ep20/*` into `results/_lm_distilgpt2_ep20/`, then
+`python src/lm_assemble.py lm_distilgpt2_ep20` → stack_v6 = v5 legs + ep20 (fold-1 pilot:
+ep10 + ep20 together +0.0004 over ep10 alone). Untested: lr 5e-4 at 10-20 epochs (5e-4 at ep5
+≈ ep10 at 2e-4); more column orders at scoring (`src/lm_rescore.py`, never run).
 
 ## Previous best (2026-11-01 21:25)
 
@@ -187,3 +190,25 @@ GPT-2 leg — 29 days remain.
 | 11-03 | lm_distilgpt2_ep5_lr5 (lr 5e-4) fold 1 | f1 0.94793 | stack gain +0.00199 (lr 2e-4: +.00159; ep10: +.00199/+.00230) → higher lr substitutes ~half the epochs |
 | 11-03 | **lm_distilgpt2_ep10** (5 folds; f2-5 Kaggle T4, f1 local) | **0.94987** | folds .94846/.94953/.95518/.95013/.94611 — every fold > ep5. CPU assembly: `src/lm_assemble.py` |
 | 11-03 | **stack_v5** (stack_v4 legs, LM ep5 → ep10) | **0.95085** | +0.00061 over v4; + ep5 as an extra leg: 0.95085 (flat); submitted |
+| 11-03 | nonlinear stack terms (LM², EBM², LM×EBM, LM hinge splines) | 0.95081-0.95085 | flat vs linear 0.95085 |
+| 11-03 | lm_distilgpt2_ep20 fold 1 (local) | f1 0.94750 | stack gain +0.00237 (ep10 +0.00230); ep10 + ep20 together +0.00254 (corr .978) → ~+0.0002 expected from adding ep20 |
+
+### 11-03 evening — we were behind the public notebooks (LB 0.95110 vs top 0.95229)
+
+- **Missed lever: digit fingerprint.** Public notebooks target-encode *digit keys* of the six
+  float columns (int part, frac, int/10, int(10x), leading 1-2 digits + length, GPT-2 tokens:
+  "96-key digit-trie TE", nested inner-fold TE, smoothing 20/100) → a single XGB d2 / LGBM
+  4-leaf reaches **0.9505-0.9515 OOF** (our best tree 0.94807, EBM 0.94846). Fraud rate depends on
+  the first decimal (.0/.4 high, .2/.3/.6 low) in every float column. Sources:
+  `lazyyeou/s6e11-digit-trie-te-joint-glm-nested-stack`, `goodpjw2008/s6e11-part-6-glm-boost-stack-lb-0-95215`.
+- **Public OOF banks share our folds** (StratifiedKFold(5, True, 42), train.csv is id-sorted):
+  `goodpjw2008/s6e11-fraud-series-artifacts` → `ext/goodpjw/` (26 members, best gb_bag5 0.95151),
+  `nilanjansaha123/96-key-digit-trie-gpt-2-full-refit-hybrid` output → `ext/96-key-…/preds/`.
+  `src/ext_stack.py` = LR on logit-ranks over ext + our legs.
+
+| Date | Run | OOF AUC | Notes |
+|---|---|---|---|
+| 11-03 | ext bank alone (goodpjw) | 0.95159 | |
+| 11-03 | **stack_ext1** = goodpjw bank + our ebm×2, xgbt2_b2048, lm_distilgpt2_ep10 | **0.95194** | LM weight .50 (largest) → LM is the different-kind leg; **LB 0.95212** (v5 0.95110); submitted |
+| 11-03 | + 96-key bank (5 members) | 0.95192 | flat — same kind |
+| 11-03 | lm_distilgpt2_ep20 folds 2, 3 (Kaggle) | .94832 / .95334 | solo below ep10 (.94953/.95518) |
