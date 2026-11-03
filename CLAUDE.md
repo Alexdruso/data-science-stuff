@@ -214,6 +214,28 @@ rules that separate the real ones from the rest. Each cost days to learn; none i
     so plan Kaggle or cloud GPUs early, because 6 GB local is too slow. A label-last GPT-2
     ("Detective", about 0.961) is a cheaper second leg that makes different errors.
 
+**The public notebooks (s6e11: +0.001 LB in 20 minutes once we looked)**
+
+15. **Read the public notebooks on day 1 and every ~3 days, and pool their OOF banks.**
+    Working LB-blind means not chasing LB deltas. It does not mean ignoring what the public
+    has found. On s6e11 we spent two days on our own pipeline at LB 0.95110 while the top was
+    at 0.95229. The notebooks had a feature family we never tried: target encoding of the
+    float columns' *digit keys* (integer part, fraction, leading digits, GPT-2 tokens). That
+    gave a single shallow tree 0.9515 OOF against our 0.948. They also published OOF banks on
+    the community folds (`StratifiedKFold(5, shuffle=True, random_state=42)` on id-sorted
+    rows, which is also our `fold_assignment`). Stacking our different-kind leg (the
+    label-first GPT-2) on a public bank took LB from 0.95110 to 0.95212. The routine:
+    - Compare our best public score with the top: `kaggle competitions leaderboard <c> -s`.
+    - List the notebooks: `kaggle kernels list --competition <c> --sort-by voteCount`, then
+      `--sort-by scoreDescending`. Scan the titles for feature families we don't know.
+    - Read the top ones: `kaggle kernels pull <ref>`.
+    - Download their OOF banks: `kaggle kernels output <ref>`, or the dataset they attach.
+    - Stack the banks with our legs (s6e11 `src/ext_stack.py`: LR on logit-ranks, with nested
+      CV for the stacker).
+    - Price our own levers *inside the pooled stack*: legs that helped our stack added nothing
+      next to the bank (s6e11: our EBM/trees 0, ep20 LM 0). Only a leg that differs in kind
+      survives (lesson 7).
+
 ## Architecture Conventions
 
 ### Data Science Preferences (from `.cursor/rules/`)
