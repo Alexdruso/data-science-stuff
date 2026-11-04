@@ -334,3 +334,8 @@ No train labels used → no leakage, no CV.
 T=1, fold-1 rows scored first). Bar: pool_v4 single-logit fold-1 gain ≥ +0.0002 → score all
 train+test and add to the pool (full-pool delta must then be ≥ +0.0001 = 2.5 sd). Next if it passes:
 longer replicas (e120/e160) — the gain rose with memorisation.
+| 11-04 | **PR replica e80, full fold 1** (140k rows, K=2, T=1) | solo 0.93021 | pool_v4 gain **-0.00005**, coef -0.002 -> **FAIL**. The 30k-subset +0.0006 was noise (bootstrap P(<=0)=7%, landed in the tail). Full scoring stopped. An orig-only replica does not add to the pool at e10-e80 |
+| 11-04 | pool calibration vs joint generator-artifact counts (#".0" decimals, #short numbers across 6 floats) | ratio y/pool 0.99-1.02 on all groups >18k rows | pool already calibrated along the artifact axis; dead |
+| 11-04 | **pool_v5 submitted** (0.952523) | | |
+
+**Day-4 verdict:** every different-kind leg built today (LM per-column, semi-supervised EM, scratch init, TabPFN-3/3.5, orig-only generator replica e10-e80, prototype matching, artifact counts) is absorbed or null on full-fold reads; only bank pooling moved OOF (0.95194 → 0.95252). Untested own avenues: replica e160+ with lr 2e-4 (memorisation regime the generator likely sat in), replica *initialising* our short-format train LM, GReaT-format full leg (stopped after 1h, resumable).
