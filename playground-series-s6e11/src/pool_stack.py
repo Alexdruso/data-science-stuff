@@ -35,6 +35,14 @@ def rl(v: np.ndarray) -> np.ndarray:
     return np.log(r / (1 - r))
 
 
+def tf_raw(v: np.ndarray) -> np.ndarray:
+    """Member score as a standardized logit (log-odds kept, probabilities logit-transformed)."""
+    if v.min() >= 0 and v.max() <= 1:
+        v = np.clip(v, 1e-7, 1 - 1e-7)
+        v = np.log(v / (1 - v))
+    return (v - v.mean()) / (v.std() + 1e-12)
+
+
 def _ok(o: np.ndarray, t: np.ndarray, n_tr: int, n_te: int) -> bool:
     return len(o) == n_tr and len(t) == n_te and bool(np.isfinite(o).all() and np.isfinite(t).all())
 
@@ -81,6 +89,7 @@ def main() -> None:
     ap.add_argument("--C", type=float, nargs="+", default=[1.0])
     ap.add_argument("--drop", nargs="*", default=[], help="substrings of member names to drop")
     ap.add_argument("--ablate", nargs="*", default=[], help="substrings; report stack without each")
+    ap.add_argument("--raw", action="store_true", help="standardized logits instead of rank-logits")
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
     tr = build_features(pl.read_csv(DATA_DIR / "train.csv"))
@@ -94,7 +103,8 @@ def main() -> None:
     mem = {k: v for k, v in mem.items() if not any(s in k for s in a.drop)}
     auc = {k: roc_auc_score(y, v[0]) for k, v in mem.items()}
     names = [k for k in sorted(auc, key=lambda k: -auc[k]) if auc[k] >= a.min_auc]
-    R = {k: rl(mem[k][0]) for k in names}
+    tf = tf_raw if a.raw else rl
+    R = {k: tf(mem[k][0]) for k in names}
     kept: list[str] = []
     for k in names:
         dup = next((j for j in kept if np.corrcoef(R[k], R[j])[0, 1] > a.dedup), None)
@@ -104,7 +114,7 @@ def main() -> None:
     for k in kept:
         print(f"  {k:60s} {auc[k]:.5f}")
     Xo = np.column_stack([R[k] for k in kept])
-    Xt = np.column_stack([rl(mem[k][1]) for k in kept])
+    Xt = np.column_stack([tf(mem[k][1]) for k in kept])
 
     def stack(cols: list[int], C: float) -> tuple[float, np.ndarray, np.ndarray]:
         oof, tst = np.zeros(len(y)), np.zeros(len(te_ids))
