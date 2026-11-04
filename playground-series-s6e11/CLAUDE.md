@@ -220,3 +220,32 @@ GPT-2 leg — 29 days remain.
 | 11-03 | + 96-key bank (5 members) | 0.95192 | flat — same kind |
 | 11-03 | lm_distilgpt2_ep20 folds 2, 3 (Kaggle) | .94832 / .95334 | solo below ep10 (.94953/.95518) |
 | 11-03 | ext stack, folds 1-3 only, members rank-logit within subset | base .95314 | ext bank alone −0.00028; ext + LM ep10 alone = base (our EBM/tree legs add 0 over the bank); **+ ep20: −0.00002, ep10→ep20 −0.00007** → ep20 does not help in the ext stack; LM length saturated at ep10 there |
+
+## Day 4 (2026-11-04)
+
+- LB top 0.95240 (09:00). New public: masayakawamata GPT-2 label-first OOF bank (GReaT recipe,
+  gpt2 small, 10 orders, CV **0.95003**; dataset `masayakawamata/s6e11-gpt2-target-first-oof` →
+  `ext/dl/`), goodpjw Part 7 (residual MLPs from the GLM `gbn_bag5_w*`, + masa GPT-2, nested CV
+  0.95206, LB 0.95222). Downloads land in `ext/dl/` (alexchilton, malyshevdanil banks slow).
+- `src/pool_stack.py` = general bank loader (+ masa `oof.npy/test.npy`, `oof_*.npy` formats),
+  dedup by rank corr, LR stack with nested outer CV, `--ablate`.
+
+| Date | Run | OOF AUC | Notes |
+|---|---|---|---|
+| 11-04 | lm_distilgpt2_ep20 (5 folds, f4/f5 Kaggle ep20b) | 0.94862 | below ep10 |
+| 11-04 | pool: goodpjw artifacts + 96-key + our ep10/ebm | 0.951911 | ≈ stack_ext1 |
+| 11-04 | **pool_v1** = above + masa GPT-2 + our ep10/ep20/ebm×2/xgb | **0.952033** | without ours 0.951985 → **our LMs add only +0.00005 once masa's LM is in**; masa alone adds +0.00035. C 0.01-10 flat |
+| 11-04 | masa vs ep10 per fold | masa .94888/.95032/.95531/.94987/.94585 vs ep10 .94846/.94953/.95518/.95013/.94611 | rank corr .98; avg of the two +0.0005 solo but +0.00005 in the stack → same-kind LMs are absorbed |
+| 11-04 | residual LightGBM (4 leaves) on pool_v1 logit, raw + digit features | 0.952017 | null: the pool already has what shallow trees see |
+| 11-04 | GReaT-format pilot | killed | masa's LM already *is* GReaT format → same kind, absorbed |
+| 11-04 | per-column LM LLRs (ep10 f1, K=4; `src/lm_colscore.py`, `lm_leg.py --colscore`) | f1 gain −0.0003 | 24 col-LLR features on top of a single pooled-stack logit lose; LM total adds −0.00002 → dead |
+| 11-04 | orig-row copy check (best orig match over 6 high-card cols) | — | max 3/6 matches, mostly 1 → the generator does not copy orig rows; dead |
+| 11-04 | **pool_v2** = all banks (goodpjw, 96-key, masa, alexchilton 38, malyshev own 11) + ours | **0.952188** | alexchilton +0.00014, malyshev +0.00003, ours +0.00008; **submitted** |
+| 11-04 | residual LightGBM on pool_v2 with raw + LM logits | 0.952085 | nonlinear meta loses 0.0001 → keep LR |
+| 11-04 | fold-1 LM gains over pool_noLM logit (`src/lm_pool_eval.py`) | ep5 −.00004, ep10 +.00000, ep20 +.00001, lr5 −.00007 | the pool has absorbed the LM kind; only a much stronger LM can move it |
+
+**PR (pre-registered 11-04 ~10:40, before the number):** `lm_distilgpt2_allneg` = all negatives
+(neg_frac 1.0) + positives ×4, 2.5 epochs (same steps as ep10), fold 1, K=3. Adopt (full 5-fold
+leg: Kaggle f2/f3 + local f1/f4/f5) only if f1 solo ≥ 0.94896 (ep10 0.94846 + 0.0005) **and** its
+fold-1 gain over pool_noLM beats ep10's (+0.000004). Honest expectation: solo +0.0002-0.0005,
+gain within noise → likely fail.
