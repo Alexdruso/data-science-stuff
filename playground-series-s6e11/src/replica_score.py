@@ -57,8 +57,13 @@ def main() -> None:
     order_tr = np.concatenate([np.where(folds == 1)[0], np.where(folds != 1)[0]])
     jobs = [("tr", seg_tr, order_tr), ("te", seg_te, np.arange(seg_te.n))]
     t0 = time.time()
+    import os
+
+    stop = int(os.environ.get("CHUNKSTOP", "0"))
     for split, segs, rows in jobs:
         for c, b in enumerate(range(0, len(rows), CHUNK)):
+            if stop and c >= stop:
+                break
             f = out / f"{split}_{c:03d}.npz"
             if f.exists():
                 continue
