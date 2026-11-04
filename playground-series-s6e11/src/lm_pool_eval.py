@@ -51,6 +51,9 @@ def main() -> None:
           f"{roc_auc_score(ys, masa[:, 0]):.5f}")
     for d in a.dirs:
         v = np.load(RESULTS_DIR / d / f"f{a.fold}_val.npy")[:, None]
+        if v.min() >= 0 and v.max() <= 1:  # probabilities -> log-odds
+            v = np.clip(v, 1e-9, 1 - 1e-9)
+            v = np.log(v / (1 - v))
         print(f"  {d:40s} solo {roc_auc_score(ys, v[:, 0]):.5f}  gain {stack(np.hstack([base, v])) - b0:+.6f}"
               f"  gain over base+masa {stack(np.hstack([base, masa, v])) - bm:+.6f}"
               f"  rho(masa) {np.corrcoef(v[:, 0], masa[:, 0])[0, 1]:.4f}")

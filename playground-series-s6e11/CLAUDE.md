@@ -279,3 +279,25 @@ re-sampled every epoch ~ Bernoulli(p/q), p = the ep10 **fold-k** model's test po
 teacher: never saw fold k). Rationale: P(x|fraud) is positive-starved (9.3k rows/fold); test holds
 ~5k unlabeled frauds (generative EM). f1 pilot, 8 epochs (28k steps vs ep10's 23k). Bar: f1 solo
 ≥ 0.94896 (ep10 + 0.0005) → full leg. Prior ~20%.
+| 11-04 | pool_v5 = pool_v4 sources + ko3 npy members (no ko3_conv) | 0.952523 | +0.00004 vs v4 = 1 sd (noise) → not submitted |
+| 11-04 | two-level family stack (per-family LR C .01 → LR over 5 family logits) | 0.95233 | flat LR 0.952523 wins. Family stacks: tree .95186, nn .95139, lm .95077 (5 LMs; masa alone .95003), glm .95073, ebm .95039 |
+| 11-04 | scratch-init distilgpt2 LM (no pretraining), ep10, lr 5e-4 / 1e-3, f1 (Kaggle `s6e11-lm-scratch`) | f1 0.94632 / 0.94582 | rho(masa) .970/.974 (more decorrelated) but pool_v4 fold-1 gain −0.00004/+0.00001 = noise → dead. Pretraining helps solo by +0.002 |
+
+**PR (11-04 13:50, before the number): TabPFN-3.5 on Kaggle T4×2** (user accepted the licence;
+`kaggle_kernels/s6e11-tabpfn35`, raw features, ctx 150k majority-downsample = all positives,
+n_est 2). Fold-1 pilot. Bar: pool_v4 fold-1 gain ≥ +0.00005 → folds 2-5. Prior ~25% (s6e10:
+public full-context 3.5 was the top coefficient; our local v3 here was null).
+| 11-04 | **PR TabPFN-3.5** (Kaggle T4×2, ctx 150k majority-downsample, raw, n_est 2) fold 1 | f1 solo **0.94717** | 8 min val + 7 min test per fold. pool_v4 fold-1 gain (logit input) **−0.00005 → FAIL**; TabPFN-3 re-read with logits −0.000015 (fail stands; earlier read fed probabilities — `lm_pool_eval.py` now logit-transforms probability members). Not run on folds 2-5 |
+| 11-04 | **PR semi-supervised Storyteller** (`--semi _lm_distilgpt2_ep10`, +79.7k test rows, ~5.5k soft positives, ep8) f1 | f1 **0.94796** | ep10 0.94846 → **FAIL** (bar 0.94896); pool_v4 fold-1 gain −0.00002. Unlabeled test rows do not help the generative LM |
+| 11-04 | ko4 harvest (areebbb pool 0.95231 = submissions only; alexchilton update; denpugovkin logreg → `ext/ko4_conv`) | 0.952523 | alexchilton update adds no new member after dedup |
+
+### 11-04 hand-off
+- **Best OOF: pool_v5 0.952523** (not submitted, +1 sd over v4); **submitted: pool_v2/v3/v4** (v4 0.952484).
+- In flight: `lm_distilgpt2_great_ep10` full leg (GReaT format, bs 32, ~4 h/fold incl. scoring,
+  resumable: re-run the same command, `logs/lm_great_ep10.log`):
+  `HF_HUB_OFFLINE=1 ~/venvs/lm/bin/python src/lm_leg.py --model distilgpt2 --epochs 10 --great_format --bs 32 --k_val 3 --k_test 2 --tag _great_ep10`.
+  Price it only in the full pool (fold-level single-logit reads cannot resolve LM variants: sd ≈ gain).
+- Dead today (all pre-registered): per-column LLR, K orders, all-negatives, semi-supervised EM,
+  scratch-init, TabPFN-3 / 3.5, residual boosting, family stack, raw-logit stacker, orig-copy.
+- The lever that keeps paying is **harvesting public same-fold banks** (+0.0001-0.0002 per batch);
+  re-list kernels by date every few hours (`ext/ko*/`, convert csv/parquet to `ext/ko*_conv`).
