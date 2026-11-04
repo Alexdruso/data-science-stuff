@@ -301,3 +301,36 @@ public full-context 3.5 was the top coefficient; our local v3 here was null).
   scratch-init, TabPFN-3 / 3.5, residual boosting, family stack, raw-logit stacker, orig-copy.
 - The lever that keeps paying is **harvesting public same-fold banks** (+0.0001-0.0002 per batch);
   re-list kernels by date every few hours (`ext/ko*/`, convert csv/parquet to `ext/ko*_conv`).
+
+### 11-04 afternoon — own lever: model the generator (replica), not the samples
+- Digit fingerprint is **generator-made**: in orig, per-first-decimal fraud rates are noise; in train
+  ".0" is fraud-elevated in every float column (amount 1.90% vs orig 1.40%, distance 1.94/1.34,
+  hours 2.20/1.84) and digit frequencies are distorted (hours ".9" 48k vs ".5" 83k) = tempered
+  token sampling. → a replica of the generator scored like the sampler should reproduce it.
+- Prototype memorisation probe (`src/proto_match.py`): max exact matches to the 339 orig fraud rows
+  ≤ 16/24 (mostly 11-12) → no row copying; "closer to orig non-fraud" diff AUC 0.82 but pool
+  +0.000036 (1 sd) → not a lever.
+- `src/replica.py`: distilgpt2, GReaT text, label-first, trained on the 20k ORIGINAL rows only (no
+  train labels → leak-free on train, no CV), scored on a 30k fold-1 subset (`src/replica_eval.py`):
+
+| epochs (lr 5e-5, bs 32) | T=1 AUC | T=0.7 AUC | T=0.7 top-k 50 | mean loglik T=1 |
+|---|---|---|---|---|
+| 10 | 0.87087 | 0.86929 | 0.67225 | −128.457 |
+| 20 | 0.91764 | 0.91761 | 0.79862 | −127.991 |
+| 40 | 0.92779 | 0.92729 | 0.82488 | −127.126 (T=0.7: −125.910) |
+
+Pool (pool_v4) gain on the 30k subset: e40 −0.00005 (T=1) / −0.00002 (T=0.7). Flattening
+(+0.047, then +0.010 for 2× epochs). Train rows are consistently more likely under T=0.7 than T=1
+→ data really were sampled tempered. Running e80 (resume from e40) to close it on data, not extrapolation.
+| **80** | 0.91962 | 0.91922 | 0.78465 | **−126.163** (T=0.7 −124.804) |
+
+**e80 overfits orig (solo ↓) but its pool_v4 gain jumps to +0.0006** on the 30k subset: +0.00041…
++0.00063 over 5 inner-CV seeds (e40: −0.00027…+0.00011); bootstrap mean +0.00058, sd 0.00038,
+P(≤0) 7%. Coefficient **negative** (−0.20 vs pool 1.12) → a suppressor: removes a component the pool
+over-trusts. Hypothesis: the generator memorised orig; only a replica that memorises too sees it.
+No train labels used → no leakage, no CV.
+
+**PR (11-04 19:35, before the number):** full fold-1 read (140k rows, `src/replica_score.py`, K=2,
+T=1, fold-1 rows scored first). Bar: pool_v4 single-logit fold-1 gain ≥ +0.0002 → score all
+train+test and add to the pool (full-pool delta must then be ≥ +0.0001 = 2.5 sd). Next if it passes:
+longer replicas (e120/e160) — the gain rose with memorisation.
