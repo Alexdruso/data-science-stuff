@@ -249,3 +249,13 @@ GPT-2 leg — 29 days remain.
 leg: Kaggle f2/f3 + local f1/f4/f5) only if f1 solo ≥ 0.94896 (ep10 0.94846 + 0.0005) **and** its
 fold-1 gain over pool_noLM beats ep10's (+0.000004). Honest expectation: solo +0.0002-0.0005,
 gain within noise → likely fail.
+| 11-04 | K=16 vs K=3 column orders (ep10 f1, 40k rows) inside pool_noLM | gain −0.00003/−0.00002 | solo +0.0001 but null in the pool → more orders is dead |
+| 11-04 | adversarial validation train vs test (raw, 200k each) | AUC 0.5004 | no shift → OOF ordering trustworthy |
+| 11-04 | pool + kernel outputs (sameershaikh glm-boost bag, megayak per-value TE, yekenot RealMLP ×2 csv→`ext/ko_conv`) | 0.952251 (C .1) | |
+| 11-04 | pool sweep: C .01/.03 | 0.952289/.952287 | stronger reg helps the bigger pool; pruning (dedup .999/.998, min_auc .948/.949) **loses** (.95222/.95221/.95220/.95205) → weak members carry signal |
+| 11-04 | **pool_v3** = 105 members (min_auc .93, dedup .9999, all our legs, C .01) | **0.952304** | ours +0.00010; **submitted**. C .003 0.952221 |
+
+**PR (11-04 ~11:00, before the number): TabPFN-3 leg** (`src/run_tabpfn.py`, v3 checkpoint, ctx = all
+fold positives + 90k negatives, raw + digit keys, n_est 2). Bar: fold-1 gain over pool_v3-without-it
+≥ +0.00005 (fold-level single-logit read) → then full 5 folds. Prior ~15% (s6e10: our local
+TabPFN-3 null; only full-context public 3.5 earned weight).

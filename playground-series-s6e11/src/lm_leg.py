@@ -178,6 +178,51 @@ def score_rows(model: GPT2LMHeadModel, voc: Vocab, segs: Segs, rows: np.ndarray,
     return lse[1] - lse[0]
 
 
+@torch.no_grad()
+def col_lp(model: GPT2LMHeadModel, voc: Vocab, segs: Segs, rows: np.ndarray, orders: np.ndarray,
+           prefix: list[int]) -> np.ndarray:
+    """(B, n_cols) log P(segment of column c | prefix, earlier segments)."""
+    ids, att, _ = segs.batch(rows, orders, [prefix] * len(rows))
+    n_cols = len(RAW_COLS)
+    col = np.full(ids.shape, n_cols, dtype=np.int64)  # n_cols = dump bucket (prefix / pad)
+    for i, (r, o) in enumerate(zip(rows, orders)):
+        pos = len(prefix)
+        for c in o:
+            ln = segs.len[c][r]
+            col[i, pos : pos + ln] = c
+            pos += ln
+    ids, att = ids.cuda(), att.cuda()
+    lp = voc.token_logp(model, ids, att)  # predicts ids[:, 1:]
+    colt = torch.from_numpy(col[:, 1:]).cuda()
+    out = torch.zeros(len(rows), n_cols + 1, device=lp.device)
+    out.scatter_add_(1, colt, lp * att[:, 1:].float())
+    res = out[:, :n_cols].cpu().numpy()
+    del ids, att, lp, colt, out
+    return res
+
+
+@torch.no_grad()
+def score_rows_cols(model: GPT2LMHeadModel, voc: Vocab, segs: Segs, rows: np.ndarray,
+                    pre: dict, k_orders: int, bs: int, seed: int
+                    ) -> tuple[np.ndarray, np.ndarray]:
+    """As score_rows, plus the per-column LLR averaged over the k orders (n x n_cols)."""
+    model.eval()
+    rng = np.random.default_rng(seed)
+    n_cols = len(RAW_COLS)
+    lp = np.zeros((2, k_orders, len(rows)))
+    llr = np.zeros((len(rows), n_cols), dtype=np.float32)
+    for kk in range(k_orders):
+        orders = np.array([rng.permutation(n_cols) for _ in range(len(rows))])
+        for b in range(0, len(rows), bs):
+            sl = slice(b, b + bs)
+            c1 = col_lp(model, voc, segs, rows[sl], orders[sl], pre[1])
+            c0 = col_lp(model, voc, segs, rows[sl], orders[sl], pre[0])
+            llr[sl] += (c1 - c0) / k_orders
+            lp[1, kk, sl], lp[0, kk, sl] = c1.sum(1), c0.sum(1)
+    lse = np.logaddexp.reduce(lp, axis=1)
+    return lse[1] - lse[0], llr
+
+
 def fit_lm(model: GPT2LMHeadModel, voc: Vocab, segs: Segs, rows_all: np.ndarray,
            labels: np.ndarray, pre: dict[int, list[int]], epochs: float, lr: float, bs: int,
            rng: np.random.Generator, last: dict[int, list[int]] | None = None) -> None:
@@ -240,6 +285,8 @@ def main() -> None:
     ap.add_argument("--tag", default="")
     ap.add_argument("--great_format", action="store_true", help="full names, 'name is value,'")
     ap.add_argument("--label_last", action="store_true", help="Detective: P(y|x), label last")
+    ap.add_argument("--pos_rep", type=int, default=1, help="repeat positives in the fit set")
+    ap.add_argument("--colscore", action="store_true", help="also save per-column LLRs")
     ap.add_argument("--orig_epochs", type=float, default=0.0,
                     help="first fit a GReaT replica on the 20k original rows (all of them)")
     a = ap.parse_args()
@@ -264,10 +311,15 @@ def main() -> None:
 
     def scorer(model: GPT2LMHeadModel, segs: Segs, rows: np.ndarray, k_ord: int, seed: int,
                prior: float) -> np.ndarray:
+        if last is None and a.colscore:
+            sc, llr = score_rows_cols(model, voc, segs, rows, pre, k_ord, 4 * a.bs, seed)
+            col_out[0] = llr
+            return sc + prior
         if last is None:
             return score_rows(model, voc, segs, rows, pre, k_ord, 4 * a.bs, seed) + prior
         return score_rows_last(model, voc, segs, rows, pre, last, k_ord, 4 * a.bs, seed) + (
             np.log(a.neg_frac))
+    col_out: list[np.ndarray] = [np.zeros(0)]
     or_s = pl.read_csv(DATA_DIR / "orig" / "credit_card_fraud_2026.csv", infer_schema=False)
     seg_or = Segs(or_s, tok)
     y_or = or_s[TARGET].cast(pl.Float64).cast(pl.Int64).to_numpy()
@@ -305,6 +357,9 @@ def main() -> None:
         va_idx = np.where(folds == k)[0]
         keep = (y[tr_idx] == 1) | (rng.random(len(tr_idx)) < a.neg_frac)
         fit_idx = tr_idx[keep]
+        if a.pos_rep > 1:
+            pos_idx = tr_idx[y[tr_idx] == 1]
+            fit_idx = np.concatenate([fit_idx, *[pos_idx] * (a.pos_rep - 1)])
         prior = np.log(y[tr_idx].mean() / (1 - y[tr_idx].mean()))
         model = GPT2LMHeadModel.from_pretrained(a.model).cuda()
         if a.orig_epochs:
@@ -323,9 +378,13 @@ def main() -> None:
         else:
             torch.save(model.state_dict(), out / f"f{k}_model.pt")  # before val: resumable
             np.save(out / f"f{k}_val.npy", sv)
+            if a.colscore:
+                np.save(out / f"f{k}_val_colllr.npy", col_out[0])
             if not a.no_test:
                 st = scorer(model, seg_te, np.arange(seg_te.n), a.k_test, 100 + k, prior)
                 np.save(out / f"f{k}_test.npy", st)
+                if a.colscore:
+                    np.save(out / f"f{k}_test_colllr.npy", col_out[0])
         del model
         torch.cuda.empty_cache()
 
