@@ -259,3 +259,23 @@ gain within noise → likely fail.
 fold positives + 90k negatives, raw + digit keys, n_est 2). Bar: fold-1 gain over pool_v3-without-it
 ≥ +0.00005 (fold-level single-logit read) → then full 5 folds. Prior ~15% (s6e10: our local
 TabPFN-3 null; only full-context public 3.5 earned weight).
+| 11-04 | raw standardized logits as stacker input (`--raw`) | 0.952230 | rank-logit 0.952304 → keep rank-logit |
+| 11-04 | **pool_v4** = 142 members: + ko2 kernel outputs (sameershaikh 10-fold glm-boost bag, seed set, digit-key trees, realmlp-glm; dhananjayk part 3; lazyyeou; georgymamarin) via `ext/ko2`, `ext/ko2_conv` (csv→npy); public blends/stacks dropped (`--drop blend pooled fusion _blend avg5`) | **0.952484** | ours +0.0001 (LMs ep20/ep10/ep5 = coefficients 2-4); **submitted** |
+
+Pool recipe (reproduce): `src/pool_stack.py --ext ext/dl/s6e11-fraud-series-artifacts
+ext/96-key-digit-trie-gpt-2-full-refit-hybrid ext/dl/s6e11-gpt2-target-first-oof ext/dl/s6e11-oof-predictions
+ext/dl/malyshev_split ext/ko ext/ko_conv ext/goodpjw ext/ko2 ext/ko2_conv --ours <all our legs> --min_auc 0.93
+--dedup 0.9999 --C 0.01 --drop blend pooled fusion _blend avg5`. Keep harvesting kernel outputs — every
+batch so far has added +0.00005-0.0002.
+| 11-04 | **PR all-negatives LM** (`--neg_frac 1 --pos_rep 4 --epochs 2.5`, f1) | f1 **0.94833** | ep10 0.94846 → **FAIL** vs bar 0.94896; pool gain −0.00004. More distinct negatives at equal compute does not help |
+| 11-04 | pool + ko3 batch (16 more kernels; npy members in `ext/ko3`, parquet/csv → `ext/ko3_conv`) | 0.952509 | without the 22 ko3_conv members 0.952523 → the 169-member LR starts to overfit; pool gains now ~noise (≤0.00004); ours +0.00005 |
+| 11-04 | C .005/.02 on the 169-member pool | .952509/.952511 | flat |
+| 11-04 | **instrument calibration**: paired bootstrap (100×, rows) of pool deltas | sd **0.00004** | v4−v3 +0.00018 (4.6 sd), v3−v2 +0.00012, v4−stack_ext1 +0.00054 (sd .0001) → pool deltas ≤0.00004 are noise |
+| 11-04 | **PR TabPFN-3** (v3 ckpt, ctx all pos + 90k neg, raw + digit keys, n_est 2) fold 1 | f1 solo **0.94311** | rho(masa) .67 but pool_v4 fold-1 gain −0.000001 → **FAIL** (bar +0.00005); 20 min/fold val. Dead, as in s6e10 |
+
+**PR (11-04 12:25, before the number): semi-supervised Storyteller** (`lm_leg.py --semi
+_lm_distilgpt2_ep10`): fold-k fit set += test rows included w.p. q = p + 0.25(1−p), label
+re-sampled every epoch ~ Bernoulli(p/q), p = the ep10 **fold-k** model's test posterior (honest
+teacher: never saw fold k). Rationale: P(x|fraud) is positive-starved (9.3k rows/fold); test holds
+~5k unlabeled frauds (generative EM). f1 pilot, 8 epochs (28k steps vs ep10's 23k). Bar: f1 solo
+≥ 0.94896 (ep10 + 0.0005) → full leg. Prior ~20%.

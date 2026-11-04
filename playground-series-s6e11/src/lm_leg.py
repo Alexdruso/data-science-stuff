@@ -225,8 +225,11 @@ def score_rows_cols(model: GPT2LMHeadModel, voc: Vocab, segs: Segs, rows: np.nda
 
 def fit_lm(model: GPT2LMHeadModel, voc: Vocab, segs: Segs, rows_all: np.ndarray,
            labels: np.ndarray, pre: dict[int, list[int]], epochs: float, lr: float, bs: int,
-           rng: np.random.Generator, last: dict[int, list[int]] | None = None) -> None:
-    """Label-first LM fit with a fresh random column order per row per step."""
+           rng: np.random.Generator, last: dict[int, list[int]] | None = None,
+           soft: np.ndarray | None = None) -> None:
+    """Label-first LM fit with a fresh random column order per row per step.
+
+    soft: optional P(y=1) per row; labels are then re-sampled every epoch (stochastic EM)."""
     n_cols = len(RAW_COLS)
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
     steps = int(epochs * len(rows_all) / bs)
@@ -238,6 +241,8 @@ def fit_lm(model: GPT2LMHeadModel, voc: Vocab, segs: Segs, rows_all: np.ndarray,
     step, run_loss = 0, 0.0
     while step < steps:
         perm = rng.permutation(len(rows_all))
+        if soft is not None:
+            labels = (rng.random(len(rows_all)) < soft).astype(np.int64)
         for b in range(0, len(perm) - bs + 1, bs):
             if step >= steps:
                 break
@@ -285,6 +290,8 @@ def main() -> None:
     ap.add_argument("--tag", default="")
     ap.add_argument("--great_format", action="store_true", help="full names, 'name is value,'")
     ap.add_argument("--label_last", action="store_true", help="Detective: P(y|x), label last")
+    ap.add_argument("--semi", default="", help="teacher dir: add test rows, labels ~ teacher")
+    ap.add_argument("--scratch", action="store_true", help="random init (config only)")
     ap.add_argument("--pos_rep", type=int, default=1, help="repeat positives in the fit set")
     ap.add_argument("--colscore", action="store_true", help="also save per-column LLRs")
     ap.add_argument("--orig_epochs", type=float, default=0.0,
@@ -305,6 +312,8 @@ def main() -> None:
     folds = fold_assignment(y)
     t0 = time.time()
     seg_tr, seg_te = Segs(tr_s, tok), Segs(te_s, tok)
+    seg_all = Segs(pl.concat([tr_s.drop(TARGET), te_s], how="vertical_relaxed"), tok) if (
+        "--semi" in sys.argv) else None
     print(f"tokenized in {time.time() - t0:.0f}s", flush=True)
     pre = prefixes(tok)
     last = suffixes(tok) if a.label_last else None
@@ -361,11 +370,30 @@ def main() -> None:
             pos_idx = tr_idx[y[tr_idx] == 1]
             fit_idx = np.concatenate([fit_idx, *[pos_idx] * (a.pos_rep - 1)])
         prior = np.log(y[tr_idx].mean() / (1 - y[tr_idx].mean()))
-        model = GPT2LMHeadModel.from_pretrained(a.model).cuda()
+        if a.scratch:
+            from transformers import AutoConfig
+
+            torch.manual_seed(1000 + k)
+            model = GPT2LMHeadModel(AutoConfig.from_pretrained(a.model)).cuda()
+        else:
+            model = GPT2LMHeadModel.from_pretrained(a.model).cuda()
         if a.orig_epochs:
             model.load_state_dict(torch.load(orig_ckpt))
         print(f"fold {k}:", flush=True)
-        fit_lm(model, voc, seg_tr, fit_idx, y[fit_idx], pre, a.epochs, a.lr, a.bs, rng, last)
+        if a.semi:
+            tz = np.load(RESULTS_DIR / a.semi / f"f{k}_test.npy")
+            pt = 1 / (1 + np.exp(-tz))
+            q = pt + a.neg_frac * (1 - pt)
+            inc = np.where(rng.random(len(pt)) < q)[0]
+            n_tr = seg_tr.n
+            rows_fit = np.concatenate([fit_idx, n_tr + inc])
+            soft = np.concatenate([y[fit_idx].astype(float), pt[inc] / q[inc]])
+            print(f"  semi: +{len(inc)} test rows (expected pos {soft[len(fit_idx):].sum():.0f})",
+                  flush=True)
+            fit_lm(model, voc, seg_all, rows_fit, (soft > 0.5).astype(np.int64), pre, a.epochs,
+                   a.lr, a.bs, rng, last, soft=soft)
+        else:
+            fit_lm(model, voc, seg_tr, fit_idx, y[fit_idx], pre, a.epochs, a.lr, a.bs, rng, last)
         sub = va_idx if not a.val_sub else np.random.default_rng(5).choice(va_idx, a.val_sub,
                                                                              replace=False)
         t0 = time.time()
