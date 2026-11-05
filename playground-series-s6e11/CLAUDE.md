@@ -422,7 +422,7 @@ f1 solo ≥ 0.9468 **and** pool_v7 fold-1 gain ≥ +0.0001 → full 5-fold leg (
 - Kaggle GPU quota exhausted until the weekly reset. Still in flight there: `s6e11-lm-replica-ctl2` (arms 4-5,
   decision-irrelevant now; log them when it completes: `kaggle kernels output alessandrosanvito/s6e11-lm-replica-ctl2`).
 - What still moves the pool: new public same-fold OOF banks (ds5_conv batch +0.0001). Re-harvest every few hours.
-- Untested own avenues: digit-spelled LM at ep20+ with lr 5e-4 (gain rose with epochs, ~3× short); a digit-spelled
+- **RESUME:** PR-6 (digit-spelled LM lr 5e-4 ep20, f1) runs overnight → read it first (command in PR-6). Untested own avenues: a digit-spelled
   GReaT-format LM; stacking at test time on refits only.
 
 **PR-5 (11-05 17:45, before the number): digit-spelled LM, lr 5e-4, ep10** (≈ ep20 at lr 2e-4; on BPE LMs lr 5e-4
