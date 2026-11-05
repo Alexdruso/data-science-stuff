@@ -424,3 +424,7 @@ f1 solo ≥ 0.9468 **and** pool_v7 fold-1 gain ≥ +0.0001 → full 5-fold leg (
 - What still moves the pool: new public same-fold OOF banks (ds5_conv batch +0.0001). Re-harvest every few hours.
 - Untested own avenues: digit-spelled LM at ep20+ with lr 5e-4 (gain rose with epochs, ~3× short); a digit-spelled
   GReaT-format LM; stacking at test time on refits only.
+
+**PR-5 (11-05 17:45, before the number): digit-spelled LM, lr 5e-4, ep10** (≈ ep20 at lr 2e-4; on BPE LMs lr 5e-4
+halved the epochs needed). f1 full val, K=3, no test. Same bar as PR-3/4: solo ≥ 0.9468 and pool_v7 f1 gain ≥ +0.0001.
+Honest expectation: gain ~+0.00005 (extrapolating +0.000015 per doubling) → likely FAIL. Prior ~10%.
