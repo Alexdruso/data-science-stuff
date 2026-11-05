@@ -394,3 +394,10 @@ val subset. Reference: random-order ep5 f1 on the same 30k rows. Bar: solo ≥ r
 ep10 run. Prior ~15%: one factorisation concentrates capacity, but GReaT itself trained on random orders, so
 the sampled data carry no preferred order and K-order averaging is lost.
 | 11-05 | NB raw + NB dig + kNN + orig-GLM together in the pool | — | −0.000002 → null |
+| 11-05 | **PR-2 fixed-column-order LM** (short, ep5, K=1, f1 30k) | 0.94358 | random-order ep5 K3 same rows 0.94351 → +0.00007 < bar +0.0005 → **FAIL**; corr .981 with ep5; one order with K=1 ≈ random orders with K=3 (cheaper scoring, same signal) |
+
+**PR-3 (11-05 14:35, before the number): digit-spelled Storyteller.** Numbers written one character per token
+(`--spaced_digits`: "1 3 7 1 . 3 7"), short format, label-first distilgpt2, ep5, fold 1 full val, K=3. Rationale:
+a different view of the same density (the BPE LMs share number tokens with the generator; this one must learn
+digit structure) → possibly decorrelated from masa/ours (rho ~.98). Bar: f1 solo ≥ 0.9468 (ep5 .94733 − 0.0005)
+**and** pool_v7 fold-1 gain ≥ +0.0001 → full leg. Prior ~10% (less faithful to the generator's tokenisation).
