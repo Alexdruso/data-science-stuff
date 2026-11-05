@@ -421,7 +421,7 @@ f1 solo ≥ 0.9468 **and** pool_v7 fold-1 gain ≥ +0.0001 → full 5-fold leg (
   logliks, NB, kNN, orig-only GLM, 12 stacker variants, goodpjw full bank (overfits), duplicate rows.
 - Kaggle GPU quota exhausted until the weekly reset. Still in flight there: `s6e11-lm-replica-ctl2` (arms 4-5,
   decision-irrelevant now; log them when it completes: `kaggle kernels output alessandrosanvito/s6e11-lm-replica-ctl2`).
-- What still moves the pool: new public same-fold OOF banks (ds5_conv batch +0.0001). Re-harvest every few hours.
+- What still moves the pool: new public same-fold OOF banks (ds5_conv batch +0.0001). Re-harvest every few hours. Next full rebuild should add `ext/ko10 ext/ko11_conv` (each ~+0.00003, below noise alone).
 - **RESUME:** PR-6 (digit-spelled LM lr 5e-4 ep20, f1) runs overnight → read it first (command in PR-6). Untested own avenues: a digit-spelled
   GReaT-format LM; stacking at test time on refits only.
 
@@ -436,3 +436,4 @@ Honest expectation: gain ~+0.00005 (extrapolating +0.000015 per doubling) → li
 --tag _spaced_ep20_lr5`, f1 full, K=3, no test; local, ~3.5 h → finishes ~23:30, resumable). Same bar: solo ≥ 0.9468
 and pool_v7 f1 gain ≥ +0.0001 → full 5-fold leg. Expectation from the trend: gain ~+0.00009 → coin flip at best. Prior ~25%.
 Read with: `python src/lm_pool_eval.py pool_v7 _lm_distilgpt2_spaced_ep20_lr5 _lm_distilgpt2_spaced_ep10_lr5`.
+| 11-05 21:00 | harvest ko11: denpugovkin joint-gains GLM/4-leaf (5) + logreg v2 (parquet → `ext/ko11_conv`) | — | pool delta +0.000031 (< 1 sd) → not submitted; include in the next full pool rebuild |
