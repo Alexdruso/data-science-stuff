@@ -357,3 +357,14 @@ longer replicas (e120/e160) — the gain rose with memorisation.
 | 11-05 | **pool_v7** = v6 + ds5 series-artifacts + ds5_conv (170 members after dedup) | **0.952670** | +0.00014 over v6 (3.5 sd); without sadam_* 0.952571 (+0.0001 from their v6 gb/glm pairs), without digitcnn 0.952644, without sadam TabPFN-3.5 0.952670 (0); ours +0.000056; **submitted** |
 | 11-05 | exact / leave-one-column-out duplicate rows across train+test | 0 groups | the generator never repeats a row; dead |
 | 11-05 | LM per-class logliks (l1, l0 separately; + log P(x); + order spread) vs LLR on top of pool_v7, ep10 f1 40k K=16 | −0.00009 / −0.00012 / −0.00002 | LLR is the right summary; dead |
+
+**PR-1 (11-05 ~10:15, before the number): Deotte's full Storyteller recipe — replica-initialised GReaT LM.**
+Arm: distilgpt2 initialised from our orig-only GReaT replica `great_e40.pt` (40 ep on the 20k original
+rows), then label-first GReaT-format fine-tune on fold-1 train, lr 5e-5, 8 epochs, bs 32, 25% negatives,
+K=3 val orders (`lm_leg.py --great_format --orig_epochs 40 --lr 5e-5 --epochs 8 --tag _great_r40_ep8`).
+Paired control on the other Kaggle T4: identical without the init (`--tag _great_lr5_ep8`).
+Instrument: fold-1 solo AUC + `lm_pool_eval.py`-style fold-1 gain over pool_v7's logit.
+**Bar:** replica-init f1 solo ≥ 0.9494 (masa's public GReaT LM f1 0.94888 + 0.0005) **and** fold-1 gain over
+pool_v7 ≥ +0.0001 → full 5-fold leg. Init effect = init − control (paired). Prior ~15%: our Day-2
+short-format orig pre-fit (10 ep, then 2 ep/fold at lr 2e-4) was noise, but that was neither GReaT format nor a
+low fine-tune lr, which are the parts of the recipe that would preserve the replica.
