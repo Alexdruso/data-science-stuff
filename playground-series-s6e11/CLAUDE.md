@@ -401,3 +401,4 @@ the sampled data carry no preferred order and K-order averaging is lost.
 a different view of the same density (the BPE LMs share number tokens with the generator; this one must learn
 digit structure) → possibly decorrelated from masa/ours (rho ~.98). Bar: f1 solo ≥ 0.9468 (ep5 .94733 − 0.0005)
 **and** pool_v7 fold-1 gain ≥ +0.0001 → full leg. Prior ~10% (less faithful to the generator's tokenisation).
+| 11-05 | **PR-1 arms 1-2** (Kaggle; GReaT lr 5e-5 ep8, replica-e40 init vs none) fold 1 | f1 **0.94812 / 0.94802** | init effect +0.0001 (noise); both < bar 0.9494; pool_v7 gain −0.000065 / −0.000019 → **PR-1 FAIL**. Deotte's replica-init recipe does not transfer: the masa-style LM is at this kind's ceiling (~.9485-.9489 on f1) |

@@ -25,7 +25,7 @@ from sklearn.metrics import roc_auc_score
 from transformers import AutoTokenizer, GPT2LMHeadModel
 
 sys.path.insert(0, str(Path(__file__).parent))
-from features import RAW_COLS, TARGET, build_features
+from features import NUM_COLS, RAW_COLS, TARGET, build_features
 
 from data_science_stuff.kaggle.cv import fold_assignment
 from data_science_stuff.kaggle.io import competition_dirs
@@ -294,6 +294,7 @@ def main() -> None:
     ap.add_argument("--val_sub", type=int, default=0, help="score only N val rows (pilot)")
     ap.add_argument("--tag", default="")
     ap.add_argument("--great_format", action="store_true", help="full names, 'name is value,'")
+    ap.add_argument("--spaced_digits", action="store_true", help="numbers spelled digit by digit")
     ap.add_argument("--fixed_order", action="store_true", help="CSV column order only (k=1)")
     ap.add_argument("--label_last", action="store_true", help="Detective: P(y|x), label last")
     ap.add_argument("--semi", default="", help="teacher dir: add test rows, labels ~ teacher")
@@ -312,6 +313,9 @@ def main() -> None:
     te_s = pl.read_csv(DATA_DIR / "test.csv", infer_schema=False)
     tr_s = tr_s.with_columns(pl.col("id").cast(pl.Int64)).sort("id")
     te_s = te_s.with_columns(pl.col("id").cast(pl.Int64)).sort("id")
+    if a.spaced_digits:  # write numbers digit by digit: one GPT-2 token per character
+        sp = [pl.col(c).str.split("").list.join(" ").alias(c) for c in NUM_COLS]
+        tr_s, te_s = tr_s.with_columns(sp), te_s.with_columns(sp)
     ref = build_features(pl.read_csv(DATA_DIR / "train.csv"))
     assert (ref["id"].to_numpy() == tr_s["id"].to_numpy()).all()
     y = ref[TARGET].to_numpy().astype(int)
@@ -336,6 +340,8 @@ def main() -> None:
             np.log(a.neg_frac))
     col_out: list[np.ndarray] = [np.zeros(0)]
     or_s = pl.read_csv(DATA_DIR / "orig" / "credit_card_fraud_2026.csv", infer_schema=False)
+    if a.spaced_digits:
+        or_s = or_s.with_columns([pl.col(c).str.split("").list.join(" ").alias(c) for c in NUM_COLS])
     seg_or = Segs(or_s, tok)
     y_or = or_s[TARGET].cast(pl.Float64).cast(pl.Int64).to_numpy()
     used = np.unique(np.concatenate([*[a.ravel() for a in seg_tr.arr + seg_te.arr + seg_or.arr],
