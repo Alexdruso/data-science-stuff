@@ -340,3 +340,20 @@ longer replicas (e120/e160) — the gain rose with memorisation.
 
 **Day-4 verdict:** every different-kind leg built today (LM per-column, semi-supervised EM, scratch init, TabPFN-3/3.5, orig-only generator replica e10-e80, prototype matching, artifact counts) is absorbed or null on full-fold reads; only bank pooling moved OOF (0.95194 → 0.95252). Untested own avenues: replica e160+ with lr 2e-4 (memorisation regime the generator likely sat in), replica *initialising* our short-format train LM, GReaT-format full leg (stopped after 1h, resumable).
 | 11-04 | replica e120 (from e80, +40 ep at lr 2e-4), full fold 1 | solo 0.82020 | loglik -123.7 (still improving) but pool_v4 gain **-0.00003** -> FAIL. Deeper memorisation hurts solo and adds nothing; orig-only generator replica closed at e10-e120, lr 5e-5 to 2e-4 |
+
+## Day 5 (2026-11-05)
+
+- 08:58 PC had rebooted overnight (GReaT ep10 leg died at step 6.5k of fold 1; resumable). LB top 0.95263
+  (Hawksartelier); top public notebooks are now rank means of public *files* (goodpjw Part 10 0.95239 =
+  0.5 Part 9 + 0.5 amanatar Sovereign file, no CV). goodpjw's honest nested CV is 0.95199; ours 0.95267.
+- Harvest: kernels → `ext/ko5/` (new OOF: mikhailnaumov XGB2_12, kava1 xgb_v5, georgymamarin v-new);
+  datasets → `ext/ds5/`, csv/npz → `ext/ds5_conv/` via `src/conv_ds5.py` (sadamtorres TabPFN-3.5 +
+  GBDT pairs, queyrusi digit CNN, wguesdon trees, malyshev cross-fitted, digit-token joint) +
+  goodpjw series-artifacts new version (test-bag members).
+
+| Date | Run | OOF AUC | Notes |
+|---|---|---|---|
+| 11-05 | pool_v6 = v5 sources + ko5 | 0.952532 | ≈ v5 (noise) |
+| 11-05 | **pool_v7** = v6 + ds5 series-artifacts + ds5_conv (170 members after dedup) | **0.952670** | +0.00014 over v6 (3.5 sd); without sadam_* 0.952571 (+0.0001 from their v6 gb/glm pairs), without digitcnn 0.952644, without sadam TabPFN-3.5 0.952670 (0); ours +0.000056; **submitted** |
+| 11-05 | exact / leave-one-column-out duplicate rows across train+test | 0 groups | the generator never repeats a row; dead |
+| 11-05 | LM per-class logliks (l1, l0 separately; + log P(x); + order spread) vs LLR on top of pool_v7, ep10 f1 40k K=16 | −0.00009 / −0.00012 / −0.00002 | LLR is the right summary; dead |
