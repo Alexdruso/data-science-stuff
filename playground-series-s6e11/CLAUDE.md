@@ -371,3 +371,11 @@ low fine-tune lr, which are the parts of the recipe that would preserve the repl
 PR-1 arm 3 (added 09:45, before any number, same bar): local RTX 2060, replica-e40 init at our tuned lr 2e-4,
 10 epochs (`--great_format --orig_epochs 40 --epochs 10 --bs 32 --tag _great_r40_ep10`), fold 1.
 | 11-05 | pool_v8 = v7 + goodpjw full 70-member `s6e11-oof-bank` (`ext/ds5b`; 218 members after dedup) | 0.952631 | below v7; without the bank 0.952666; C .003/.005 → .952578/.952622 → the extra bank members are noise; keep v7 |
+| 11-05 | stacker variants on the cached v7 matrix (`src/pool_lab.py`, base reproduces 0.952666) | — | nest10 .952661, C .02 .952660, standardized cols .952397, random-subspace bag .95251, LM cols ×1.5/2/3 .952662/.952634/.952634, + masa² .952682 (+0.000016, noise), + top-5² .952583 → all null; plain LR C .01 stays |
+| 11-05 | harvest ko6 (6 kernels since 09:00) | — | only georgymamarin re-run (same members as ko5); nothing new |
+| 11-05 | naive-Bayes per-value leg (`src/nb_leg.py`, fold-safe smoothed value rates summed as log-odds), raw / + digit keys | 0.92505 / 0.90448 | pool_v7 gain (`src/pool_add.py`, cached matrix) −0.000007 / +0.000014 → absorbed; dead |
+| 11-05 | within-fold rank-logit member transform (cached v7) | — | −0.00002 → null; global rank-logit stays |
+| 11-05 | class-weighted stacker (balanced C .01 / C .001) | — | −0.00028 / −0.00005 → null |
+PR-1 arms 4-5 (added 11:55, before any number, same bar): Kaggle `s6e11-lm-replica-ctl2` — arm 4 = no-init
+GReaT lr 2e-4 ep10 (`_great_ep10`, the paired control for local arm 3); arm 5 = replica-e40 init, lr 5e-5,
+14 epochs (`_great_r40_ep14`, does the low-lr arm just need more steps?).
