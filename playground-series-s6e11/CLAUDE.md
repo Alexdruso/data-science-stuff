@@ -402,3 +402,10 @@ a different view of the same density (the BPE LMs share number tokens with the g
 digit structure) → possibly decorrelated from masa/ours (rho ~.98). Bar: f1 solo ≥ 0.9468 (ep5 .94733 − 0.0005)
 **and** pool_v7 fold-1 gain ≥ +0.0001 → full leg. Prior ~10% (less faithful to the generator's tokenisation).
 | 11-05 | **PR-1 arms 1-2** (Kaggle; GReaT lr 5e-5 ep8, replica-e40 init vs none) fold 1 | f1 **0.94812 / 0.94802** | init effect +0.0001 (noise); both < bar 0.9494; pool_v7 gain −0.000065 / −0.000019 → **PR-1 FAIL**. Deotte's replica-init recipe does not transfer: the masa-style LM is at this kind's ceiling (~.9485-.9489 on f1) |
+- 11-05 14:40: **Kaggle weekly GPU quota (30 h) exhausted** — local RTX 2060 only until the weekly reset.
+| 11-05 | harvest ko8 (queyrusi two-stacks, longnguyen xgb) | — | submissions only, no OOF |
+| 11-05 | **PR-3 digit-spelled LM** (short, ep5, f1 full) | f1 **0.94290** | < bar 0.9468 → **FAIL**; pool_v7 f1 gain +0.000020 (ep5 −0.000029), over base+masa +0.000015; **rho(masa) 0.956** vs ≈0.983 for every BPE LM → the most decorrelated LM so far |
+
+**PR-4 (11-05 15:40, before the number): digit-spelled LM, 10 epochs** (`--spaced_digits --epochs 10`, f1 full, K=3).
+Rationale: 3× more tokens per row → ep5 likely undertrained (final train loss above BPE ep5). Same bar as PR-3:
+f1 solo ≥ 0.9468 **and** pool_v7 fold-1 gain ≥ +0.0001 → full 5-fold leg (local, ~2.5 h/fold → spans into tomorrow). Prior ~15%.
