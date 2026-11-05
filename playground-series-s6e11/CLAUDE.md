@@ -393,3 +393,4 @@ distilgpt2 trained and scored in ONE column order (CSV order, `--fixed_order`, K
 val subset. Reference: random-order ep5 f1 on the same 30k rows. Bar: solo ≥ reference + 0.0005 → full-fold
 ep10 run. Prior ~15%: one factorisation concentrates capacity, but GReaT itself trained on random orders, so
 the sampled data carry no preferred order and K-order averaging is lost.
+| 11-05 | NB raw + NB dig + kNN + orig-GLM together in the pool | — | −0.000002 → null |

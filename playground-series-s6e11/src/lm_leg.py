@@ -45,7 +45,12 @@ SHORT = {
 }
 
 
-GREAT_FMT = "--great_format" in sys.argv  # GReaT's own "column_name is value," text
+GREAT_FMT = "--great_format" in sys.argv
+FIXED = "--fixed_order" in sys.argv  # one column order (CSV order) for fit and score
+
+
+def _order(rng: np.random.Generator, n: int) -> np.ndarray:
+    return np.arange(n) if FIXED else rng.permutation(n)  # GReaT's own "column_name is value," text
 SEG_FMT = " {name} is {v}," if GREAT_FMT else " {name} {v},"
 
 
@@ -143,7 +148,7 @@ def score_rows_last(model: GPT2LMHeadModel, voc: Vocab, segs: Segs, rows: np.nda
     stem = last[1][:1]
     out = np.zeros(len(rows))
     for _ in range(k_orders):
-        orders = np.array([rng.permutation(n_cols) for _ in range(len(rows))])
+        orders = np.array([_order(rng, n_cols) for _ in range(len(rows))])
         for b in range(0, len(rows), bs):
             sl = slice(b, b + bs)
             n = len(rows[sl])
@@ -168,7 +173,7 @@ def score_rows(model: GPT2LMHeadModel, voc: Vocab, segs: Segs, rows: np.ndarray,
     n_cols = len(RAW_COLS)
     lp = np.zeros((2, k_orders, len(rows)))
     for kk in range(k_orders):
-        orders = np.array([rng.permutation(n_cols) for _ in range(len(rows))])
+        orders = np.array([_order(rng, n_cols) for _ in range(len(rows))])
         for y in (0, 1):
             for b in range(0, len(rows), bs):
                 sl = slice(b, b + bs)
@@ -212,7 +217,7 @@ def score_rows_cols(model: GPT2LMHeadModel, voc: Vocab, segs: Segs, rows: np.nda
     lp = np.zeros((2, k_orders, len(rows)))
     llr = np.zeros((len(rows), n_cols), dtype=np.float32)
     for kk in range(k_orders):
-        orders = np.array([rng.permutation(n_cols) for _ in range(len(rows))])
+        orders = np.array([_order(rng, n_cols) for _ in range(len(rows))])
         for b in range(0, len(rows), bs):
             sl = slice(b, b + bs)
             c1 = col_lp(model, voc, segs, rows[sl], orders[sl], pre[1])
@@ -248,7 +253,7 @@ def fit_lm(model: GPT2LMHeadModel, voc: Vocab, segs: Segs, rows_all: np.ndarray,
                 break
             sel = perm[b : b + bs]
             rows = rows_all[sel]
-            orders = np.array([rng.permutation(n_cols) for _ in rows])
+            orders = np.array([_order(rng, n_cols) for _ in rows])
             if last is None:
                 ids, att, _ = segs.batch(rows, orders, [pre[int(v)] for v in labels[sel]])
             else:
@@ -289,6 +294,7 @@ def main() -> None:
     ap.add_argument("--val_sub", type=int, default=0, help="score only N val rows (pilot)")
     ap.add_argument("--tag", default="")
     ap.add_argument("--great_format", action="store_true", help="full names, 'name is value,'")
+    ap.add_argument("--fixed_order", action="store_true", help="CSV column order only (k=1)")
     ap.add_argument("--label_last", action="store_true", help="Detective: P(y|x), label last")
     ap.add_argument("--semi", default="", help="teacher dir: add test rows, labels ~ teacher")
     ap.add_argument("--scratch", action="store_true", help="random init (config only)")
