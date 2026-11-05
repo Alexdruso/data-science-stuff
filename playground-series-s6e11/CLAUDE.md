@@ -430,3 +430,9 @@ halved the epochs needed). f1 full val, K=3, no test. Same bar as PR-3/4: solo �
 Honest expectation: gain ~+0.00005 (extrapolating +0.000015 per doubling) → likely FAIL. Prior ~10%.
 | 11-05 | **PR-1 arms 4-5** (Kaggle ctl2): arm 4 no-init GReaT lr 2e-4 ep10; arm 5 replica-e40 init lr 5e-5 ep14 | f1 0.94768 / **0.94903** | arm 5 = best fold-1 LM so far (> masa .94888) but < bar .9494 and pool_v7 gain −0.000082 (rho masa .987) → FAIL. Init effect at lr 2e-4: arm 3 − arm 4 = **+0.00055** (at lr 5e-5 ep8: +0.0001). Replica init is a real solo gain but the pool absorbs it (same kind as masa) |
 | 11-05 19:00 | harvest ko10: sameershaikh digit-sequence CNN (3 members, solo .945, maxcorr .968) | — | pool delta −0.000031 → null; rest submissions-only |
+| 11-05 | **PR-5 digit-spelled LM lr 5e-4 ep10** f1 | f1 **0.94610** | pool_v7 f1 gain **+0.000060** (ep10 lr 2e-4 +0.000034, ep5 +0.000020), rho(masa) .967 → FAIL (bar .9468 / +0.0001), but the only own lever whose pool gain rises monotonically with training |
+
+**PR-6 (11-05 19:40, before the number): digit-spelled LM lr 5e-4 ep20** (`--spaced_digits --lr 5e-4 --epochs 20
+--tag _spaced_ep20_lr5`, f1 full, K=3, no test; local, ~3.5 h → finishes ~23:30, resumable). Same bar: solo ≥ 0.9468
+and pool_v7 f1 gain ≥ +0.0001 → full 5-fold leg. Expectation from the trend: gain ~+0.00009 → coin flip at best. Prior ~25%.
+Read with: `python src/lm_pool_eval.py pool_v7 _lm_distilgpt2_spaced_ep20_lr5 _lm_distilgpt2_spaced_ep10_lr5`.
