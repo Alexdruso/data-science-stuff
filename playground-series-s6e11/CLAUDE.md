@@ -368,3 +368,5 @@ Instrument: fold-1 solo AUC + `lm_pool_eval.py`-style fold-1 gain over pool_v7's
 pool_v7 ≥ +0.0001 → full 5-fold leg. Init effect = init − control (paired). Prior ~15%: our Day-2
 short-format orig pre-fit (10 ep, then 2 ep/fold at lr 2e-4) was noise, but that was neither GReaT format nor a
 low fine-tune lr, which are the parts of the recipe that would preserve the replica.
+PR-1 arm 3 (added 10:25, before any number, same bar): local RTX 2060, replica-e40 init at our tuned lr 2e-4,
+10 epochs (`--great_format --orig_epochs 40 --epochs 10 --bs 32 --tag _great_r40_ep10`), fold 1.

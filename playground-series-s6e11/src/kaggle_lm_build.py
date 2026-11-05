@@ -1,6 +1,6 @@
 """Package src/lm_leg.py as a single-file Kaggle GPU kernel that runs several jobs in parallel.
 
-    python src/kaggle_lm_build.py SLUG "ARGS FOR GPU0" ["ARGS FOR GPU1"] [--fold-jobs]
+    python src/kaggle_lm_build.py SLUG "ARGS FOR GPU0" ["ARGS FOR GPU1"] [--ds=owner/dataset]
     kaggle kernels push -p kaggle_kernels/SLUG --accelerator NvidiaTeslaT4
 
 Each job is one `lm_leg.py` argument string run on its own GPU (CUDA_VISIBLE_DEVICES).
@@ -57,6 +57,9 @@ for _n in ("train.csv", "test.csv"):
 if not (DATA_DIR / "orig" / "credit_card_fraud_2026.csv").exists():
     os.symlink(_find("credit_card_fraud_2026.csv"), DATA_DIR / "orig" / "credit_card_fraud_2026.csv")
 RESULTS_DIR = Path("/kaggle/working")
+for _p in Path("/kaggle/input").rglob("_lm_*_orig_e*.pt"):  # replica checkpoints (--ds)
+    if not (RESULTS_DIR / _p.name).exists():
+        os.symlink(_p, RESULTS_DIR / _p.name)
 SUBMISSIONS_DIR = Path("/kaggle/working")
 # ------------------------------------------------------------------------------------------
 '''
@@ -89,7 +92,8 @@ if __name__ == "__main__":
 
 
 def main() -> None:
-    args = [x for x in sys.argv[1:] if not x.startswith("--keep")]
+    ds = [x.split("=", 1)[1] for x in sys.argv[1:] if x.startswith("--ds=")]
+    args = [x for x in sys.argv[1:] if not x.startswith(("--keep", "--ds="))]
     keep = "--keep_models" in sys.argv
     slug, jobs = args[0], args[1:]
     src = (HERE / "lm_leg.py").read_text()
@@ -110,7 +114,7 @@ def main() -> None:
         "id": f"alessandrosanvito/{slug}", "title": slug, "code_file": "lm_job.py",
         "language": "python", "kernel_type": "script", "is_private": True,
         "enable_gpu": True, "enable_internet": True,
-        "dataset_sources": ["uditjain13/credit-card-fraud-detection-2026"],
+        "dataset_sources": ["uditjain13/credit-card-fraud-detection-2026", *ds],
         "competition_sources": ["playground-series-s6e11"], "kernel_sources": [],
     }
     (out / "kernel-metadata.json").write_text(json.dumps(meta, indent=2))
