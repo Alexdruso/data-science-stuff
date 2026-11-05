@@ -379,3 +379,6 @@ PR-1 arm 3 (added 09:45, before any number, same bar): local RTX 2060, replica-e
 PR-1 arms 4-5 (added 11:55, before any number, same bar): Kaggle `s6e11-lm-replica-ctl2` — arm 4 = no-init
 GReaT lr 2e-4 ep10 (`_great_ep10`, the paired control for local arm 3); arm 5 = replica-e40 init, lr 5e-5,
 14 epochs (`_great_r40_ep14`, does the low-lr arm just need more steps?).
+| 11-05 | leave-one-source-out ablation (cached v7, 1 seed; noise ±0.00003) | — | only ds5_conv clearly carries signal (drop −0.000125); every other source/member within ±0.00006 → no pruning |
+| 11-05 | orig-only GLM (the label formula; `src/orig_glm.py`, no train labels) lin / spline | train 0.93435 / 0.93205 | pool gain −0.000003 / −0.000012 → absorbed |
+| 11-05 | kNN leg (k 100, rank-gauss nums + one-hot, ref = all pos + 120k neg reweighted; `src/knn_leg.py`) | 0.91899 | pool gain +0.000007 → absorbed |
