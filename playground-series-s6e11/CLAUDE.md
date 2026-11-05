@@ -358,7 +358,7 @@ longer replicas (e120/e160) — the gain rose with memorisation.
 | 11-05 | exact / leave-one-column-out duplicate rows across train+test | 0 groups | the generator never repeats a row; dead |
 | 11-05 | LM per-class logliks (l1, l0 separately; + log P(x); + order spread) vs LLR on top of pool_v7, ep10 f1 40k K=16 | −0.00009 / −0.00012 / −0.00002 | LLR is the right summary; dead |
 
-**PR-1 (11-05 ~10:15, before the number): Deotte's full Storyteller recipe — replica-initialised GReaT LM.**
+**PR-1 (11-05 09:36, before the number): Deotte's full Storyteller recipe — replica-initialised GReaT LM.**
 Arm: distilgpt2 initialised from our orig-only GReaT replica `great_e40.pt` (40 ep on the 20k original
 rows), then label-first GReaT-format fine-tune on fold-1 train, lr 5e-5, 8 epochs, bs 32, 25% negatives,
 K=3 val orders (`lm_leg.py --great_format --orig_epochs 40 --lr 5e-5 --epochs 8 --tag _great_r40_ep8`).
@@ -368,5 +368,6 @@ Instrument: fold-1 solo AUC + `lm_pool_eval.py`-style fold-1 gain over pool_v7's
 pool_v7 ≥ +0.0001 → full 5-fold leg. Init effect = init − control (paired). Prior ~15%: our Day-2
 short-format orig pre-fit (10 ep, then 2 ep/fold at lr 2e-4) was noise, but that was neither GReaT format nor a
 low fine-tune lr, which are the parts of the recipe that would preserve the replica.
-PR-1 arm 3 (added 10:25, before any number, same bar): local RTX 2060, replica-e40 init at our tuned lr 2e-4,
+PR-1 arm 3 (added 09:45, before any number, same bar): local RTX 2060, replica-e40 init at our tuned lr 2e-4,
 10 epochs (`--great_format --orig_epochs 40 --epochs 10 --bs 32 --tag _great_r40_ep10`), fold 1.
+| 11-05 | pool_v8 = v7 + goodpjw full 70-member `s6e11-oof-bank` (`ext/ds5b`; 218 members after dedup) | 0.952631 | below v7; without the bank 0.952666; C .003/.005 → .952578/.952622 → the extra bank members are noise; keep v7 |
