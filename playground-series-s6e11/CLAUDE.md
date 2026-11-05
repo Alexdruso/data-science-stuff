@@ -437,3 +437,4 @@ Honest expectation: gain ~+0.00005 (extrapolating +0.000015 per doubling) → li
 and pool_v7 f1 gain ≥ +0.0001 → full 5-fold leg. Expectation from the trend: gain ~+0.00009 → coin flip at best. Prior ~25%.
 Read with: `python src/lm_pool_eval.py pool_v7 _lm_distilgpt2_spaced_ep20_lr5 _lm_distilgpt2_spaced_ep10_lr5`.
 | 11-05 21:00 | harvest ko11: denpugovkin joint-gains GLM/4-leaf (5) + logreg v2 (parquet → `ext/ko11_conv`) | — | pool delta +0.000031 (< 1 sd) → not submitted; include in the next full pool rebuild |
+| 11-05 21:15 | pool_v9 = v7 sources + ko10 + ko11_conv (178 members) | 0.952662 | ≈ v7 (−0.000008) → not submitted; pool_v7 stays the best |
