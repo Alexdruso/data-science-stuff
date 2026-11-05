@@ -382,3 +382,14 @@ GReaT lr 2e-4 ep10 (`_great_ep10`, the paired control for local arm 3); arm 5 = 
 | 11-05 | leave-one-source-out ablation (cached v7, 1 seed; noise ±0.00003) | — | only ds5_conv clearly carries signal (drop −0.000125); every other source/member within ±0.00006 → no pruning |
 | 11-05 | orig-only GLM (the label formula; `src/orig_glm.py`, no train labels) lin / spline | train 0.93435 / 0.93205 | pool gain −0.000003 / −0.000012 → absorbed |
 | 11-05 | kNN leg (k 100, rank-gauss nums + one-hot, ref = all pos + 120k neg reweighted; `src/knn_leg.py`) | 0.91899 | pool gain +0.000007 → absorbed |
+| 11-05 | LM consensus column (mean of 5 LM rank-logits) replacing / added to the LM columns | — | −0.000023 / +0.000002 → null |
+| 11-05 | ridge (squared-loss) stacker, alpha 1e2-1e6 | — | −0.0047…−0.0019 → LR loss stays |
+| 11-05 | harvest ko7 (areebbb pool, megayak re-run, FT-transformer, DBSCAN, flaml) + alexchilton bank update (`ext/ds7`, `src/pool_add_dir.py`) | — | no new OOF members after dedup |
+| 11-05 | **PR-1 arm 3** (replica-e40 init, GReaT, lr 2e-4, ep10, local) fold 1 | f1 **0.94823** | short ep10 .94846, masa .94888 → **FAIL** (bar 0.9494); pool_v7 fold-1 gain −0.000098, over base+masa −0.000016. Replica init at our lr does not help (lower train loss = memorises, does not generalise) |
+| 11-05 | temperature-scaled LM scoring (ep10 f1 model, 40k, K=4; `src/lm_temp.py`), T .7–1.4 | solo .94541→.94593 (rises with T) | pool_v7 subset gain −0.00005 → −0.0001 (falls with T); pool_noLM same → dead: flatter LLR helps solo only |
+
+**PR-2 (11-05 13:45, before the number): fixed-column-order Storyteller.** Arm: short-format label-first
+distilgpt2 trained and scored in ONE column order (CSV order, `--fixed_order`, K=1), 5 epochs, fold 1, 30k
+val subset. Reference: random-order ep5 f1 on the same 30k rows. Bar: solo ≥ reference + 0.0005 → full-fold
+ep10 run. Prior ~15%: one factorisation concentrates capacity, but GReaT itself trained on random orders, so
+the sampled data carry no preferred order and K-order averaging is lost.
