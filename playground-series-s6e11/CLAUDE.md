@@ -409,3 +409,18 @@ digit structure) → possibly decorrelated from masa/ours (rho ~.98). Bar: f1 so
 **PR-4 (11-05 15:40, before the number): digit-spelled LM, 10 epochs** (`--spaced_digits --epochs 10`, f1 full, K=3).
 Rationale: 3× more tokens per row → ep5 likely undertrained (final train loss above BPE ep5). Same bar as PR-3:
 f1 solo ≥ 0.9468 **and** pool_v7 fold-1 gain ≥ +0.0001 → full 5-fold leg (local, ~2.5 h/fold → spans into tomorrow). Prior ~15%.
+| 11-05 16:30 | harvest (spline-tree-rankstack update; others submissions-only) | — | no new members; LB top 0.95269 |
+| 11-05 | **PR-4 digit-spelled LM ep10** f1 | f1 **0.94495** | ep5 .94290 → +0.002 from length, rho(masa) .964; pool_v7 f1 gain +0.000034 (over base+masa +0.000046) → **FAIL** (bar .9468 / +0.0001). Gain grows ~+0.000015 per doubling of epochs: ~3× short of the bar; digit-spelling avenue closed at ep5-ep10 |
+
+### 11-05 hand-off
+- **Best OOF + submitted: pool_v7 0.952670** (`src/pool_stack.py --ext <v5 dirs> ext/ko5 ext/ds5/s6e11-fraud-series-artifacts
+  ext/ds5_conv`, C .01, dedup .9999, min_auc .93). Cached matrix for 5-min stacker/member tests: `results/pool_lab.npz`
+  (`src/pool_lab.py cache|run`, `src/pool_add.py <member>`, `src/pool_add_dir.py <dir>`).
+- Dead today (all pre-registered or cheap-screened): replica-init LM at lr 5e-5/2e-4 (PR-1), fixed-order LM (PR-2),
+  digit-spelled LM ep5/ep10 (PR-3/4; most decorrelated LM, rho .96, but gain +0.00003), LM temperature, split
+  logliks, NB, kNN, orig-only GLM, 12 stacker variants, goodpjw full bank (overfits), duplicate rows.
+- Kaggle GPU quota exhausted until the weekly reset. Still in flight there: `s6e11-lm-replica-ctl2` (arms 4-5,
+  decision-irrelevant now; log them when it completes: `kaggle kernels output alessandrosanvito/s6e11-lm-replica-ctl2`).
+- What still moves the pool: new public same-fold OOF banks (ds5_conv batch +0.0001). Re-harvest every few hours.
+- Untested own avenues: digit-spelled LM at ep20+ with lr 5e-4 (gain rose with epochs, ~3× short); a digit-spelled
+  GReaT-format LM; stacking at test time on refits only.
