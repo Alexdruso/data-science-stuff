@@ -454,3 +454,13 @@ generator's digit fingerprint (public digit-TE trees 0.9515); they have never be
 Fold-1 pilot, inter 30, bags 4, jobs 4. **Bar:** pool_v7 fold-1 gain ≥ +0.0001 (`lm_pool_eval.py pool_v7
 _ebm_i30_dig`) → full 5-fold leg. Honest expectation: solo ~0.950-0.951 (between EBM and digit trees),
 gain ≈ 0 because the pool holds GLM-boost digit models (same additive kind) → likely FAIL. Prior ~15%.
+
+**PR-8 (11-06 14:05, before the number): discriminatively fine-tuned Storyteller** (`src/lm_disc.py`). Start from the
+ep10 fold-1 generative LM; train its Bayes score s(x) = log P(x|1) − log P(x|0) + prior directly with BCE on y
+(+ 1.0 × generative NLL as regulariser, lr 2e-5, bs 32, 1:3 pos:neg, 3 passes over positives), on rows the
+generative model never saw: fold-1 val, cross-fitted in two stratified halves (fit A → score B and back).
+Paired reference: the untouched ep10 model on the same rows/orders (K=3). Rationale: every LM so far is a pure
+density fit and the pool absorbs them (same kind as masa); a conditional-likelihood objective shapes the LLR
+where the classes overlap, which a density fit does not target. **Bar:** pool_v7 fold-1 gain ≥ +0.0001
+(`lm_pool_eval.py pool_v7 _lm_distilgpt2_disc`) **and** disc solo ≥ gen solo → full leg (cross-fitted per fold).
+Honest expectation: ~1.2k positives per half is little for 82M params; solo ±0.001, gain ≈ 0. Prior ~15%.
