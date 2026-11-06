@@ -483,3 +483,11 @@ same objective as PR-8 (BCE on the LLR + 1.0 × gen NLL, lr 2e-5, bs 32, 1:3) bu
 PR-8 failed on data size (1.2k positives per half); this has 8× the positives at the cost of positives the generative
 model already fit (their LLR is inflated → small gradients there). Paired reference: ep10 f1 0.94846. Bar: solo ≥
 0.94846 and pool_v7 f1 gain ≥ +0.0001. Prior ~10%.
+| 11-06 | **PR-10 disc fine-tune on fold-train rows** (9.3k pos + unseen negs, 1 pass) f1 | f1 **0.94793** | paired ep10 0.94846 → −0.0005; pool_v7 gain −0.000027 → **FAIL**. Discriminative-LM avenue closed (val-halves and train-rows both lose) |
+| 11-06 | non-negative LR stacker (L-BFGS-B, cached v7) | 0.952067 | free LR 0.952675 (78 negative coefs, Σneg −2.85 vs Σpos 4.23) → negative weights carry −0.0006 of real signal; free-LR combination spread test sd 2.49 vs OOF 2.50 → no test-side blow-up; keep free LR |
+
+**PR-11 (11-06 15:55, before the number): K=16 column orders on the full fold 1** for the ep10 LM (`lm_rescore.py
+_lm_distilgpt2_ep10 --k 16 --sub 139992`, logsumexp). The 11-04 K=16 read used 40k rows (gain resolution ~±0.0001,
+i.e. could not see the size of effect that matters now); LMs carry the pool's largest weights (masa .36, ep20 .19,
+ep10 .13). Instrument: `lm_pool_eval.py pool_v7` on the K=16 vs the stored K=3 f1 scores (paired, same model).
+Bar: K16 − K3 pool_v7 f1 gain ≥ +0.0001 → rescore ep10/ep20 val+test at K=16 for all folds (~8 h GPU, overnight). Prior ~15%.
