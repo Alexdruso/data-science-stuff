@@ -96,6 +96,8 @@ def main() -> None:
     ap.add_argument("--neg_ratio", type=int, default=3)
     ap.add_argument("--k_val", type=int, default=3)
     ap.add_argument("--tag", default="_disc")
+    ap.add_argument("--fit_on", default="valhalves", choices=["valhalves", "train"],
+                    help="train: fold-train positives + the negatives the generative fit never saw")
     ap.add_argument("--sub", type=int, default=0, help="smoke test on N val rows")
     a = ap.parse_args()
     out = RESULTS_DIR / f"_lm_{a.model}{a.tag}"
@@ -129,6 +131,23 @@ def main() -> None:
         half[rng.permutation(idx)[: len(idx) // 2]] = 1
     sv = np.zeros(len(va))
     base = np.zeros(len(va))
+    if a.fit_on == "train":
+        tr_idx = np.where(tr_k)[0]
+        keep = (y[tr_idx] == 1) | (np.random.default_rng(1000 + k).random(len(tr_idx)) < 0.25)
+        unseen_neg = tr_idx[(~keep) & (y[tr_idx] == 0)]
+        fit_rows = np.concatenate([tr_idx[y[tr_idx] == 1], unseen_neg])
+        model = GPT2LMHeadModel.from_pretrained(a.model).cuda()
+        model.load_state_dict(torch.load(RESULTS_DIR / a.src / f"f{k}_model.pt"))
+        disc_fit(model, voc, seg, fit_rows, y[fit_rows], pre, a.epochs, a.lr, a.bs, a.lam,
+                 a.neg_ratio, prior, np.random.default_rng(10))
+        sv = score_rows(model, voc, seg, va, pre, a.k_val, 4 * a.bs * 2, k) + prior
+        base = np.load(RESULTS_DIR / a.src / f"f{k}_val.npy") if not a.sub else sv * 0
+        print(f"fold {k}: disc {roc_auc_score(y[va], sv):.5f}", flush=True)
+        del model
+        torch.cuda.empty_cache()
+        if not a.sub:
+            np.save(out / f"f{k}_val.npy", sv)
+        return
     for h in (0, 1):
         fit_rows, sc_rows = va[half == h], va[half != h]
         model = GPT2LMHeadModel.from_pretrained(a.model).cuda()
