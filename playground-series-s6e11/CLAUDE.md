@@ -438,3 +438,19 @@ and pool_v7 f1 gain ≥ +0.0001 → full 5-fold leg. Expectation from the trend:
 Read with: `python src/lm_pool_eval.py pool_v7 _lm_distilgpt2_spaced_ep20_lr5 _lm_distilgpt2_spaced_ep10_lr5`.
 | 11-05 21:00 | harvest ko11: denpugovkin joint-gains GLM/4-leaf (5) + logreg v2 (parquet → `ext/ko11_conv`) | — | pool delta +0.000031 (< 1 sd) → not submitted; include in the next full pool rebuild |
 | 11-05 21:15 | pool_v9 = v7 sources + ko10 + ko11_conv (178 members) | 0.952662 | ≈ v7 (−0.000008) → not submitted; pool_v7 stays the best |
+| 11-05 | **PR-6 digit-spelled LM lr 5e-4 ep20** f1 | f1 **0.94627** | pool_v7 f1 gain **+0.000001** (ep10 lr5 +0.000060), over base+masa +0.000017, rho(masa) .957 → **FAIL**; the rising-gain trend broke at ep20 (more training = more masa-like solo, less unique). Digit-spelled avenue closed |
+
+## Day 6 (2026-11-06)
+- 08:42 PC rebooted again at 23:25 (PR-6 had finished at 23:12). Session 13:20, deadline for today's window 22:00.
+| 11-06 13:50 | harvest ko12 (21 kernels since 21:00: longnguyen xgb_v6 ×6, dhananjayk part 4 blends, masa OOF stack, mikhailnaumov, kava1, yekenot RealMLP csv → `ext/ko12_conv`) | — | pool delta −0.000036 (ko12) / −0.000011 (ko12_conv) → null |
+| 11-06 | harvest datasets: masa TabPack MLP bank (0.94402, same folds; `ext/ds12_conv`) | — | pool delta −0.000002 → null. dosomethingbetter GPT-2 replica/story weights not used (training data unknown → leak risk) |
+| 11-06 | label autocorrelation along id (lags 1-100), 10k-block fraud-rate sd vs binomial | ≈0 / .00121 vs .00128 | no generation-order signal; dead |
+
+**PR-7 (11-06 14:00, before the number): EBM on raw + digit keys** (`ebm_leg.py --digits`: per float column
+first/second decimal, #decimals, int length, leading and last int digit as written in the CSV = 36 label-free
+categorical keys; EBM handles them natively, so no target encoding and no fold leak). Rationale: the two own
+findings that moved anything were the GA2M structure (EBM best own tree-free leg 0.94846) and the
+generator's digit fingerprint (public digit-TE trees 0.9515); they have never been combined in one GA2M.
+Fold-1 pilot, inter 30, bags 4, jobs 4. **Bar:** pool_v7 fold-1 gain ≥ +0.0001 (`lm_pool_eval.py pool_v7
+_ebm_i30_dig`) → full 5-fold leg. Honest expectation: solo ~0.950-0.951 (between EBM and digit trees),
+gain ≈ 0 because the pool holds GLM-boost digit models (same additive kind) → likely FAIL. Prior ~15%.
