@@ -464,3 +464,22 @@ density fit and the pool absorbs them (same kind as masa); a conditional-likelih
 where the classes overlap, which a density fit does not target. **Bar:** pool_v7 fold-1 gain ≥ +0.0001
 (`lm_pool_eval.py pool_v7 _lm_distilgpt2_disc`) **and** disc solo ≥ gen solo → full leg (cross-fitted per fold).
 Honest expectation: ~1.2k positives per half is little for 82M params; solo ±0.001, gain ≈ 0. Prior ~15%.
+| 11-06 | **PR-7 EBM raw + 36 digit keys** f1 (10 min, 4 jobs) | f1 **0.94724** | raw EBM same seed-class .94706 → digits +0.0002 solo; pool_v7 f1 gain **−0.000014** (over base+masa +0.000009) → **FAIL**. Low-card digit keys barely help a GA2M; the public digit signal lives in high-card per-value TE (int part, token tries), already in the bank |
+| 11-06 | **PR-8 discriminative fine-tune of the ep10 LM** (BCE on LLR + gen NLL, cross-fitted fold-1 val halves) | f1 **0.94714** | paired gen 0.94846 → −0.0013 (both halves lower: .94949/.95087, .94497/.94610); pool_v7 gain −0.000023 → **FAIL**. 1.2k positives per half overfit 82M params; the conditional objective does not add a new kind |
+| 11-06 | public-member test-file audit (cached v7): corr(member, consensus) test − OOF; OOF-vs-test logit KS | — | no member drops on test (min −0.0011; median +0.002 = fold-averaged test preds are smoother) → no misaligned/broken test files. megayak per-value TE bank (9) has test on another scale (KS .89) — harmless under rank-logit |
+
+**PR-9 (11-06 15:05, before the fold-1 number): factorization machine over value tokens** (`src/fm_leg.py`; full values,
+int part, first decimal, int+d1, leading 2 digits, #decimals, last 2 decimals; rare <20 → per-field rare). Tuned on
+**fold 2** only (solo: high-card tokens overfit; best .9425 dropping full/ipd1/last2 tokens, .9385 with AdamW wd 10 on
+all tokens). Read on fold 1, 2 seeds, both configs. Bar: pool_v7 f1 gain ≥ +0.0001. Expectation: ≈ LR-level solo → absorbed. Prior 5%.
+| 11-06 | **PR-9 FM over value tokens** f1 (2 seeds) | drop-highcard **0.94305** / wd10 0.93916 | pool_v7 gain −0.000052 / −0.000030 → **FAIL**. Per-value signal needs TE-style shrinkage; an FM's L2/decay overfits high-card tokens, and without them it is an LR |
+| 11-06 15:15 | harvest ko13 (queyrusi part 8 = submissions; nikitachubai LGBM .94886 → `ext/ko13_conv`; lourens GLM-CatBoost = holdout split, not our folds) | — | pool delta +0.000010 → null |
+| 11-06 | **pool_v7 residual scan** (honest OOF, 1-param recalibrated): 493 marginal cells (raw bins + digit keys), 61.5k pairwise cells, exact-value + int-part cells of every high-card column, var = Σq(1−q) | max\|z\| 1.82 / 3.96 (null ≈ 3.0 / 4.7); per-value χ²/df ≤ 1 | **no marginal, pairwise or per-value residual structure** — the pool is calibrated everywhere a cell-level lever could live. Same instrument on our ep10 LM alone: z up to +8.7 (customer_age, flags) → it does detect structure |
+| 11-06 | per-member leak audit: χ²/df of OOF residuals in (fold, exact value) cells of the 6 high-card floats | most public members 0.99-1.03, ours LM 1.01 / EBM 1.04; under-dispersed only the 10-fold / other-fold members (goodpjw gb10_* .93-.97, sadam v6 pairs .93) → cross-fold neighbours, per-row honest; pool_v7 0.912 inherits it | **no leaky member to prune**. (Aggregating cells over all folds is biased low for any honest cross-fitted TE — the per-fold cell is the right test) |
+
+**PR-10 (11-06 15:15, before the number): discriminative fine-tune on fold-train rows** (`lm_disc.py --fit_on train`):
+same objective as PR-8 (BCE on the LLR + 1.0 × gen NLL, lr 2e-5, bs 32, 1:3) but fit on all 9.3k fold-1 train positives
++ the ~75% of fold-1 train negatives the generative ep10 fit never saw, 1 pass over positives; score fold-1 val, K=3.
+PR-8 failed on data size (1.2k positives per half); this has 8× the positives at the cost of positives the generative
+model already fit (their LLR is inflated → small gradients there). Paired reference: ep10 f1 0.94846. Bar: solo ≥
+0.94846 and pool_v7 f1 gain ≥ +0.0001. Prior ~10%.
