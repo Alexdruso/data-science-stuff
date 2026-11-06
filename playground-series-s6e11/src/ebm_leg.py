@@ -26,6 +26,29 @@ from data_science_stuff.kaggle.predictions import save_predictions
 DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 
 
+FLOATS = ["amount_usd", "hours_since_last_txn", "distance_from_home_km", "account_balance_usd",
+          "velocity_score", "merchant_risk_score"]
+
+
+def digit_keys(path: Path) -> "pd.DataFrame":
+    """Label-free digit keys of each float as written in the CSV (the generator's tokens)."""
+    import pandas as pd
+
+    raw = pd.read_csv(path, usecols=["id", *FLOATS], dtype=str)
+    out = pd.DataFrame({"id": raw["id"].astype(np.int64)})
+    for c in FLOATS:
+        s = raw[c].fillna("nan")
+        ip = s.str.split(".").str[0]
+        fr = s.str.split(".").str[1].fillna("")
+        out[f"{c}_d1"] = fr.str[:1].replace("", "x")
+        out[f"{c}_d2"] = fr.str[1:2].replace("", "x")
+        out[f"{c}_nd"] = fr.str.len().astype(str)
+        out[f"{c}_il"] = ip.str.len().astype(str)
+        out[f"{c}_lead"] = ip.str[:1]
+        out[f"{c}_last"] = ip.str[-1:]
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--folds", type=int, nargs="+", default=[1, 2, 3, 4, 5])
@@ -39,12 +62,16 @@ def main() -> None:
     ap.add_argument("--leaves", type=int, default=2)
     ap.add_argument("--smooth", type=int, default=75)
     ap.add_argument("--tag", default="")
+    ap.add_argument("--digits", action="store_true", help="add raw-string digit keys of the floats")
     a = ap.parse_args()
-    name = f"ebm_i{a.inter}" + (f"_s{a.seed}" if a.seed != 42 else "") + a.tag
+    name = f"ebm_i{a.inter}" + (f"_s{a.seed}" if a.seed != 42 else "") + ("_dig" if a.digits else "") + a.tag
     out = RESULTS_DIR / f"_{name}"
     out.mkdir(exist_ok=True)
     train = build_features(pl.read_csv(DATA_DIR / "train.csv")).to_pandas()
     test = build_features(pl.read_csv(DATA_DIR / "test.csv")).to_pandas()
+    if a.digits:
+        train = train.merge(digit_keys(DATA_DIR / "train.csv"), on="id", how="left")
+        test = test.merge(digit_keys(DATA_DIR / "test.csv"), on="id", how="left")
     feats = [c for c in train.columns if c not in EXCLUDE_COLS]
     y = train[TARGET].to_numpy().astype(int)
     folds = fold_assignment(y)
