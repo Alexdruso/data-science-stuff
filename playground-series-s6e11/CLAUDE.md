@@ -491,3 +491,53 @@ _lm_distilgpt2_ep10 --k 16 --sub 139992`, logsumexp). The 11-04 K=16 read used 4
 i.e. could not see the size of effect that matters now); LMs carry the pool's largest weights (masa .36, ep20 .19,
 ep10 .13). Instrument: `lm_pool_eval.py pool_v7` on the K=16 vs the stored K=3 f1 scores (paired, same model).
 Bar: K16 − K3 pool_v7 f1 gain ≥ +0.0001 → rescore ep10/ep20 val+test at K=16 for all folds (~8 h GPU, overnight). Prior ~15%.
+| 11-07 | **PR-11 K=16 vs K=3 column orders, ep10 LM, full fold 1** (same model, paired) | K3 0.94829 / K16 **0.94855** | pool_v7 f1 gain K16 −0.000035 vs K3 −0.000039 → **+0.000004 ≪ +0.0001 → FAIL**. More orders sharpen the solo, not the pool |
+
+## Day 7 (2026-11-07)
+- PC rebooted again overnight (shutdown 23:24). Session 09:50 → 22:00.
+
+**Screen S7-1 (11-07 09:55, before the number): segment-interaction LR stacker** on cached pool_v7 (top-20 |w| members ×
+segment indicators + segment intercepts; segments: any ".0" float, #".0" floats, channel, auth_method, card_type).
+Nest seed 7 only, paired vs base. Bar: ≥ +0.0001 → confirm on 3 seeds. Expectation: pool already calibrated along the
+artifact axis and categoricals (residual scan 11-06) → ≈ 0. Prior 5%.
+
+**PR-12 (11-07 10:10, before the number): drop column-name tokens from the LM Bayes score** (`src/lm_rescore_names.py
+_lm_distilgpt2_ep10 --fold 1 --k 3`). Our LLR sums every body token incl. " name" tokens, but column order is our own
+shuffle → log P(name | label, prefix) has zero true label signal; its label-conditional part is fit noise in the LLR.
+megayak's public LM masks names out ("column tokens are inputs, never targets"). Same model/rows/orders, paired.
+**Bar:** nonames − names pool_v7 f1 gain ≥ +0.0001 (`lm_pool_eval.py pool_v7`) → rescore val+test for ep5/ep10/ep20
+all folds (~1.5 h GPU each). Expectation: name-term LLR sd small vs LLR spread → solo +0.0001..0.0005, pool gain mostly
+absorbed but the masa-decorrelation could help. Prior 20%.
+| 11-07 | **S7-1 segment-interaction LR stacker** (cached v7, nest seed 7, base 0.952646) | dot0 −0.000021, dot0n −0.000041, channel −0.000042, auth_method −0.000150 | **FAIL** — segment-specific member weights only add variance; the pool's combination is uniform across segments |
+| 11-07 | **PR-12 drop column-name tokens from the LM score** (ep10 f1, same orders, K=3) | names 0.94842 / nonames **0.94840** | name-term LLR sd 0.042 (tiny vs LLR spread); pool_v7 gain −0.000036 vs −0.000035 → **+0.000001 → FAIL**. Note: re-drawing the K=3 orders alone moves the pool gain by 3e-5 (stored −0.000003) = the LM order-noise floor |
+
+**PR-13 (11-07 10:25, before the number): pseudo-likelihood Bayes score** (`src/lm_pll.py _lm_distilgpt2_ep10 --fold 1`,
+full fold 1, ~2 h GPU). Same saved ep10 model; for each column c put c last (others random) → log P(x_c | x_-c, y);
+PLL-LLR = Σ_c [lp(c|1) − lp(c|0)]. A different estimator of the class contrast than the prefix-chain LLR every public LM
+uses (it weights each column by its full-context conditional, not its position in a chain) → plausibly different errors.
+By-product: chain LLR at K=24. **Bar:** PLL pool_v7 f1 gain ≥ +0.0001 (`lm_pool_eval.py pool_v7 _lm_distilgpt2_ep10_pll`)
+→ score ep5 all folds + test. Expectation: solo below the chain LLR (PLL double-counts dependence), rho(masa) ~.95;
+gain likely ≤ +0.00005. Prior 10%.
+| 11-07 10:15 | harvest ko14 (25 kernels since 11-06 14:00) + ds14 (goodpjw artifacts 11-07, megayak target-first LM, alexchilton frozen banks, amanatar rank3, nina 03) | — | 4 new members after dedup (megayak glm_boost_c/raw/cnt, kava1 catboost_v7) → pool_v7 delta **−0.000011** → null. megayak LM bank has only folds 0-1 (NaN elsewhere) → not poolable yet |
+| 11-07 | goodpjw wide stack (200 members, nested OOF 0.95250) as one pool_v7 member | — | maxcorr .991, delta **−0.000037** → null (it is our pool's twin) |
+
+**PR-14 (11-07 10:50, before the number): class-specialist fine-tune** (`src/lm_specialist.py _lm_distilgpt2_ep10 --fold 1
+--epochs 2 --lr 2e-5`). Copy A of the ep10 f1 model fine-tuned on the 9.3k fold-train positives only (prefix 1); copy B
+on an equal number of fold-train negatives the generative fit never saw (prefix 0); LLR = log P_A(x|1) − log P_B(x|0).
+Rationale: in the joint model log P(x|1) is fit from 1.7% of the tokens and shares all capacity with the negatives; a
+short specialist pass sharpens the minority conditional without a discriminative objective (PR-8/10 lost to overfit of
+BCE). Also reported: positive specialist only (A vs joint for y=0). Paired ref = joint model, same rows/orders, K=3.
+**Bar:** pool_v7 f1 gain of spec (or specpos) − specref ≥ +0.0001 → full leg (5 folds; ep5 models are all local).
+Expectation: positives already fit 10 epochs in the joint model → A overfits them further; solo ±0.0003. Prior 10%.
+| 11-07 | **test-side audit of pool_v7 vs the public wide stack** (1 − Spearman; OOF vs test, against common members gb_bag5 / masa GPT-2 / our LM ep10 / ebm_dig) | ours oof→test .0127→.0085, .0284→.0270, .0285→.0237, .0228→.0130; wide .0097→.0146, .0246→.0316, .0309→.0325, .0215→.0191 | our stack moves *closer* to members on test (fold-averaged members are smoother) = consistent; goodpjw's wide stack moves *away* on test → the extra ours-vs-public distance on test (.0099 vs .0033 OOF) is their test-side noise (10-fold OOF vs refit test mismatch), not ours. pool_v7's test side is sound; public LB ranks above us need not transfer |
+| 11-07 | member OOF-vs-test structure scan (R² of each member on all others, fit on OOF, applied to test; full-data C .01 fit) | LMs: unexplained var OOF/test .035/.016 (ep20), .021/.016 (masa), .014/.005 (ep10) | ⚠️ `results/pool_lab_w_free.npy` stores the **intercept LAST** (not first) — reading it with `[1:]` shifts names by one (a "realmlp_s42 w −6.8" scare was the intercept; true w −0.001). Real finding: LM members are 2-3× noisier on OOF (1 model, K=3) than on test (5 models × K=3) → the stacker is attenuation-biased *against* LMs on test (conservative, not harmful). Dropping realmlp_s42: −0.000011 OOF, test distance .00065 → irrelevant |
+| 11-07 | megayak target-first GPT-2 LM bank (compact format, names masked; folds 1-2 only), single-logit gain over pool_v7 | f1 .94851 / f2 .95068 | gain −0.000131 / −0.000034, rho(masa) .984/.982 → null (masa's kind); no need to wait for its other folds |
+
+**PR-15 (11-07 11:35, before the number): negative-quarter LM ensemble** (Kaggle `s6e11-lm-negq`, 2× T4; weekly GPU
+quota has reset). Every own LM (ep5/ep10/ep20) was fit on the *same* 25% negative subsample (rng 1000+k, first draw), so
+they share their training negatives. New `lm_leg.py --neg_quarter q` fits the disjoint quarter q (q=0 = original). Fold 1,
+ep10 recipe (lr 2e-4, bs 64, K=3, same val orders as ep10), quarters 1 and 2. Read: avg(q0,q1,q2) LLR vs q0 alone,
+`lm_pool_eval.py pool_v7`. Rationale: 3× the distinct negatives at equal per-model compute — data, not just a seed
+(all-negatives single model at equal compute failed 11-04; this is 3× compute). **Bar:** avg pool_v7 f1 gain − q0 gain
+≥ +0.0001 → q1-q3 for all folds (~8 kernel-runs). Expectation: solo +0.0005 (ensemble), pool mostly absorbed (masa and
+the 3 own LMs already average). Prior 15%.
