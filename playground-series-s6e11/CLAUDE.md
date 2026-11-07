@@ -594,3 +594,7 @@ negative subsample, K1 16 on all positives, Dirichlet α 1, 40 iters); score log
 density that is neither an LM nor independent (NB 0.925 was absorbed). Bar: pool_v7 f1 gain ≥ +0.0001 → 5 folds.
 Expectation: solo 0.93-0.94, rho(pool) low, absorbed like NB/PLL. Prior 5%.
 | 11-07 | **S7-5 latent-class mixture leg** (`src/lcm_leg.py`, f1) K0 64/K1 16, 32 bins; K0 200/K1 32, 64 bins | solo **0.93387** / 0.93171 | rho(masa) .89; pool_v7 gain −0.000040 / +0.000001 → **FAIL**. Non-LM generative density beats NB (.925) but is too weak; more components overfit the 9.3k positives |
+| 11-07 15:20 | harvest 19: lucifer19 shadow-vote v14 | — | no OOF files (submission only) → nothing to add |
+| 11-07 17:05 | harvest 20: areebbb GLM-boost + residual MLP pool | — | submission only, no OOF → nothing to add |
+| 11-07 20:15 | harvest 23: megayak target-first GPT-2 LM bank **complete** (5 folds; `ext/ds23/megayak-lm`), megayak shallow-tree stack re-run | LM solo **0.95043** (> masa .95003) | maxcorr .982; pool_v7 delta **+0.000039** (~1 sd) → not submitted; include in the next rebuild (candidate pool_v11 = v7 + megayak LM) |
+| 11-07 21:00 | **pool_v11** = v7 sources + megayak complete LM bank (`ext/ds23/megayak-lm`) | **0.952705** | +0.000035 over v7 (< 1 sd, bar +0.0001) → **not submitted**; best OOF file on disk, finals candidate. Submit only when the next public bank batch stacks on top of it to ≥ +0.0001 over v7 |
