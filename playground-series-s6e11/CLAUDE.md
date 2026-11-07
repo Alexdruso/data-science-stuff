@@ -552,3 +552,30 @@ the 3 own LMs already average). Prior 15%.
 - Local GPU: PR-14 class specialists (`logs/lm_spec_f1.log`).
 | 11-07 | epoch-trend read at pool level, f1 (standard format): ep5_lr5 / ep10_lr5 (≈ep20) / ep20 | solo .94793 / .94738 / .94750 | pool_v7 gain +0.000005 / −0.000014 / −0.000061 → past ~ep10-equivalent the single LM overfits; **no ep40 run**. The single-model LM ceiling is reached; only data-diverse LM ensembles (PR-15) remain on this axis |
 | 11-07 | **PR-14 class-specialist fine-tune** (ep10 f1; A on 9.3k pos, B on 9.3k unseen negs, 2 ep, lr 2e-5) | ref 0.94836 / spec **0.94545** / pos-only 0.94736 | pool_v7 gain −0.000035 / −0.000034 (ref ≈ −0.00003) → **FAIL**. Single-class fine-tuning drifts each conditional away from the shared calibration the LLR needs (solo −0.003); decorrelated (rho .968) but weaker |
+| 11-07 | **PR-15 negative-quarter LM ensemble** f1 (Kaggle; q1, q2 ep10 on disjoint negative quarters; q0 = stored ep10) | q1 .94869 / q2 .94851; avg(q0,q1) .94892; **avg(q0,q1,q2) .94902** (+0.00056 solo) | inter-quarter corr .9917 (= seed-level); pool_v7 gain avg012 −0.000030 vs q0 −0.000003 → **FAIL**. More distinct negatives sharpen the solo LM exactly like a seed bag, and the pool already holds that (masa + ep5/10/20). q3 (Kaggle negq-b) not needed; speculative local q1-f3 run stopped |
+
+**Screen S7-2 (11-07 13:55, before the number): clustered-member stacker** on cached pool_v7: hierarchical clustering of
+members on |corr| (average linkage), each cluster collapsed to its mean rank-logit, LR C .01 on cluster means
+(thresholds .995/.99/.98), plus "means + all members" at C .01. Paired vs base, 3 nest seeds. Bar ≥ +0.00008 (2 sd).
+Expectation: the free LR already shrinks within near-duplicate groups via L2 → ≈ 0 or slightly negative. Prior 5%.
+| 11-07 | **S7-2 clustered-member stacker** (avg-linkage on \|corr\|; cluster-mean columns) | .995: 84 cl. −0.000158 / +members −0.000001; .99: 51 cl. −0.000224 / +0.000005; .98: 28 cl. −0.000523 / −0.000007 | **FAIL**. Collapsing even corr>.995 near-duplicates costs 0.00016 → the differences *between* near-duplicate members carry real signal (cf. 11-06 negative weights worth 0.0006); the free LR over all members is the right combiner |
+| 11-07 14:10 | harvest 16: lucifer19 golden-signal v5/v8 (3-fold own split, digit/token TE; npz → `ext/ko16_conv`), denpugovkin train-verify GLM/tree (parquet), sometimessubodh xgb, dhananjayk wide stack 18 | — | 10 new (gs_v8 maxcorr .980 = most decorrelated) → pool_v7 delta **−0.000027** → null. Note: never `np.load(..., allow_pickle=True)` on downloaded files (code execution) — the classifier blocks it; plain arrays load without it |
+
+**Screen S7-3 (11-07 14:15, before the number): pairwise-ranking stacker** (AUC surrogate) on cached pool_v7: within each
+inner train split, every positive paired with 20 random negatives; LR without intercept on ±(x_pos − x_neg), C ∈
+{.01, .1, 1}; scored on the inner val split; same nest seeds (7, 13, 99) as lr_stack. Also 0.5·rank(pair) + 0.5·rank(LR).
+Bar ≥ +0.00008 (2 sd) over base. Expectation: log-loss LR and pairwise LR agree for near-logistic signal → ≈ 0. Prior 7%.
+| 11-07 | **S7-3 pairwise-ranking stacker** (20 negs/pos, LR on ±differences, no intercept; nest seeds 7/13/99) | C .01 / .1 / 1: −0.000222 / −0.000479 / −0.000535; 50/50 rank mix with LR −0.000004 | **FAIL**. The log-loss LR beats the AUC surrogate (a pairwise fit sees only 20 negatives per positive, and the full negative ranking matters) |
+
+### 11-07 hand-off (14:30)
+- **Best OOF + submitted: pool_v7 0.952670** (unchanged). Test side audited sound vs the public wide stack.
+- Dead today (all pre-registered, fold-1 or cached-matrix reads): K=16 orders (PR-11), name-token masking (PR-12),
+  pseudo-likelihood score (PR-13), class specialists (PR-14), negative-quarter LM ensemble (PR-15), epoch trend past
+  ep10-equiv, segment-interaction stacker (S7-1), clustered-member stacker (S7-2), pairwise-ranking stacker (S7-3),
+  megayak LM bank, goodpjw wide stack as a member, harvests 14/15/16 (all ≤ 0).
+- **The LM axis is exhausted at pool level**: every LM change that raises solo AUC (orders, data, epochs, ensembles)
+  is absorbed (masa + ep5/10/20 already average it); every LM change that decorrelates (PLL, specialists, digits)
+  loses too much solo. Only a *new kind* or new public banks can move pool_v7.
+- Kaggle GPU quota reset Sat 11-07 (~4.5 h used of ~30). Kernel `s6e11-lm-negq-b` (q3 f1, q1 f2) still running; not
+  needed after PR-15 FAIL.
+- Tools added: `lm_leg.py --neg_quarter`, `lm_rescore_names.py`, `lm_pll.py`, `lm_specialist.py`.
