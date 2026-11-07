@@ -579,3 +579,18 @@ Bar ≥ +0.00008 (2 sd) over base. Expectation: log-loss LR and pairwise LR agre
 - Kaggle GPU quota reset Sat 11-07 (~4.5 h used of ~30). Kernel `s6e11-lm-negq-b` (q3 f1, q1 f2) still running; not
   needed after PR-15 FAIL.
 - Tools added: `lm_leg.py --neg_quarter`, `lm_rescore_names.py`, `lm_pll.py`, `lm_specialist.py`.
+| 11-07 14:35 | **pool_v10** = v9 sources + ko12, ko12_conv, ko13_conv, ds12_conv, ko14, ds14 (goodpjw, frozen), ko15_conv, ko16, ko16_conv (drop wide_stack) | 0.952615 | −0.000055 vs v7 at C .01 → not submitted; C re-tune on the v10 matrix next |
+| 11-07 | pool_v10 C re-tune (197 members, cached `results/pool_lab_v10.npz`) | C .02 .952613 / .01 .952615 / .005 .952609 / .003 .952585 / .002 .952529 | flat-to-worse at every C → the 26 extra members are noise for the free LR; **pool_v7 stays best** (171 members). Harvest 17 (gaurav TabPFN chunks = no output, lucifer v13 = stacks/blends only, susilnayak = submission) → nothing to add. `results/pool_lab.npz` restored to the v7 matrix |
+
+**Screen S7-4 (11-07 14:45, before the number): importance pruning of pool_v7 members** (cached v7). Importance =
+|coef| × sd(column) from the full C .01 fit; drop the bottom k ∈ {20, 40, 60, 90} and re-run lr_stack (3 nest seeds).
+Selection uses the full-data fit → mildly optimistic; bar ≥ +0.00008 (2 sd) to adopt. v10 showed extra members cost
+−0.00005, so pruning could recover ~that. Prior 10%.
+| 11-07 | **S7-4 importance pruning of pool_v7** (drop bottom-k by \|coef\|·sd of the full fit) | k 20/40/60/90: +0.000032 / +0.000023 / +0.000017 / +0.000029 | below the +0.00008 bar (and optimistic: importances from the full fit) → not adopted. But the bottom 90 of 171 members carry **nothing**: an 81-member pool equals v7 → a simpler finals hedge candidate (`pool_v7_p81`, build with nested importance selection if used) |
+
+**Screen S7-5 (11-07 15:00, before the number): class-conditional latent-class mixture** (`src/lcm_leg.py`, fold 1):
+P(x|y) = Σ_k π_k Π_j θ_kj(x_j), numerics in 32 fold-train quantile bins, cats/bools as codes; EM (K0 64 on a 25%
+negative subsample, K1 16 on all positives, Dirichlet α 1, 40 iters); score log P(x|1) − log P(x|0). A generative
+density that is neither an LM nor independent (NB 0.925 was absorbed). Bar: pool_v7 f1 gain ≥ +0.0001 → 5 folds.
+Expectation: solo 0.93-0.94, rho(pool) low, absorbed like NB/PLL. Prior 5%.
+| 11-07 | **S7-5 latent-class mixture leg** (`src/lcm_leg.py`, f1) K0 64/K1 16, 32 bins; K0 200/K1 32, 64 bins | solo **0.93387** / 0.93171 | rho(masa) .89; pool_v7 gain −0.000040 / +0.000001 → **FAIL**. Non-LM generative density beats NB (.925) but is too weak; more components overfit the 9.3k positives |
