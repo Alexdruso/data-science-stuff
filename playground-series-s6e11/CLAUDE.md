@@ -598,3 +598,4 @@ Expectation: solo 0.93-0.94, rho(pool) low, absorbed like NB/PLL. Prior 5%.
 | 11-07 17:05 | harvest 20: areebbb GLM-boost + residual MLP pool | — | submission only, no OOF → nothing to add |
 | 11-07 20:15 | harvest 23: megayak target-first GPT-2 LM bank **complete** (5 folds; `ext/ds23/megayak-lm`), megayak shallow-tree stack re-run | LM solo **0.95043** (> masa .95003) | maxcorr .982; pool_v7 delta **+0.000039** (~1 sd) → not submitted; include in the next rebuild (candidate pool_v11 = v7 + megayak LM) |
 | 11-07 21:00 | **pool_v11** = v7 sources + megayak complete LM bank (`ext/ds23/megayak-lm`) | **0.952705** | +0.000035 over v7 (< 1 sd, bar +0.0001) → **not submitted**; best OOF file on disk, finals candidate. Submit only when the next public bank batch stacks on top of it to ≥ +0.0001 over v7 |
+| 11-07 21:10 | **pool_v11 submitted** (user asked; best OOF 0.952705, needed on the board to be selectable as a final) | | |
