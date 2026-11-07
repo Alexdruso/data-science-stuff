@@ -299,6 +299,8 @@ def main() -> None:
     ap.add_argument("--label_last", action="store_true", help="Detective: P(y|x), label last")
     ap.add_argument("--semi", default="", help="teacher dir: add test rows, labels ~ teacher")
     ap.add_argument("--scratch", action="store_true", help="random init (config only)")
+    ap.add_argument("--neg_quarter", type=int, default=0,
+                    help="which disjoint neg_frac slice of the negatives to fit (0 = original)")
     ap.add_argument("--pos_rep", type=int, default=1, help="repeat positives in the fit set")
     ap.add_argument("--colscore", action="store_true", help="also save per-column LLRs")
     ap.add_argument("--orig_epochs", type=float, default=0.0,
@@ -376,7 +378,9 @@ def main() -> None:
         rng = np.random.default_rng(1000 + k)
         tr_idx = np.where(folds != k)[0]
         va_idx = np.where(folds == k)[0]
-        keep = (y[tr_idx] == 1) | (rng.random(len(tr_idx)) < a.neg_frac)
+        u = rng.random(len(tr_idx))  # neg_quarter 0 = the original subsample, q = a disjoint one
+        lo = a.neg_quarter * a.neg_frac
+        keep = (y[tr_idx] == 1) | ((u >= lo) & (u < lo + a.neg_frac))
         fit_idx = tr_idx[keep]
         if a.pos_rep > 1:
             pos_idx = tr_idx[y[tr_idx] == 1]

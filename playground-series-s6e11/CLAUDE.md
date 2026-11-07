@@ -541,3 +541,14 @@ ep10 recipe (lr 2e-4, bs 64, K=3, same val orders as ep10), quarters 1 and 2. Re
 (all-negatives single model at equal compute failed 11-04; this is 3× compute). **Bar:** avg pool_v7 f1 gain − q0 gain
 ≥ +0.0001 → q1-q3 for all folds (~8 kernel-runs). Expectation: solo +0.0005 (ensemble), pool mostly absorbed (masa and
 the 3 own LMs already average). Prior 15%.
+| 11-07 12:15 | harvest 15: alexchilton oof-predictions update (ds15), denpugovkin less-freedom GLM (parquet → `ext/ko15_conv`, same folds), hirofumitsuda, malyshev fusion, giannhs | — | ds15/ko15: 0 new after dedup; ko15_conv 3 new → delta **−0.000007** → null |
+| 11-07 | **PR-13 pseudo-likelihood LM score** (ep10 f1, each column last, full fold) | PLL solo **0.93067**, K=24 chain 0.94852 | PLL rho(masa) **.912** (most decorrelated LM-derived score yet) but pool_v7 gain −0.000025; 24 per-column PLL terms as stacker features −0.00025/−0.00028 (C .01/1) → **FAIL**. Full-context conditionals double-count dependence (solo −0.018); decorrelation without strength again |
+
+### 11-07 status (12:35)
+- Best OOF + submitted is still **pool_v7 0.952670**; its test side is sound (audit above). LB top 0.95322 (sihaoli666).
+- Kaggle weekly GPU quota has reset (probe ran on T4 11-07). In flight: `s6e11-lm-negq` (q1, q2 fold 1) and
+  `s6e11-lm-negq-b` (q3 fold 1, q1 fold 2 + test) for PR-15 → download with
+  `kaggle kernels output alessandrosanvito/s6e11-lm-negq -p kaggle_out/negq` into `results/_lm_distilgpt2_ep10_q*/`.
+- Local GPU: PR-14 class specialists (`logs/lm_spec_f1.log`).
+| 11-07 | epoch-trend read at pool level, f1 (standard format): ep5_lr5 / ep10_lr5 (≈ep20) / ep20 | solo .94793 / .94738 / .94750 | pool_v7 gain +0.000005 / −0.000014 / −0.000061 → past ~ep10-equivalent the single LM overfits; **no ep40 run**. The single-model LM ceiling is reached; only data-diverse LM ensembles (PR-15) remain on this axis |
+| 11-07 | **PR-14 class-specialist fine-tune** (ep10 f1; A on 9.3k pos, B on 9.3k unseen negs, 2 ep, lr 2e-5) | ref 0.94836 / spec **0.94545** / pos-only 0.94736 | pool_v7 gain −0.000035 / −0.000034 (ref ≈ −0.00003) → **FAIL**. Single-class fine-tuning drifts each conditional away from the shared calibration the LLR needs (solo −0.003); decorrelated (rho .968) but weaker |
