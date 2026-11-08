@@ -22,7 +22,7 @@ import numpy as np
 import polars as pl
 import torch
 from sklearn.metrics import roc_auc_score
-from transformers import AutoTokenizer, GPT2LMHeadModel
+from transformers import AutoModelForCausalLM, AutoTokenizer, GPT2LMHeadModel
 
 sys.path.insert(0, str(Path(__file__).parent))
 from features import NUM_COLS, RAW_COLS, TARGET, build_features
@@ -108,7 +108,7 @@ class Vocab:
                    ) -> torch.Tensor:
         """log P(ids[:, t+1] | ids[:, :t+1]) under the restricted softmax, shape (B, L-1)."""
         with torch.autocast("cuda", dtype=torch.float16):
-            h = model.transformer(input_ids=ids, attention_mask=att).last_hidden_state[:, :-1]
+            h = model.base_model(input_ids=ids, attention_mask=att).last_hidden_state[:, :-1]
             logits = h @ model.lm_head.weight[self.used].T
         lp = torch.log_softmax(logits.float(), -1)
         tgt = self.remap[ids[:, 1:]].clamp(min=0)
@@ -156,7 +156,7 @@ def score_rows_last(model: GPT2LMHeadModel, voc: Vocab, segs: Segs, rows: np.nda
             ids, att = ids.cuda(), att.cuda()
             pos = att.sum(1) - 1
             with torch.autocast("cuda", dtype=torch.float16):
-                h = model.transformer(input_ids=ids, attention_mask=att).last_hidden_state
+                h = model.base_model(input_ids=ids, attention_mask=att).last_hidden_state
                 h = h[torch.arange(n, device=h.device), pos]
                 lg = (h @ model.lm_head.weight[voc.used[[t1, t0]]].T).float()
             out[sl] += (lg[:, 0] - lg[:, 1]).cpu().numpy() / k_orders
@@ -306,7 +306,7 @@ def main() -> None:
     ap.add_argument("--orig_epochs", type=float, default=0.0,
                     help="first fit a GReaT replica on the 20k original rows (all of them)")
     a = ap.parse_args()
-    name = f"lm_{a.model}{'_last' if a.label_last else ''}{a.tag}"
+    name = f"lm_{a.model.split('/')[-1]}{'_last' if a.label_last else ''}{a.tag}"
     out = RESULTS_DIR / f"_{name}"
     out.mkdir(exist_ok=True)
 
@@ -351,10 +351,10 @@ def main() -> None:
                                      *[np.asarray(q) for q in suffixes(tok).values()]]))
     voc = Vocab(used[used >= 0])
     print(f"restricted vocab: {len(voc.used)} tokens", flush=True)
-    orig_ckpt = RESULTS_DIR / f"_lm_{a.model}_orig_e{a.orig_epochs:g}.pt"
+    orig_ckpt = RESULTS_DIR / f"_lm_{a.model.split('/')[-1]}_orig_e{a.orig_epochs:g}.pt"
     if a.orig_epochs and not orig_ckpt.exists():
         print("replica on original rows:", flush=True)
-        model = GPT2LMHeadModel.from_pretrained(a.model).cuda()
+        model = AutoModelForCausalLM.from_pretrained(a.model, torch_dtype=torch.float32).cuda()
         fit_lm(model, voc, seg_or, np.arange(seg_or.n), y_or, pre, a.orig_epochs, a.lr, a.bs,
                np.random.default_rng(0))
         torch.save(model.state_dict(), orig_ckpt)
@@ -367,7 +367,7 @@ def main() -> None:
                     and (out / f"f{k}_model.pt").exists()):
                 tr_k = folds != k
                 prior_k = np.log(y[tr_k].mean() / (1 - y[tr_k].mean()))
-                model = GPT2LMHeadModel.from_pretrained(a.model).cuda()
+                model = AutoModelForCausalLM.from_pretrained(a.model, torch_dtype=torch.float32).cuda()
                 model.load_state_dict(torch.load(out / f"f{k}_model.pt"))
                 st = scorer(model, seg_te, np.arange(seg_te.n), a.k_test, 100 + k, prior_k)
                 np.save(out / f"f{k}_test.npy", st)
@@ -390,9 +390,9 @@ def main() -> None:
             from transformers import AutoConfig
 
             torch.manual_seed(1000 + k)
-            model = GPT2LMHeadModel(AutoConfig.from_pretrained(a.model)).cuda()
+            model = AutoModelForCausalLM.from_config(AutoConfig.from_pretrained(a.model)).cuda()
         else:
-            model = GPT2LMHeadModel.from_pretrained(a.model).cuda()
+            model = AutoModelForCausalLM.from_pretrained(a.model, torch_dtype=torch.float32).cuda()
         if a.orig_epochs:
             model.load_state_dict(torch.load(orig_ckpt))
         print(f"fold {k}:", flush=True)
@@ -417,6 +417,7 @@ def main() -> None:
         print(f"  fold {k}: val auc {roc_auc_score(y[sub], sv):.5f} on {len(sub)} rows "
               f"({time.time() - t0:.0f}s)", flush=True)
         if a.val_sub:
+            torch.save(model.state_dict(), out / f"f{k}_model.pt")
             np.save(out / f"f{k}_valsub_idx.npy", sub)
             np.save(out / f"f{k}_valsub.npy", sv)
         else:

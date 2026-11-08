@@ -621,3 +621,13 @@ v7 pruned to its top 81 members (S7-4: = v7), then megayak LM + harvest 25a/b/c 
 free LR over 171 members may drown small new signals that a leaner pool can use. Bar: pruned81 + new ≥ v7 + 0.0001
 (selection on the full fit is mildly optimistic → only the new-member delta is clean). Prior 10%.
 | 11-08 | **S8-1 today's banks on pruned-81 v7** (36 new after dedup) | pruned81 0.952695; + all new **0.952729** | per source: yekenot RealMLP v2 +0.000030, megayak LM +0.000026, subodh +0.000010, catboost −0.000008, mathsonchain −0.000021. All new = +0.000063 vs v7, i.e. +0.00003 over pool_v11 (and pruning selection is optimistic) → **FAIL** (bar +0.0001). Leaner pool does not unlock the weak banks. ⚠️ `lr_stack` drove load to 16 on 12 cores (BLAS threads) — run pool jobs with `OMP_NUM_THREADS=4` |
+
+**PR-17 (11-08 17:35, before the number): non-GPT-2 pretrained Storyteller — SmolLM2-135M** (`lm_leg.py` now loads any
+causal LM: `AutoModelForCausalLM`, `model.base_model`, fp32 weights). Same label-first short format / 25% negatives /
+restricted softmax as ep5/ep10; SmolLM2's tokenizer writes every digit as its own token (`123.45` → 1,2,3,.,4,5) and it
+was pretrained on a different corpus (FineWeb-Edu/code/math). Every LM in the pool is GPT-2-family (ours, masa, megayak);
+PR-3/4's digit-spelled GPT-2 was the most decorrelated LM (rho masa .96) but GPT-2 never saw digit-split numbers in
+pretraining. Kaggle `s6e11-lm-smollm` 2×T4, fold 1, `--val_sub 50000 --k_val 3 --no_test`: arm A ep3, arm B ep5 (lr 2e-4,
+bs 64). Read: pool_v7 single-logit gain on the 50k subset, paired against ep10 (and ep5) GPT-2 on the same rows.
+**Bar:** SmolLM gain − ep10 gain ≥ +0.0001 → full leg on Kaggle (~4 h/fold/GPU). Expectation: solo ≈ ep5 GPT-2, rho(masa)
+~.96-.97, gain absorbed like PR-3/4. Prior 5%.
