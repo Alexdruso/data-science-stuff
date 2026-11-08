@@ -631,3 +631,10 @@ pretraining. Kaggle `s6e11-lm-smollm` 2×T4, fold 1, `--val_sub 50000 --k_val 3 
 bs 64). Read: pool_v7 single-logit gain on the 50k subset, paired against ep10 (and ep5) GPT-2 on the same rows.
 **Bar:** SmolLM gain − ep10 gain ≥ +0.0001 → full leg on Kaggle (~4 h/fold/GPU). Expectation: solo ≈ ep5 GPT-2, rho(masa)
 ~.96-.97, gain absorbed like PR-3/4. Prior 5%.
+
+**Screen S8-2 (11-08 16:55, before the number): local re-stack of the contested region** (`src/pool_local.py`, cached v7).
+Per nest split: global LR C .01; region = top q of the global train score (q .8/.9/.95); a local LR (C .01/.1) fit on region
+rows only re-scores val region rows (mapped linearly onto the global scale). Rationale: the global log-loss fit is dominated by
+easy negatives while AUC is decided where positives meet hard negatives. Bar ≥ +0.00008 (2 sd). Expectation: LR over near-
+logistic members is already locally right; s6e7 cascade was null. Prior 5%.
+| 11-08 | **S8-2 local re-stack of the top-q region** (cached v7, nest 7/13/99) | global 0.952666 | q .8/.9/.95 × C .01: −0.000017 / −0.000002 / +0.000007; C .1: −0.000096 / −0.000037 / −0.000009 → **FAIL**. The global LR is already right where positives meet hard negatives; a local fit only adds variance |
