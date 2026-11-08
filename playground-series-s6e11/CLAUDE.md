@@ -651,3 +651,4 @@ rank-logit members; outer 5-fold, inner 10% early stopping. Never tried at pool 
   ep5 − ep10 GPT-2 = +0.000107 with row-bootstrap sd **0.000085** → the +0.0001 bar is ~1.2 sd; a pass is only a trigger
   to rescore the full fold 1 with the kept model (sd ~half), not a verdict.
 | 11-08 17:20 | harvest 26: giannhs boosting-bagging-neurals (new), georgymamarin re-run, tigerpiotta EDA | — | no OOF files → nothing to add |
+| 11-08 | S8-1 honest re-read: importance pruning selected **inside** each nest split (`src/pool_pruned_nested.py`) | v7 0.952666 / v7+36 new (free) 0.952702 / **nested-pruned81+new 0.952654** | pruning is worth −0.000012 when nested → S8-1's 0.952729 (and S7-4's "pruned81 = v7") carried ~+0.00008 selection optimism. Do not use full-fit importances for pool selection; no pruned finals candidate |
