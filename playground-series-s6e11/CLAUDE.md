@@ -599,3 +599,17 @@ Expectation: solo 0.93-0.94, rho(pool) low, absorbed like NB/PLL. Prior 5%.
 | 11-07 20:15 | harvest 23: megayak target-first GPT-2 LM bank **complete** (5 folds; `ext/ds23/megayak-lm`), megayak shallow-tree stack re-run | LM solo **0.95043** (> masa .95003) | maxcorr .982; pool_v7 delta **+0.000039** (~1 sd) → not submitted; include in the next rebuild (candidate pool_v11 = v7 + megayak LM) |
 | 11-07 21:00 | **pool_v11** = v7 sources + megayak complete LM bank (`ext/ds23/megayak-lm`) | **0.952705** | +0.000035 over v7 (< 1 sd, bar +0.0001) → **not submitted**; best OOF file on disk, finals candidate. Submit only when the next public bank batch stacks on top of it to ≥ +0.0001 over v7 |
 | 11-07 21:10 | **pool_v11 submitted** (user asked; best OOF 0.952705, needed on the board to be selectable as a final) | | |
+
+## Day 8 (2026-11-08)
+- Session 15:30 → 22:00. LB top 0.95328 (강북구집돌이); goodpjw Part 12 (wide stack + megayak LM, nested 0.95252) LB 0.95298.
+| 11-08 15:50 | harvest 25a: sometimessubodh 38-feature bank (12 members, `ext/ds25_conv/subodh`), mathsonchain 17 single models (same folds), goodpjw artifacts 11-07 23:52 (realmlp_*), + megayak LM | — | 28 new; pool_v7 delta +0.000031 vs megayak alone +0.000039 → **new banks −0.000008 = null** |
+| 11-08 16:00 | harvest 25b: alexchilton shallow-tree-stack re-run (38 oof_hash members), yekenot RealMLP v2 (0.95012, csv → `ext/ko25_conv`) + megayak LM | — | 3 new; delta +0.000049 → **+0.00001 over megayak = null**. Others (goodpjw part 12, sameershaikh wide stack, malyshev, georgymamarin, denpugovkin, gaurav AutoGluon) = stacks/submissions only |
+
+**PR-16 (11-08 16:10, before the number): top-k truncation evidence** (`src/lm_topk.py _lm_distilgpt2_ep10 --fold 1 --k 3`).
+GReaT samples at top-k 50: a value token outside the generator's top 50 under label y's context cannot be emitted with y →
+hard evidence the LLR sees only smoothly. Same ep10 f1 model, same orders as PR-12 (rng 777); per value token the rank of the
+true token in the restricted vocab under each label; per row: #tokens with rank ≥ 10/20/50/100 per label (mean/min over
+orders), max log-rank, #tokens out of top-50 under y but inside under 1−y. Read: LR on [pool_v7 logit, ep10 LLR, features]
+vs [pool_v7 logit, ep10 LLR], inner 5-fold CV on fold 1. **Bar:** ≥ +0.0001 → score all folds + test (only the f1 model
+is saved locally → would need retraining = Kaggle). Expectation: our short-format LM ranks are a poor proxy of the
+generator's GReaT-format ranks under its unknown order; most of the information is already in the LLR. Prior 7%.
