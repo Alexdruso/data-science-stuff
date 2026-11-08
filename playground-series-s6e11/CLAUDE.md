@@ -640,3 +640,10 @@ logistic members is already locally right; s6e7 cascade was null. Prior 5%.
 | 11-08 | **S8-2 local re-stack of the top-q region** (cached v7, nest 7/13/99) | global 0.952666 | q .8/.9/.95 × C .01: −0.000017 / −0.000002 / +0.000007; C .1: −0.000096 / −0.000037 / −0.000009 → **FAIL**. The global LR is already right where positives meet hard negatives; a local fit only adds variance |
 - PR-17 arms C/D — **DEFERRED** (Kaggle GPU slots both busy: v1 of s6e11-lm-smollm kept running after the v2 push; run only if A/B show promise) (same bar, same read; kernel `s6e11-lm-smollm-b` built): C = SmolLM2-135M lr 5e-4 ep3 (GPT-2: higher lr ≈ half
   the epochs); D = SmolLM2-360M lr 2e-4 ep1.5 bs 32 (capacity on the new family; GPT-2 124M = distilgpt2, so prior lower).
+| 11-08 | **S8-3 test-side attenuation check** (`src/attenuation_check.py`; free LR fit on folds 2-5, fold 1 scored with the ep10 column = q0 vs avg(q0,q1,q2) quantile-mapped) | (a) 0.952099 / (b) 0.952106 | denoised LM input +0.000007; scaling the ep10 coef λ 1.2/1.5/2: −0.000013/−0.000033/−0.000070 → the 11-07 "attenuation against LMs on test" worry is immaterial; no correction |
+
+**Screen S8-4 (11-08 17:25, before the number): GBDT residual over the pool members** (`src/pool_gbdt_resid.py`): LightGBM
+(4/8 leaves, lr .02, min_child 2000/4000, ff .5, L2 10) boosted from the nested LR stack OOF (init_score) on the 171 v7
+rank-logit members; outer 5-fold, inner 10% early stopping. Never tried at pool scale (day-3 GBDT meta over 9 legs lost
+0.0005). Bar ≥ +0.00008. Expectation: no member × member structure left (residual scans clean) → early stop at ~0 trees. Prior 5%.
+| 11-08 | **S8-4 GBDT residual over pool members** (init = nested LR OOF) | LR 0.952666 | 4 leaves −0.000032 (best_iter 1,1,75,255,9), 8 leaves −0.000067 → **FAIL**. Early stopping finds nothing in 2/5 folds; no member × member interaction left for a tree to use |
