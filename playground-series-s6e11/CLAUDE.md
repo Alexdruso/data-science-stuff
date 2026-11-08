@@ -638,3 +638,5 @@ rows only re-scores val region rows (mapped linearly onto the global scale). Rat
 easy negatives while AUC is decided where positives meet hard negatives. Bar ≥ +0.00008 (2 sd). Expectation: LR over near-
 logistic members is already locally right; s6e7 cascade was null. Prior 5%.
 | 11-08 | **S8-2 local re-stack of the top-q region** (cached v7, nest 7/13/99) | global 0.952666 | q .8/.9/.95 × C .01: −0.000017 / −0.000002 / +0.000007; C .1: −0.000096 / −0.000037 / −0.000009 → **FAIL**. The global LR is already right where positives meet hard negatives; a local fit only adds variance |
+- PR-17 arms C/D (same bar, same read; Kaggle `s6e11-lm-smollm-b`): C = SmolLM2-135M lr 5e-4 ep3 (GPT-2: higher lr ≈ half
+  the epochs); D = SmolLM2-360M lr 2e-4 ep1.5 bs 32 (capacity on the new family; GPT-2 124M = distilgpt2, so prior lower).
