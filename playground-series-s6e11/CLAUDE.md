@@ -669,3 +669,4 @@ rank-logit members; outer 5-fold, inner 10% early stopping. Never tried at pool 
 - Next session: re-harvest first (`kaggle kernels list --sort-by dateRun`, `kaggle datasets list --search s6e11 --sort-by
   updated`); measure with `src/pool_add_dir.py ext/ds23 <new dirs>` (subtract megayak's +0.000039). Kaggle GPU quota:
   ~7 h used this week (resets Sat). Run pool CPU jobs with OMP_NUM_THREADS=4.
+| 11-08 21:15 | harvest 28: areebbb wide-stack re-run, lucifer v22, parth catboost, kospintr/kiza baselines; no new datasets | — | stacks/submissions/known weak members only → nothing to add. LB top 0.95328 (unchanged since 12:03) |
