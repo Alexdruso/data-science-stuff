@@ -613,3 +613,11 @@ orders), max log-rank, #tokens out of top-50 under y but inside under 1−y. Rea
 vs [pool_v7 logit, ep10 LLR], inner 5-fold CV on fold 1. **Bar:** ≥ +0.0001 → score all folds + test (only the f1 model
 is saved locally → would need retraining = Kaggle). Expectation: our short-format LM ranks are a poor proxy of the
 generator's GReaT-format ranks under its unknown order; most of the information is already in the LLR. Prior 7%.
+| 11-08 16:20 | harvest 25c: kava1 catboost v9 (6, .946), mikhailnaumov XGB2_12 (.9501) + megayak LM | — | delta +0.000028 (< megayak alone) → null |
+| 11-08 | **PR-16 top-k truncation evidence** (ep10 f1, K=3, rng 777; 32 rank features) | LLR solo 0.94842; best single feature nout20_d auc .69 | base+LLR+feats: all C .1 **−0.000121**; best group nout20 **+0.000036**, excl +0.000035 → **FAIL** (bar +0.0001). Under the *true* label our LM still puts 0.58 tokens/row outside its top 50 (rank ≥ 100: 0.03) → its ranks are a loose proxy of the generator's top-k set under an unknown order; what signal there is already lives in the LLR |
+
+**Screen S8-1 (11-08 16:50, before the number): today's banks on the importance-pruned pool** (`src/pool_pruned_add.py`).
+v7 pruned to its top 81 members (S7-4: = v7), then megayak LM + harvest 25a/b/c members added unselected. Rationale: the
+free LR over 171 members may drown small new signals that a leaner pool can use. Bar: pruned81 + new ≥ v7 + 0.0001
+(selection on the full fit is mildly optimistic → only the new-member delta is clean). Prior 10%.
+| 11-08 | **S8-1 today's banks on pruned-81 v7** (36 new after dedup) | pruned81 0.952695; + all new **0.952729** | per source: yekenot RealMLP v2 +0.000030, megayak LM +0.000026, subodh +0.000010, catboost −0.000008, mathsonchain −0.000021. All new = +0.000063 vs v7, i.e. +0.00003 over pool_v11 (and pruning selection is optimistic) → **FAIL** (bar +0.0001). Leaner pool does not unlock the weak banks. ⚠️ `lr_stack` drove load to 16 on 12 cores (BLAS threads) — run pool jobs with `OMP_NUM_THREADS=4` |
