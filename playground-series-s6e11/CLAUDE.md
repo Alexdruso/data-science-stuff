@@ -647,3 +647,6 @@ logistic members is already locally right; s6e7 cascade was null. Prior 5%.
 rank-logit members; outer 5-fold, inner 10% early stopping. Never tried at pool scale (day-3 GBDT meta over 9 legs lost
 0.0005). Bar ≥ +0.00008. Expectation: no member × member structure left (residual scans clean) → early stop at ~0 trees. Prior 5%.
 | 11-08 | **S8-4 GBDT residual over pool members** (init = nested LR OOF) | LR 0.952666 | 4 leaves −0.000032 (best_iter 1,1,75,255,9), 8 leaves −0.000067 → **FAIL**. Early stopping finds nothing in 2/5 folds; no member × member interaction left for a tree to use |
+- PR-17 instrument calibration (before the number): on the 50k fold-1 subset (861 pos), the paired gain difference
+  ep5 − ep10 GPT-2 = +0.000107 with row-bootstrap sd **0.000085** → the +0.0001 bar is ~1.2 sd; a pass is only a trigger
+  to rescore the full fold 1 with the kept model (sd ~half), not a verdict.
