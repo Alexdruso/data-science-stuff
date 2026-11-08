@@ -650,3 +650,4 @@ rank-logit members; outer 5-fold, inner 10% early stopping. Never tried at pool 
 - PR-17 instrument calibration (before the number): on the 50k fold-1 subset (861 pos), the paired gain difference
   ep5 − ep10 GPT-2 = +0.000107 with row-bootstrap sd **0.000085** → the +0.0001 bar is ~1.2 sd; a pass is only a trigger
   to rescore the full fold 1 with the kept model (sd ~half), not a verdict.
+| 11-08 17:20 | harvest 26: giannhs boosting-bagging-neurals (new), georgymamarin re-run, tigerpiotta EDA | — | no OOF files → nothing to add |
