@@ -655,3 +655,17 @@ rank-logit members; outer 5-fold, inner 10% early stopping. Never tried at pool 
 | 11-08 | C re-tune on v7 + 36 new members (incl. megayak) | — | C .005/.01/.02: +0.000020/+0.000036/+0.000031 vs v7 → flat; C .01 stays; nothing beyond pool_v11 |
 | 11-08 19:05 | harvest 27: giannhs re-run (log only), sameershaikh wide stack re-run (members.csv: same 14 sources we already pool — goodpjw, alexchilton, sameershaikh, malyshev, lazyyeou, sadam, megayak, nilanjan, masa, queyrusi, yekenot, wguesdon), gaurav AutoGluon, baselines | — | nothing new to add |
 | 11-08 | **PR-17 SmolLM2-135M Storyteller** (Kaggle 2×T4, fold 1, 50k-row subset, K=3; ~29 min/1k steps bs 64, 20 min scoring) | ep3 solo **0.94551** / ep5 **0.94633** (GPT-2 ep5 .94677, ep10 .94856 on the same rows) | pool_v7 gain −0.000025 / −0.000059 vs ep10 −0.000094, ep5 +0.000033 → paired vs ep10 +0.00007/+0.000035 (sd .000085), vs ep5 negative → **FAIL**. rho(masa) .958 = as decorrelated as the digit-spelled GPT-2 (PR-3/4) and, like it, weaker solo; gain falls with epochs. A digit-native pretrained tokenizer is the same story as spelling digits in GPT-2: a new view, not a stronger one. Arms C/D (lr 5e-4, 360M) not worth running. Models in `results/_lm_SmolLM2-135M_ep{3,5}/f1_model.pt` |
+
+### 11-08 hand-off (20:00)
+- **Best OOF + submitted: pool_v11 0.952705** (v7 + megayak LM). Every public nested CV is still below it (goodpjw Part 12
+  .95252, sameershaikh wide ~.9525). LB top 0.95328; public LB noise ~7e-4 (goodpjw), so LB ranks above us need not transfer.
+- Closed today (pre-registered): harvests 25-27 (36 new members, all ≤ +0.00001 over megayak), PR-16 top-k truncation
+  evidence, PR-17 SmolLM2 (non-GPT-2 digit-native LM), S8-1 pruned pool (nested: −0.000012), S8-2 local re-stack,
+  S8-3 test-side LM attenuation (immaterial), S8-4 GBDT residual over members, C re-tune.
+- What this measured: the combiner is right (LR, C .01, all members; no local, interaction, pruning or nonlinear gain),
+  and every new LM kind tried (tokenizer, pretraining corpus, scoring rule) trades solo strength for decorrelation at
+  ~zero net. Untested classes that remain: a *stronger-solo* LM (megayak's format beat ours by +0.0005 solo — the only LM
+  change that ever moved the pool was solo strength, ep2→ep5→ep10), and new public banks.
+- Next session: re-harvest first (`kaggle kernels list --sort-by dateRun`, `kaggle datasets list --search s6e11 --sort-by
+  updated`); measure with `src/pool_add_dir.py ext/ds23 <new dirs>` (subtract megayak's +0.000039). Kaggle GPU quota:
+  ~7 h used this week (resets Sat). Run pool CPU jobs with OMP_NUM_THREADS=4.
