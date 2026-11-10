@@ -1,0 +1,12 @@
+{
+ "max_depth": 2,
+ "min_child_weight": 8.527487156399918,
+ "subsample": 0.9064405450192388,
+ "colsample_bytree": 0.9982242387590416,
+ "reg_lambda": 0.03421487338074908,
+ "reg_alpha": 0.01106614828329805,
+ "gamma": 0.7305704261615203,
+ "max_bin": 512,
+ "max_cat_to_onehot": 1,
+ "learning_rate": 0.03
+}

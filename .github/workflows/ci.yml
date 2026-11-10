@@ -11,11 +11,15 @@ on:
 jobs:
   lint-and-test:
     name: Lint, Test, and Type Check
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04, which has no Python 3.9 build in
+    # actions/python-versions. 24.04 still has 3.9-3.11.
+    runs-on: ${{ matrix.os }}
     strategy:
+      # One leg failing must not cancel the others and hide their results.
+      fail-fast: false
       matrix:
         python-version: ["3.9", "3.10", "3.11"]
-        os: [ubuntu-latest]
+        os: [ubuntu-24.04]
 
     steps:
       - name: Checkout code

@@ -23,8 +23,9 @@ from typing import Any, NamedTuple
 
 import numpy as np
 from numpy.typing import NDArray
-from sklearn.linear_model import Ridge
-from sklearn.metrics import balanced_accuracy_score
+from scipy.stats import rankdata
+from sklearn.linear_model import LogisticRegression, Ridge
+from sklearn.metrics import balanced_accuracy_score, roc_auc_score
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 
@@ -42,6 +43,37 @@ def clipped_logit(p: NDArray[np.float64], *, eps: float = 1e-6) -> NDArray[np.fl
     [-0.6931]
     """
     return np.asarray(np.log(np.clip(p, eps, 1 - eps)), dtype=np.float64)
+
+
+def logit(p: NDArray[Any], *, eps: float = 1e-15) -> NDArray[np.float64]:
+    """Binary log-odds ``log(p / (1 - p))`` with ``p`` clipped to ``[eps, 1 - eps]``.
+
+    Not to be confused with :func:`clipped_logit`, which is the multiclass
+    ``log(p)``. The default ``eps`` only guards exact 0/1 probabilities; it is
+    the value the s6e11 scripts had re-written locally.
+
+    >>> import numpy as np
+    >>> logit(np.array([0.5, 0.75])).round(4).tolist()
+    [0.0, 1.0986]
+    """
+    q = np.clip(np.asarray(p, dtype=np.float64), eps, 1 - eps)
+    return np.asarray(np.log(q / (1 - q)), dtype=np.float64)
+
+
+def rank_logit(v: NDArray[Any]) -> NDArray[np.float64]:
+    """Logit of the (average) rank of ``v``, scaled into ``(0, 1)`` as ``r / (n + 1)``.
+
+    Puts every stack member on one scale whatever it outputs (probabilities,
+    raw margins, rank means). On s6e11's public OOF pool this beat
+    standardized logits as LR stacker input (0.952304 vs 0.952230), and
+    re-ranking within each fold instead of globally was null.
+
+    >>> import numpy as np
+    >>> rank_logit(np.array([3.0, 1.0, 2.0])).round(4).tolist()
+    [1.0986, -1.0986, 0.0]
+    """
+    r = rankdata(v) / (len(v) + 1)
+    return np.asarray(np.log(r / (1 - r)), dtype=np.float64)
 
 
 def _as_columns(arr: NDArray[np.float64]) -> NDArray[np.float64]:
@@ -321,3 +353,121 @@ def load_public_predictions(
                 oofs.append(oof)
                 tests.append(test)
     return ExternalPredictions(names, oofs, tests, skipped)
+
+
+def load_oof_banks(
+    dirs: Sequence[str | Path], *, n_train: int, n_test: int
+) -> dict[str, tuple[NDArray[np.float64], NDArray[np.float64]]]:
+    """Recursively collect binary OOF/test pairs in the layouts public banks use.
+
+    Extracted from s6e11's ``pool_stack.load_banks`` (the loader behind every
+    pooled stack there). Recognised layouts, searched with ``rglob``:
+
+    - ``<base>_oof.npy`` + ``<base>_full.npy`` (or ``_test``) -> ``<parent>:<base>``
+    - ``oof_<base>.npy`` + ``test_<base>.npy`` (or ``refit_``/``foldavg_``)
+      -> ``<parent>:<base>``
+    - a directory holding ``oof.npy`` + ``test.npy`` -> ``<parent>``
+
+    Two-column (n, 2) arrays are reduced to the positive-class column. Pairs
+    with the wrong row counts, non-finite values or unreadable files are
+    skipped silently; the first pair found under a name wins. Unlike
+    :func:`load_public_predictions` this is binary-only and does not report
+    skips. **Row order is not checked:** confirm the bank's author sorted rows
+    the way ``build_features()`` does before stacking.
+    """
+    out: dict[str, tuple[NDArray[np.float64], NDArray[np.float64]]] = {}
+    for d in dirs:
+        for p in sorted(Path(d).rglob("*.npy")):
+            name: str | None = None
+            t_path: Path | None = None
+            if p.name.endswith("_oof.npy"):
+                base = p.name[: -len("_oof.npy")]
+                t_path = _first_existing(
+                    p.parent, [f"{base}_{s}.npy" for s in ("full", "test")]
+                )
+                name = f"{p.parent.name}:{base}"
+            elif p.name.startswith("oof_"):
+                base = p.name[len("oof_") : -len(".npy")]
+                t_path = _first_existing(
+                    p.parent, [f"{s}_{base}.npy" for s in ("test", "refit", "foldavg")]
+                )
+                name = f"{p.parent.name}:{base}"
+            elif p.name == "oof.npy":
+                t_path = p.parent / "test.npy"
+                name = p.parent.name
+            if name is None or t_path is None or not t_path.exists():
+                continue
+            try:
+                o = np.load(p).astype(np.float64)
+                t = np.load(t_path).astype(np.float64)
+            except (ValueError, OSError):
+                continue
+            if o.ndim == 2 and o.shape[1] == 2:  # noqa: PLR2004
+                o = o[:, 1]
+                t = t[:, 1] if t.ndim == 2 else t  # noqa: PLR2004
+            o, t = o.ravel(), t.ravel()
+            ok = len(o) == n_train and len(t) == n_test and name not in out
+            if ok and np.isfinite(o).all() and np.isfinite(t).all():
+                out[name] = (o, t)
+    return out
+
+
+def _first_existing(parent: Path, candidates: Sequence[str]) -> Path | None:
+    return next((parent / c for c in candidates if (parent / c).exists()), None)
+
+
+class NestedStack(NamedTuple):
+    """Result of :func:`nested_lr_stack`: AUC of the OOF logits, OOF and test logits."""
+
+    auc: float
+    oof: NDArray[np.float64]
+    test: NDArray[np.float64] | None
+
+
+def nested_lr_stack(
+    x: NDArray[np.float64],
+    y: NDArray[Any],
+    x_test: NDArray[np.float64] | None = None,
+    *,
+    c: float = 0.01,
+    n_splits: int = 5,
+    seeds: Sequence[int] = (7, 13, 99),
+    cols: Sequence[int] | NDArray[np.int64] | None = None,
+    max_iter: int = 5000,
+) -> NestedStack:
+    """Binary L2 logistic-regression stack scored by nested CV.
+
+    For each seed an LR is fit on K-1 folds of ``StratifiedKFold(n_splits)``
+    and its decision function scores the held-out fold; OOF logits are
+    averaged over seeds, test logits over every (seed, fold) fit. The split
+    differs from the members' own CV folds, so the score is honest with
+    respect to the meta fit.
+
+    s6e11 lessons behind the defaults: with 100+ rank-logit members
+    ``C = 0.01`` beat 0.003-1; the free LR beat non-negative weights, ridge,
+    pairwise-ranking, clustered-member, segment-interaction, local and GBDT
+    residual stackers; nest 10 equalled nest 5; and the paired-bootstrap sd of
+    a pool delta was 0.00004, so differences below ~1e-4 are noise.
+
+    Args:
+        x: OOF member matrix (n, m), e.g. :func:`rank_logit` columns.
+        y: Binary labels.
+        x_test: Optional test matrix with the same columns.
+        c: Inverse L2 strength.
+        n_splits: Folds of the nested split.
+        seeds: One split per seed.
+        cols: Column subset to use (default all), handy for ablations.
+        max_iter: LR solver iterations.
+    """
+    use = np.arange(x.shape[1]) if cols is None else np.asarray(cols)
+    oof = np.zeros(len(y))
+    tst = None if x_test is None else np.zeros(len(x_test))
+    n_fits = len(seeds) * n_splits
+    for s in seeds:
+        splits = StratifiedKFold(n_splits, shuffle=True, random_state=s).split(x, y)
+        for trn, va in splits:
+            m = LogisticRegression(C=c, max_iter=max_iter).fit(x[trn][:, use], y[trn])
+            oof[va] += m.decision_function(x[va][:, use]) / len(seeds)
+            if tst is not None and x_test is not None:
+                tst += m.decision_function(x_test[:, use]) / n_fits
+    return NestedStack(float(roc_auc_score(y, oof)), oof, tst)

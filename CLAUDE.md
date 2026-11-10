@@ -21,7 +21,8 @@ A Python monorepo containing:
   grid and Nelder-Mead fitters, bootstrap bagging, Bayes cost matrix, cascade recombination,
   XGBoost balanced-error eval metric), `encoding` (fold-safe target encoding, quantile bins,
   frequency features, rank-gauss, Fourier features), `stacking` (`stack_oof`, Caruana
-  selection, per-base ridge calibration, public-notebook OOF loading), `compare` (seed-paired
+  selection, per-base ridge calibration, public-notebook OOF loading; binary pool stacking from
+  s6e11: `logit`, `rank_logit`, `nested_lr_stack`, `load_oof_banks`), `compare` (seed-paired
   arm deltas, honest split-half blend reads), `screening` (the M-slope mechanism instrument,
   from s6e7), `shift` (adversarial validation, mask-mechanism diagnostics, uniform re-mask
   repair, from s6e7), `models` (MLP scaffold, RealMLP-TD, swap-noise DAE, imbalance losses),
@@ -104,8 +105,9 @@ Claude Code on the web so the venv, linters, and tests are ready at session star
    common failure: at the s6e10 audit there were 19 local `logit`/`softmax` copies
    (→ `stacking.clipped_logit`), 3 `inv_freq_weights` (→ `models.mlp.class_weights`),
    9 `ba`/`bacc` (→ `decision.balanced_accuracy_fast`) and 3 `weighted_bacc`
-   (→ `shift.weighted_balanced_accuracy`). If the shared version is close but not quite
-   right, extend it (a keyword argument with a backward-compatible default) rather than
+   (→ `shift.weighted_balanced_accuracy`); at s6e11 there were ~25 binary `log(p/(1-p))`
+   copies (→ `stacking.logit`; `clipped_logit` is the multiclass `log(p)`). If the shared
+   version is close but not quite right, extend it (a keyword argument with a backward-compatible default) rather than
    forking it locally.
 2. **Promote code the second time it is needed.** When a helper is about to be copied into a
    second script of a different competition, or is imported by several scripts inside one
@@ -278,6 +280,28 @@ On s6e5, s6e8 and s6e10, same folds, Deotte's best *single* model beat our best 
     ±0.00001 levers while a 0.0006 lever was untried. Breadth of model *classes* (best one of each) matters, the
     count of models does not. Keep every experiment's OOF/test pair and let an L2 LR on logits weigh them.
     Pre-registration still governs small effects. It cannot find the large effects nobody listed.
+
+**The public notebooks (s6e11: +0.001 LB in 20 minutes once we looked)**
+
+15. **Read the public notebooks on day 1 and every ~3 days, and pool their OOF banks.**
+    Working LB-blind means not chasing LB deltas. It does not mean ignoring what the public
+    has found. On s6e11 we spent two days on our own pipeline at LB 0.95110 while the top was
+    at 0.95229. The notebooks had a feature family we never tried: target encoding of the
+    float columns' *digit keys* (integer part, fraction, leading digits, GPT-2 tokens). That
+    gave a single shallow tree 0.9515 OOF against our 0.948. They also published OOF banks on
+    the community folds (`StratifiedKFold(5, shuffle=True, random_state=42)` on id-sorted
+    rows, which is also our `fold_assignment`). Stacking our different-kind leg (the
+    label-first GPT-2) on a public bank took LB from 0.95110 to 0.95212. The routine:
+    - Compare our best public score with the top: `kaggle competitions leaderboard <c> -s`.
+    - List the notebooks: `kaggle kernels list --competition <c> --sort-by voteCount`, then
+      `--sort-by scoreDescending`. Scan the titles for feature families we don't know.
+    - Read the top ones: `kaggle kernels pull <ref>`.
+    - Download their OOF banks: `kaggle kernels output <ref>`, or the dataset they attach.
+    - Stack the banks with our legs: `stacking.load_oof_banks` → `rank_logit` columns →
+      `nested_lr_stack` (L2 LR, C 0.01, nested CV; s6e11 `src/pool_stack.py` is the full script).
+    - Price our own levers *inside the pooled stack*: legs that helped our stack added nothing
+      next to the bank (s6e11: our EBM/trees 0, ep20 LM 0). Only a leg that differs in kind
+      survives (lesson 7).
 
 ## Architecture Conventions
 
