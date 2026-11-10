@@ -14,14 +14,18 @@ A Python monorepo containing:
 - **`data_science_stuff/`** — Shared installable package (versioned via git tags through
   setuptools_scm). `kaggle_utils.py` holds the original helpers (`save_cv_result`,
   `tune_decision_weights`, ...); the `kaggle/` subpackage holds the competition machinery
-  extracted from s6e5/s6e6: `io` (paths/params/submissions), `device` (LightGBM CUDA probe),
-  `cv` (`run_cv` fold loop), `blending` (Nelder-Mead blend weights, diversity report),
-  `decision` (threshold weights — grid and Nelder-Mead fitters, bootstrap bagging, Bayes cost
-  matrix, cascade recombination), `encoding` (fold-safe target encoding, quantile bins,
-  frequency features), `stacking` (`stack_oof`, Caruana selection), `screening` (the M-slope
-  mechanism instrument, from s6e7), `shift` (adversarial validation + mask-mechanism
-  diagnostics, from s6e7), `models` (MLP scaffold, RealMLP-TD, imbalance losses), and the
-  results layer: `predictions` (keyed parquet OOF/test files that carry `id` + `fold`),
+  extracted from s6e5–s6e10: `io` (paths/params/submissions), `device` (LightGBM CUDA probe,
+  XGBoost device params, CatBoost 6 GB-GPU params), `cv` (`run_cv` fold loop, `run_cv_seeds`
+  multi-seed bagging), `tuning` (`run_study` Optuna scaffold → `best_params*.json`),
+  `blending` (Nelder-Mead blend weights, diversity report), `decision` (threshold weights —
+  grid and Nelder-Mead fitters, bootstrap bagging, Bayes cost matrix, cascade recombination,
+  XGBoost balanced-error eval metric), `encoding` (fold-safe target encoding, quantile bins,
+  frequency features, rank-gauss, Fourier features), `stacking` (`stack_oof`, Caruana
+  selection, per-base ridge calibration, public-notebook OOF loading), `compare` (seed-paired
+  arm deltas, honest split-half blend reads), `screening` (the M-slope mechanism instrument,
+  from s6e7), `shift` (adversarial validation, mask-mechanism diagnostics, uniform re-mask
+  repair, from s6e7), `models` (MLP scaffold, RealMLP-TD, swap-noise DAE, imbalance losses),
+  and the results layer: `predictions` (keyed parquet OOF/test files that carry `id` + `fold`),
   `registry` (append-only run registry `results/runs.jsonl`: git commit, command, params,
   config hash, lineage, verdicts), `prereg` (verifiable pre-registration commits) and
   `tracking` (optional MLflow view; `[tracking]` extra). CLI:
@@ -90,6 +94,32 @@ workflows by hand:
 A SessionStart hook (`.claude/hooks/session-start.sh`) installs dependencies automatically in
 Claude Code on the web so the venv, linters, and tests are ready at session start.
 
+## Shared code first
+
+`data_science_stuff` is where reusable code lives. Two rules, both mandatory:
+
+1. **Check the package before writing a helper.** Before adding any function to a competition
+   script, search `data_science_stuff/` (`grep -rn "def " data_science_stuff/kaggle` or the
+   module list above) for one that already does it, and import it. Re-written copies are the
+   common failure: at the s6e10 audit there were 19 local `logit`/`softmax` copies
+   (→ `stacking.clipped_logit`), 3 `inv_freq_weights` (→ `models.mlp.class_weights`),
+   9 `ba`/`bacc` (→ `decision.balanced_accuracy_fast`) and 3 `weighted_bacc`
+   (→ `shift.weighted_balanced_accuracy`). If the shared version is close but not quite
+   right, extend it (a keyword argument with a backward-compatible default) rather than
+   forking it locally.
+2. **Promote code the second time it is needed.** When a helper is about to be copied into a
+   second script of a different competition, or is imported by several scripts inside one
+   competition (a `*_common.py`), move it into the package instead: generalise the
+   competition-specific constants into arguments, add type hints (mypy strict) and tests
+   in `tests/`, export it from the subpackage `__init__.py`, run the `quality-gate` skill,
+   and update the module list in "What This Repo Is". Keep the competition's lesson in the
+   docstring (what was measured, why the default is what it is), since it is the part that
+   is expensive to rediscover.
+
+Competition-specific feature engineering (`features.py`, domain keys, one-off probes) stays
+in the competition directory. Finished competitions are not rewritten to use new shared
+code; new scripts use it.
+
 ## Competition Workflow
 
 Each Kaggle competition follows the same pipeline (mature references: `playground-series-s6e5/`
@@ -101,7 +131,7 @@ features.py  →  baseline.py / train_<model>.py  →  tune_<model>.py  →  ens
 ```
 
 The pipeline is built on `data_science_stuff.kaggle`: `competition_dirs`/`load_params` →
-`run_cv` → `save_predictions` + `save_cv_result` (registers the run) + `optimize_thresholds` →
+`run_cv` (or `run_cv_seeds`; `run_study` in `tune_*.py`) → `save_predictions` + `save_cv_result` (registers the run) + `optimize_thresholds` →
 `load_predictions` → `optimize_blend_weights`/`stack_oof` → `write_submission`. Competition
 scripts import these; they never copy them. Older competitions (≤ s6e10) store positional
 `oof_*.npy`; `load_predictions` still reads them (with a warning) and `migrate_npy` converts.
@@ -213,6 +243,41 @@ rules that separate the real ones from the rest. Each cost days to learn; none i
     data writes them (`36`, `0.0`, `None`, `True`/`False`). Budget about 2 A100-hours per fold,
     so plan Kaggle or cloud GPUs early, because 6 GB local is too slow. A label-last GPT-2
     ("Detective", about 0.961) is a cheaper second leg that makes different errors.
+    Training with the label at a random position ("label anywhere") gives one model that reads both ways and was
+    Deotte's best s6e10 single model (0.96245). Replicate the generator in its own pinned env (be-great 0.0.3,
+    transformers 4.26.1), at several epoch counts, and note that it was trained on a noised copy of the original
+    (~7% label flips in his reconstruction).
+
+**What the winner's public code showed (`notes/deotte-playground-solutions.md`, read it at competition start)**
+
+On s6e5, s6e8 and s6e10, same folds, Deotte's best *single* model beat our best ensemble: 0.9544 vs 0.9508,
+0.9707 vs 0.9661, 0.96245 vs 0.96227. The gap was in how the data was made, not in measurement or stacking.
+
+15. **There are two generators. Reverse-engineer both on day 1.** Many original datasets were produced by a script
+    with a label rule or arithmetic identities (s6e9: `Phi((s - 5.6092) / 0.8345)`; s6e8: `daily > 8 or social > 4`;
+    s6e3: `TotalCharges - tenure * MonthlyCharges`). Fit the rule on the *original* rows, not on the synthetic ones,
+    whose noise hides it. Use the rule as a base margin, as an offset, and as the target of residual encodings.
+16. **Use the original data in every model.** Our s6e5 and s6e8 never downloaded it. Four uses: append the original
+    rows to each fold's training side with a tuned weight; per-value and per-pair smoothed LLRs fitted on the original;
+    snap features (nearest original value and the difference); and per-class ECDF and nearest-original distance.
+17. **Synthetic values are a finite vocabulary.** Give each numeric an exact-value categorical token as well as the
+    value. Add digit, modulus and decimal artifact columns, and for GReaT data the GPT-2 BPE pieces of the value
+    string (about +0.0002 per XGBoost in s6e9). Label-free density models over train + test (masked-LM completion
+    of missing cells as a full conditional distribution, reconstruction of each field from the others, surprisal)
+    are legal and were s6e8's best channels.
+18. **A weak MLP is a bug, not a verdict.** pytabkit `RealMLP_TD` with exact-value tokens and nested TEs was the best
+    single model in s6e5 and s6e8, where our MLPs earned weight 0. His recipe: 32 internal members, epoch picked on
+    a 15% inner split then refit on all outer-train rows, label smoothing 0.005, 3-5 seeds per fold.
+19. **Never early-stop on the validation fold.** Stop on an inner 10% holdout, then refit on all outer-train rows for
+    about 1.1x the rounds. Give GBDTs a `base_margin` / `init_score` from an in-fold LR, the recovered rule or a
+    TE-WOE sum.
+20. **Run TFMs zero-shot on raw features at full context** (s6e10: TabPFN-3.5 0.9611 and Kumo-large 0.9600 beat
+    tuned XGBoost). They need 20-84 GB of GPU memory, and the generator legs need A100-class GPUs. Rent that compute
+    in week 1. Do not discover in the last week that the 6 GB card cannot run them.
+21. **Spend effort where the gap can be, not where it can be measured.** We spent s6e10 PR-43 to PR-60 on
+    ±0.00001 levers while a 0.0006 lever was untried. Breadth of model *classes* (best one of each) matters, the
+    count of models does not. Keep every experiment's OOF/test pair and let an L2 LR on logits weigh them.
+    Pre-registration still governs small effects. It cannot find the large effects nobody listed.
 
 **The public notebooks (s6e11: +0.001 LB in 20 minutes once we looked)**
 

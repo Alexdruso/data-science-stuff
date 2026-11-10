@@ -7,6 +7,7 @@ import json
 import subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import pandas as pd
@@ -70,7 +71,8 @@ def test_log_run_records_everything(repo: Path) -> None:
         results,
         "lgbm_v1",
         oof_score=0.95,
-        fold_scores=[0.94, np.float64(0.96)],
+        # np.float64 subclasses float; old numpy stubs (Python 3.9) do not say so.
+        fold_scores=[0.94, cast("float", np.float64(0.96))],
         metric_name="auc",
         params={"lr": np.float32(0.05), "leaves": 31, "path": Path("x")},
         inputs=["realmlp_v1"],

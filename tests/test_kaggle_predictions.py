@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
+from numpy.typing import NDArray
 
 from data_science_stuff.kaggle.cv import fold_assignment, make_splitter, run_cv
 from data_science_stuff.kaggle.predictions import (
@@ -17,7 +19,7 @@ from data_science_stuff.kaggle.predictions import (
 )
 
 
-def _toy() -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def _toy() -> tuple[NDArray[Any], NDArray[Any], NDArray[Any], NDArray[Any]]:
     rng = np.random.default_rng(0)
     train_ids = rng.permutation(np.arange(100, 140))
     test_ids = np.arange(500, 510)
