@@ -15,19 +15,20 @@ from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedKFold
 
 sys.path.insert(0, str(Path(__file__).parent))
-from pool_stack import load_banks, rl
+
+from data_science_stuff.kaggle.stacking import load_oof_banks, rank_logit
 
 R = Path(__file__).parent.parent / "results"
 z = np.load(R / "pool_lab.npz"); Xo, y = z["Xo"], z["y"]
 args = sys.argv[1:]
 k = int(args[args.index("--k") + 1]) if "--k" in args else 81
 dirs = [a for a in args if a.startswith("ext")]
-mem = load_banks(dirs, len(y), 299984)
+mem = load_oof_banks(dirs, n_train=len(y), n_test=299984)
 new = []
 for name, (o, _) in sorted(mem.items()):
     if roc_auc_score(y, o) < 0.93:
         continue
-    r = rl(o)
+    r = rank_logit(o)
     c = max(abs(np.corrcoef(r, Xo[:, j])[0, 1]) for j in range(Xo.shape[1]))
     if c < 0.9999 and all(abs(np.corrcoef(r, q)[0, 1]) < 0.9999 for _, q in new):
         new.append((name, r))

@@ -19,15 +19,11 @@ from features import TARGET, build_features
 from data_science_stuff.kaggle.cv import fold_assignment
 from data_science_stuff.kaggle.io import competition_dirs
 from data_science_stuff.kaggle.predictions import load_predictions
+from data_science_stuff.kaggle.stacking import logit
 
 DATA_DIR, RESULTS_DIR, _ = competition_dirs(__file__)
 BASE = ["ebm_i30_s7", "ebm_i30_mib256", "ebm_i30_s7_mib256", "ebm_i30", "ebm_i60", "xgbt2_b2048",
         "xgbt2_b2048_s1", "lgbm_d2_b2048"]
-
-
-def logit(p: np.ndarray) -> np.ndarray:
-    p = np.clip(p, 1e-15, 1 - 1e-15)
-    return np.log(p / (1 - p))
 
 
 def main() -> None:

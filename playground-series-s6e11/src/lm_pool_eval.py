@@ -22,6 +22,7 @@ from features import TARGET, build_features
 from data_science_stuff.kaggle.cv import fold_assignment
 from data_science_stuff.kaggle.io import competition_dirs
 from data_science_stuff.kaggle.predictions import load_predictions
+from data_science_stuff.kaggle.stacking import logit
 
 DATA_DIR, RESULTS_DIR, _ = competition_dirs(__file__)
 
@@ -37,7 +38,7 @@ def main() -> None:
     m = fold_assignment(y) == a.fold
     ys = y[m]
     p0 = np.clip(np.asarray(load_predictions(RESULTS_DIR, a.base, ids)).ravel(), 1e-12, 1 - 1e-12)
-    base = np.log(p0 / (1 - p0))[m][:, None]
+    base = logit(p0)[m][:, None]
     masa = np.load("ext/dl/s6e11-gpt2-target-first-oof/oof.npy")[m][:, None]
     cv = StratifiedKFold(5, shuffle=True, random_state=0)
 
@@ -53,7 +54,7 @@ def main() -> None:
         v = np.load(RESULTS_DIR / d / f"f{a.fold}_val.npy")[:, None]
         if v.min() >= 0 and v.max() <= 1:  # probabilities -> log-odds
             v = np.clip(v, 1e-9, 1 - 1e-9)
-            v = np.log(v / (1 - v))
+            v = logit(v)
         print(f"  {d:40s} solo {roc_auc_score(ys, v[:, 0]):.5f}  gain {stack(np.hstack([base, v])) - b0:+.6f}"
               f"  gain over base+masa {stack(np.hstack([base, masa, v])) - bm:+.6f}"
               f"  rho(masa) {np.corrcoef(v[:, 0], masa[:, 0])[0, 1]:.4f}")

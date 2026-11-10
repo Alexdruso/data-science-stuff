@@ -10,10 +10,8 @@ from pathlib import Path
 
 import numpy as np
 import polars as pl
-from scipy.stats import rankdata
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
-from sklearn.model_selection import StratifiedKFold
 
 sys.path.insert(0, str(Path(__file__).parent))
 from cv_results import save_cv_result
@@ -21,13 +19,9 @@ from features import TARGET, build_features
 
 from data_science_stuff.kaggle.io import competition_dirs, write_submission
 from data_science_stuff.kaggle.predictions import load_predictions, save_predictions
+from data_science_stuff.kaggle.stacking import nested_lr_stack, rank_logit
 
 DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
-
-
-def rl(v: np.ndarray) -> np.ndarray:
-    r = rankdata(v) / (len(v) + 1)
-    return np.log(r / (1 - r))
 
 
 def load_ext(dirs: list[str], n_tr: int, n_te: int) -> dict[str, tuple[np.ndarray, np.ndarray]]:
@@ -65,17 +59,11 @@ def main() -> None:
     names = [k for k in sorted(auc, key=lambda k: -auc[k]) if auc[k] >= a.min_auc]
     for k in names:
         print(f"  {k:40s} {auc[k]:.5f}")
-    Xo = np.column_stack([rl(mem[k][0]) for k in names])
-    Xt = np.column_stack([rl(mem[k][1]) for k in names])
+    Xo = np.column_stack([rank_logit(mem[k][0]) for k in names])
+    Xt = np.column_stack([rank_logit(mem[k][1]) for k in names])
 
     def stack(cols: list[int]) -> tuple[float, np.ndarray, np.ndarray]:
-        oof, tst = np.zeros(len(y)), np.zeros(len(te_ids))
-        for s in (7, 13, 99):
-            for trn, va in StratifiedKFold(5, shuffle=True, random_state=s).split(Xo, y):
-                m = LogisticRegression(C=a.C, max_iter=3000).fit(Xo[trn][:, cols], y[trn])
-                oof[va] += m.decision_function(Xo[va][:, cols]) / 3
-                tst += m.decision_function(Xt[:, cols]) / 15
-        return float(roc_auc_score(y, oof)), oof, tst
+        return nested_lr_stack(Xo, y, Xt, c=a.C, cols=cols, max_iter=3000)
 
     ext_cols = [i for i, k in enumerate(names) if ":" in k]
     our_cols = [i for i, k in enumerate(names) if ":" not in k]

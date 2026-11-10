@@ -19,13 +19,9 @@ from features import TARGET, build_features
 
 from data_science_stuff.kaggle.io import competition_dirs, write_submission
 from data_science_stuff.kaggle.predictions import load_predictions, save_predictions
+from data_science_stuff.kaggle.stacking import logit
 
 DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
-
-
-def logit(p: np.ndarray) -> np.ndarray:
-    p = np.clip(p, 1e-15, 1 - 1e-15)
-    return np.log(p / (1 - p))
 
 
 def main() -> None:

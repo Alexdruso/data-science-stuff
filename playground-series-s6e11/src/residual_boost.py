@@ -21,6 +21,7 @@ from features import BOOL_COLS, CAT_COLS, NUM_COLS, TARGET, build_features
 
 from data_science_stuff.kaggle.io import competition_dirs
 from data_science_stuff.kaggle.predictions import load_predictions
+from data_science_stuff.kaggle.stacking import logit
 
 DATA_DIR, RESULTS_DIR, _ = competition_dirs(__file__)
 
@@ -50,7 +51,7 @@ def main() -> None:
     tr = build_features(pl.read_csv(DATA_DIR / "train.csv"))
     ids, y = tr["id"].to_numpy(), tr[TARGET].to_numpy().astype(int)
     p = np.clip(np.asarray(load_predictions(RESULTS_DIR, a.stack, ids)).ravel(), 1e-12, 1 - 1e-12)
-    base = np.log(p / (1 - p))
+    base = logit(p)
     parts = []
     if "raw" in a.feats:
         X = tr.select(NUM_COLS + CAT_COLS + BOOL_COLS).to_pandas()

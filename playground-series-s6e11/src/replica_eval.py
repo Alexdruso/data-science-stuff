@@ -18,6 +18,7 @@ from features import TARGET, build_features
 from data_science_stuff.kaggle.cv import fold_assignment
 from data_science_stuff.kaggle.io import competition_dirs
 from data_science_stuff.kaggle.predictions import load_predictions
+from data_science_stuff.kaggle.stacking import logit
 
 DATA_DIR, RESULTS_DIR, _ = competition_dirs(__file__)
 
@@ -31,7 +32,7 @@ def main() -> None:
     pos_in_va = np.searchsorted(va, rows)
     ys = y[rows]
     p0 = np.clip(np.asarray(load_predictions(RESULTS_DIR, base_name, ids)).ravel(), 1e-12, 1 - 1e-12)
-    base = np.log(p0 / (1 - p0))[rows][:, None]
+    base = logit(p0)[rows][:, None]
     masa = np.load("ext/dl/s6e11-gpt2-target-first-oof/oof.npy")[rows]
     ep10 = np.load(RESULTS_DIR / "_lm_distilgpt2_ep10" / "f1_val.npy")[pos_in_va]
     cv = StratifiedKFold(5, shuffle=True, random_state=0)

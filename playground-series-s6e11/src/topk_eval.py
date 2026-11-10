@@ -19,6 +19,7 @@ from features import TARGET, build_features
 
 from data_science_stuff.kaggle.io import competition_dirs
 from data_science_stuff.kaggle.predictions import load_predictions
+from data_science_stuff.kaggle.stacking import logit
 
 DATA_DIR, RESULTS_DIR, _ = competition_dirs(__file__)
 
@@ -35,7 +36,7 @@ def main() -> None:
     rows, F, names, llr = z["rows"], z["F"], list(z["names"]), z["llr"]
     ys = y[rows]
     p0 = np.clip(np.asarray(load_predictions(RESULTS_DIR, a.base, ids)).ravel(), 1e-12, 1 - 1e-12)
-    base = np.log(p0 / (1 - p0))[rows]
+    base = logit(p0)[rows]
     keep = F.std(0) > 0
     F, names = F[:, keep], [n for n, k in zip(names, keep) if k]
     Fs = StandardScaler().fit_transform(np.log1p(np.abs(F)) * np.sign(F))

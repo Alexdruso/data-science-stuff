@@ -20,6 +20,7 @@ from features import TARGET, build_features
 from data_science_stuff.kaggle.cv import fold_assignment
 from data_science_stuff.kaggle.io import competition_dirs
 from data_science_stuff.kaggle.predictions import load_predictions, save_predictions
+from data_science_stuff.kaggle.stacking import logit
 
 DATA_DIR, RESULTS_DIR, _ = competition_dirs(__file__)
 
@@ -46,7 +47,7 @@ def main() -> None:
     d = RESULTS_DIR / "_replica" / f"{a.ckpt}_score"
     s, have = load(d, "tr", len(y))
     p0 = np.clip(np.asarray(load_predictions(RESULTS_DIR, a.base, ids)).ravel(), 1e-12, 1 - 1e-12)
-    base = np.log(p0 / (1 - p0))
+    base = logit(p0)
     print(f"scored train rows: {have.sum()}; solo AUC {roc_auc_score(y[have], s[have]):.5f}")
     for k in range(1, 6):
         m = have & (folds == k)

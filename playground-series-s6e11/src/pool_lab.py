@@ -8,10 +8,10 @@ import sys
 from pathlib import Path
 
 import numpy as np
-from scipy.special import expit
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedKFold
+
+from data_science_stuff.kaggle.stacking import nested_lr_stack
 
 CACHE = Path(__file__).parent.parent / "results" / "pool_lab.npz"
 
@@ -19,43 +19,9 @@ CACHE = Path(__file__).parent.parent / "results" / "pool_lab.npz"
 def cache() -> None:
     import pool_stack as ps
 
-    captured = {}
-    orig = ps.LogisticRegression
-
-    def grab(*a, **k):  # stop pool_stack right after it builds the matrix
-        raise SystemExit
-    ps.LogisticRegression = grab
-    import builtins
-    real_stack = np.column_stack
-    calls = []
-
-    def cs(arrs):
-        out = real_stack(arrs)
-        calls.append(out)
-        return out
-    np.column_stack = cs
-    sys.argv = [sys.argv[0]] + sys.argv[2:]
-    try:
-        ps.main()
-    except SystemExit:
-        pass
-    np.column_stack = real_stack
-    ps.LogisticRegression = orig
-    import polars as pl
-    from features import TARGET, build_features
-    y = build_features(pl.read_csv(ps.DATA_DIR / "train.csv"))[TARGET].to_numpy().astype(int)
-    np.savez(CACHE, Xo=calls[0], Xt=calls[1], y=y)
-    print("cached", calls[0].shape, calls[1].shape)
-
-
-def lr_stack(Xo, y, C=0.01, nest=5, seeds=(7, 13, 99), cols=None, Xt=None):
-    cols = np.arange(Xo.shape[1]) if cols is None else cols
-    oof = np.zeros(len(y))
-    for s in seeds:
-        for trn, va in StratifiedKFold(nest, shuffle=True, random_state=s).split(Xo, y):
-            m = LogisticRegression(C=C, max_iter=5000).fit(Xo[trn][:, cols], y[trn])
-            oof[va] += m.decision_function(Xo[va][:, cols]) / len(seeds)
-    return roc_auc_score(y, oof), oof
+    pool = ps.build_pool(ps.parse_args(sys.argv[2:]))
+    np.savez(CACHE, Xo=pool.Xo, Xt=pool.Xt, y=pool.y)
+    print("cached", pool.Xo.shape, pool.Xt.shape)
 
 
 def main() -> None:
@@ -68,20 +34,20 @@ def main() -> None:
     print("matrix", Xo.shape, flush=True)
     for exp in sys.argv[2:]:
         if exp == "base":
-            print("base C.01 nest5", lr_stack(Xo, y)[0], flush=True)
+            print("base C.01 nest5", nested_lr_stack(Xo, y).auc, flush=True)
         elif exp == "nest10":
-            print("nest10", lr_stack(Xo, y, nest=10)[0], flush=True)
+            print("nest10", nested_lr_stack(Xo, y, n_splits=10).auc, flush=True)
         elif exp.startswith("C"):
-            print(exp, lr_stack(Xo, y, C=float(exp[1:]))[0], flush=True)
+            print(exp, nested_lr_stack(Xo, y, c=float(exp[1:])).auc, flush=True)
         elif exp == "std":  # standardize columns before L2
             Xs = (Xo - Xo.mean(0)) / Xo.std(0)
-            print("std C.01", lr_stack(Xs, y)[0], "C.001", lr_stack(Xs, y, C=0.001)[0], flush=True)
+            print("std C.01", nested_lr_stack(Xs, y).auc, "C.001", nested_lr_stack(Xs, y, c=0.001).auc, flush=True)
         elif exp == "subbag":  # random-subspace bag of LRs
             rng = np.random.default_rng(0)
             acc = np.zeros(len(y))
             for b in range(8):
                 cols = np.sort(rng.choice(Xo.shape[1], Xo.shape[1] // 2, replace=False))
-                s, o = lr_stack(Xo, y, cols=cols, seeds=(7,))
+                s, o, _ = nested_lr_stack(Xo, y, cols=cols, seeds=(7,))
                 acc += o
                 print(f"  subbag {b} {s:.6f} cum {roc_auc_score(y, acc):.6f}", flush=True)
         elif exp == "hill":  # greedy rank hill climb (with repeats), nested

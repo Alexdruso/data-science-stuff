@@ -15,10 +15,11 @@ from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedKFold, train_test_split
 
 sys.path.insert(0, str(Path(__file__).parent))
-from pool_lab import lr_stack
+
+from data_science_stuff.kaggle.stacking import nested_lr_stack
 
 z = np.load(Path(__file__).parent.parent / "results" / "pool_lab.npz"); Xo, y = z["Xo"], z["y"]
-auc0, s0 = lr_stack(Xo, y)
+auc0, s0, _ = nested_lr_stack(Xo, y)
 print(f"LR nested {auc0:.6f}", flush=True)
 for leaves, lr, mcs in ((4, 0.02, 2000), (8, 0.02, 4000)):
     out = s0.copy()

@@ -22,6 +22,7 @@ from features import TARGET, build_features
 from data_science_stuff.kaggle.cv import fold_assignment
 from data_science_stuff.kaggle.io import competition_dirs
 from data_science_stuff.kaggle.predictions import load_predictions
+from data_science_stuff.kaggle.stacking import logit
 
 DATA_DIR, RESULTS_DIR, _ = competition_dirs(__file__)
 REFS = ["_lm_distilgpt2_ep5", "_lm_distilgpt2_ep10", "_lm_distilgpt2_ep20"]
@@ -43,7 +44,7 @@ def main() -> None:
     j = np.array([pos[r] for r in idx])
     ys = y[idx]
     p0 = np.clip(np.asarray(load_predictions(RESULTS_DIR, a.base, ids)).ravel(), 1e-12, 1 - 1e-12)
-    base = np.log(p0 / (1 - p0))[idx][:, None]
+    base = logit(p0)[idx][:, None]
     masa = np.load("ext/dl/s6e11-gpt2-target-first-oof/oof.npy")[idx]
 
     def stack(x: np.ndarray) -> float:

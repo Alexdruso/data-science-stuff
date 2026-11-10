@@ -19,11 +19,11 @@ from sklearn.preprocessing import StandardScaler
 
 sys.path.insert(0, str(Path(__file__).parent))
 from features import RAW_COLS, TARGET, build_features
-from pool_stack import load_banks, rl
 
 from data_science_stuff.kaggle.cv import fold_assignment
 from data_science_stuff.kaggle.io import competition_dirs
 from data_science_stuff.kaggle.predictions import load_predictions
+from data_science_stuff.kaggle.stacking import load_oof_banks, logit, rank_logit
 
 DATA_DIR, RESULTS_DIR, _ = competition_dirs(__file__)
 
@@ -42,15 +42,15 @@ def main() -> None:
     ids, y = tr["id"].to_numpy(), tr[TARGET].to_numpy().astype(int)
     n_te = 299984
     m = fold_assignment(y) == a.fold
-    mem = load_banks(a.ext, len(y), n_te)
+    mem = load_oof_banks(a.ext, n_train=len(y), n_test=n_te)
     for n in a.ours:
         mem[n] = (np.asarray(load_predictions(RESULTS_DIR, n, ids)).ravel(), np.zeros(n_te))
     names = [k for k, v in mem.items() if roc_auc_score(y, v[0]) >= a.min_auc]
-    base = np.column_stack([rl(mem[k][0])[m] for k in names]) if names else None
+    base = np.column_stack([rank_logit(mem[k][0])[m] for k in names]) if names else None
     if a.base_stack:
         p0 = np.clip(np.asarray(load_predictions(RESULTS_DIR, a.base_stack, ids)).ravel(), 1e-12,
                      1 - 1e-12)
-        base = np.log(p0 / (1 - p0))[m][:, None]
+        base = logit(p0)[m][:, None]
         names = [a.base_stack]
     ys = y[m]
     d = RESULTS_DIR / a.dir
