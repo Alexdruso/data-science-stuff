@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import numpy as np
+from numpy.typing import NDArray
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedKFold
 
@@ -30,7 +31,7 @@ def test_rank_logit_is_monotone_symmetric_and_scale_free() -> None:
     np.testing.assert_array_equal(rank_logit(np.exp(v)), r)
 
 
-def _toy(n: int = 600) -> "tuple[np.ndarray, np.ndarray]":
+def _toy(n: int = 600) -> "tuple[NDArray[np.float64], NDArray[np.int64]]":
     rng = np.random.default_rng(1)
     y = (rng.random(n) < 0.3).astype(int)
     x = np.column_stack([y + rng.normal(scale=s, size=n) for s in (0.8, 1.2, 3.0)])
