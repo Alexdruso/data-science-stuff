@@ -779,3 +779,22 @@ expectation: solo ≈ parent ± 0.0003, absorbed. Prior 5%.
 - In flight: Kaggle `s6e11-replica-any` (PR-20 arms B gpt2-124M / C lr 2e-4) → download with
   `kaggle kernels output alessandrosanvito/s6e11-replica-any -p kaggle_out/replica_any` and grep "AUC" in job*.log.
 | 11-11 18:40 | harvest 31 (kernels 13:00-17:00): mzishran shallow trees + binned LR (6 members, .945-.947, maxcorr .980-.991, → `ext/ko31`); others no OOF | — | + megayak: **+0.000036** (megayak alone +0.000039) → null. LB top unchanged 0.95369 |
+| 11-11 21:10 | **PR-20 Kaggle arms** (faithful be_great replica; CV-free fidelity on the same 30k fold-1 rows) | B gpt2-124M lr 5e-5: e20 .85503 / e40 .91462 / e60 **.92055**; C distilgpt2 lr 2e-4: e10 .91021 / e20 **.92468** / e30 .91945 | every arm peaks at **.920-.925** (local distilgpt2 lr 5e-5 e30 .92528; 11-04 label-first e40 .928) → **FAIL, PR-20 closed**. Neither protocol, base model nor lr moves an orig-only replica past ~.925-.928: the 20k original rows cap replica fidelity, so the generator itself cannot be rebuilt from the original data. T=0.7 scoring never beats T=1 |
+
+### 11-11 hand-off (21:40)
+- **Best OOF + submitted: pool_v11 0.952705** (unchanged all day; nothing new reached the +0.0001 bar, so no submission).
+  pool_v12 (same, megayak's refreshed test file) is on disk, test Spearman .99996 to v11.
+- Closed today, all pre-registered or cheap-screened: PR-18 (label-anywhere compact LM: first/last/any reads, distilgpt2
+  and gpt2), PR-19 (+ unlabeled val rows), PR-20 (faithful replica, 3 arms, cap ≈ .925), PR-21 (label-free field
+  reconstruction), PR-22 (gentle BCE), harvests 29-31 (~72 new public members), ladder steps on our OOF, means with
+  public wide stacks, pair memorisation, fold-average vs refit.
+- What the day measured: the task is positive-limited (every estimator loses 0.0013-0.0017 per halving of positives),
+  and no estimator here uses the positives better than the pool. Public LB ladder steps are below their own sampling noise.
+- Untested classes that remain: none cheap. Candidates with real cost: a 5-fold compact label-first LM (+0.0005 solo,
+  fold-level delta −0.00002 → expected ≤ +0.00004 at pool level, below the bar); TFMs at full context (hardware-bound).
+  Keep harvesting public banks every few hours (`kaggle kernels list --sort-by dateRun`; `src/pool_add_dir.py ext/ds23 <dirs>`,
+  subtract megayak's +0.000039).
+- Tooling added today: `src/clm_leg.py` (compact LM, label first/last/any, unlabeled rows, pos_frac, epoch checkpoints),
+  `src/fold_member_eval.py`, `src/replica_any.py`, `src/recon_leg.py`, `kaggle_lm_build.py --src=`.
+- ⚠️ `pkill -f <pattern>` from a Bash tool call can kill the tool's own shell (exit 144) when the pattern also matches
+  the command line; kill by PID from `pgrep -f "[x]yz"` instead. Wait loops must match the script's real final line.
