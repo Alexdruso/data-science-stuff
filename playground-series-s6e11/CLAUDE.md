@@ -686,7 +686,7 @@ rank-logit members; outer 5-fold, inner 10% early stopping. Never tried at pool 
   used value tokens + END + 2 labels, rows assembled on the GPU; 67 tokens/row vs ~130 in `lm_leg.py`). Local RTX 2060:
   distilgpt2 bs 64 451 rows/s fit, gpt2 bs 32 204 rows/s (bs 64 OOMs at 6 GB).
 
-**PR-18 (11-11 10:25, before the number): label-anywhere compact LM** (`src/clm_leg.py --label any`). The label is a
+**PR-18 (11-11 09:35, before the number): label-anywhere compact LM** (`src/clm_leg.py --label any`). The label is a
 25th field at a uniform random position during the fit, so one model learns p(y | any prefix) *and* p(fields | y, prefix).
 Three reads of the same fold-1 model, K=4 draws each: `first` (Storyteller LLR), `last` (Detective, a discriminative
 read that has seen the generative objective — Deotte's s6e10 version lost only 0.0015 to the Storyteller, ours pure
@@ -696,3 +696,6 @@ Read: `lm_pool_eval.py pool_v7 _clm_any_ep10_{first,last,any} _lm_distilgpt2_ep1
 **Bar:** best single read, or first+last together, pool_v7 f1 gain − ep10 gain ≥ +0.0001 → 5-fold leg (Kaggle T4s,
 all negatives). Honest expectation: `first` ≈ 0.948, `last` ≈ 0.945-0.947, all three rho(masa) ≥ .96 and absorbed
 (17 LM variants so far were); the only new thing is the Detective read from a jointly trained model. Prior 7%.
+| 11-11 09:55 | harvest 29 (kernel outputs since 11-08 21:00, 24 kernels → `ext/ko29`, csv/npz → `ext/ko29_conv`, `ext/ko29_tab`): akmalshahbaz joint GLM + shallow GBDT (7), kava1 xgb_v12, yekenot RealMLP v3 (.95002), staesthetics LGB TE + Benford digits (.9429, maxcorr .960), herczeg TF MLP (.9423, maxcorr .952), zhenrui XGB, slimypunk TabPFN starter (5 folds, .94929, maxcorr .982) | — | 14 new + megayak: **+0.000007** (megayak alone +0.000039) → null. Rest (denpugovkin 5-reviews, georgymamarin, samanyu ladders/pair-risk, queyrusi two stacks, malyshev fusion, kazuhiroyogo) = submissions/stacks only |
+| 11-11 | **ladder move on our own OOF** (fold 0, logit ranks): pool_v11 + w·(LM − pool_v11) for megayak LM / goodpjw seed-7 LM (not in our pool) / their average | w .03/.06/.12/.2: mega −0.000039/−0.000081/−0.000176/−0.000328; lm7 −0.000027/−0.000062/−0.000148/−0.000298; avg2 −0.000032/−0.000068/−0.000152/−0.000287 | stepping toward an LM **loses at every step size**, also toward an LM the pool has never seen and toward the 2-seed average (the test-side denoising argument) → the public LM steps repair files that hold too little LM (Strike 10 carries ≈ −0.001 LM); pool_v11 already has the LM weight right. No ladder on our files |
+| 11-11 | pool_v11 ⊕ amanatar sovereign (best public CV-backed stack, .952572; corr OOF .9965 / test .9946) rank-logit blend | w .1/.2/.3/.5: +0.000012/+0.000019/+0.000019/+0.000004 | null. Note for finals: the public 0.95340 ladder file correlates only **.9934** with pool_v11 on test — the public top and our stack are materially different files, so a ⊕ blend is a real hedge option for final #2 (no OOF exists for it; decide at finals time, deadline 11-30) |
