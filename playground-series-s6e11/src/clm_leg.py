@@ -80,7 +80,8 @@ class Table:
         """Inputs [B, L], targets [B, L] (-100 = not scored), position of LABQ [B]."""
         b = idx.numel()
         seg = self.grid[idx].long()
-        seg[:, -1, 1] = self.LAB + lab
+        seg[:, -1, 1] = self.LAB + lab.clamp_min(0)
+        seg[lab < 0, -1, :] = -1  # unlabeled row: no label field at all
         seg = seg.gather(1, perm[:, :, None].expand(-1, -1, self.W)).reshape(b, -1)
         keep = torch.argsort((seg < 0).to(torch.int8), dim=1, stable=True)
         seg = seg.gather(1, keep)
@@ -143,17 +144,26 @@ def length_batches(lens: np.ndarray, rows: np.ndarray, bs: int, rs: np.random.Ra
 
 
 def fit(model: torch.nn.Module, tb: Table, rows: np.ndarray, y_dev: torch.Tensor, mode: str,
-        epochs: int, lr: float, bs: int, seed: int) -> None:
+        epochs: int, lr: float, bs: int, seed: int, ckpt: Path | None = None) -> None:
+    """Fit; with `ckpt` the state is saved after every epoch and a rerun resumes from it."""
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=0.0)
     scaler = torch.amp.GradScaler()
     per = len(rows) // bs
     total = per * epochs
-    gen = torch.Generator(device=DEV).manual_seed(seed)
-    rs = np.random.RandomState(seed)
+    start = 0
+    if ckpt is not None and ckpt.exists():
+        st = torch.load(ckpt, map_location=DEV, weights_only=True)
+        model.load_state_dict(st["model"])
+        opt.load_state_dict(st["opt"])
+        scaler.load_state_dict(st["scaler"])
+        start = int(st["epoch"]) + 1
+        print(f"  resumed after epoch {start}", flush=True)
     model.train()
-    t0, run, step = time.time(), 0.0, 0
+    t0, run, step = time.time(), 0.0, start * per
     print(f"  fit {len(rows)} rows, label {mode}, {total} steps", flush=True)
-    for _ in range(epochs):
+    for ep in range(start, epochs):
+        gen = torch.Generator(device=DEV).manual_seed(seed * 1000 + ep)
+        rs = np.random.RandomState((seed * 1000 + ep) % 2**31)
         bt = torch.as_tensor(length_batches(tb.lens, rows, bs, rs), device=DEV)
         for s in range(per):
             for grp in opt.param_groups:
@@ -171,10 +181,15 @@ def fit(model: torch.nn.Module, tb: Table, rows: np.ndarray, y_dev: torch.Tensor
             run += loss.item() if (step + 1) % 50 == 0 else 0.0
             step += 1
             if step % 2000 == 0:
-                print(f"  step {step}/{total} loss {run / 40:.4f} {step * bs / (time.time() - t0):.0f} rows/s",
-                      flush=True)
+                print(f"  step {step}/{total} loss {run / 40:.4f} "
+                      f"{(step - start * per) * bs / (time.time() - t0):.0f} rows/s", flush=True)
                 run = 0.0
             del x, tgt, lg, loss
+        if ckpt is not None:
+            tmp = ckpt.with_suffix(".tmp")
+            torch.save({"model": model.state_dict(), "opt": opt.state_dict(),
+                        "scaler": scaler.state_dict(), "epoch": ep}, tmp)
+            tmp.replace(ckpt)
     del opt, scaler
 
 
@@ -225,6 +240,11 @@ def main() -> None:
     ap.add_argument("--k_test", type=int, default=2)
     ap.add_argument("--no_test", action="store_true")
     ap.add_argument("--bench", type=int, default=0, help="stop the fit after N steps (speed check)")
+    ap.add_argument("--pos_frac", type=float, default=1.0, help="keep this fraction of the positives (learning curve)")
+    ap.add_argument("--unlab_val", action="store_true",
+                    help="label any only: add ALL of the fold's val rows to the fit without a label field "
+                         "(label-free density over the rows that get scored; all of them, so they are alike)")
+    ap.add_argument("--unlab_test", type=float, default=0.0, help="same for this fraction of the test rows")
     ap.add_argument("--tag", default="")
     a = ap.parse_args()
     reads = READS if a.label == "any" else (a.label,)
@@ -257,9 +277,20 @@ def main() -> None:
         rng = np.random.default_rng(1000 + k)
         tr_idx, va_idx = np.where(folds != k)[0], np.where(folds == k)[0]
         keep = (y[tr_idx] == 1) | (rng.random(len(tr_idx)) < a.neg_frac)
+        if a.pos_frac < 1:  # separate stream, so the negative subsample is the same at every pos_frac
+            keep &= (y[tr_idx] == 0) | (np.random.default_rng(2000 + k).random(len(tr_idx)) < a.pos_frac)
         fit_idx = tr_idx[keep]
+        if a.unlab_val or a.unlab_test > 0:
+            assert a.label == "any"
+            te_rows = np.arange(ntr, ntr + nte)
+            unl = np.concatenate([va_idx if a.unlab_val else va_idx[:0],
+                                  te_rows[rng.random(nte) < a.unlab_test]])
+            y_dev[:ntr] = torch.as_tensor(y, device=DEV)
+            y_dev[torch.as_tensor(unl, device=DEV)] = -1
+            fit_idx = np.concatenate([fit_idx, unl])
+            print(f"  + {len(unl)} unlabeled rows (val + test)", flush=True)
         # the fit sees neg_frac of the negatives: every read's label head is off by log(neg_frac)
-        prior_fix = np.log(a.neg_frac)
+        prior_fix = np.log(a.neg_frac / a.pos_frac)
         torch.manual_seed(1000 + k)
         model = build_model(a.model, tb)
         print(f"fold {k}:", flush=True)
@@ -276,8 +307,10 @@ def main() -> None:
             del model
             torch.cuda.empty_cache()
             return
-        fit(model, tb, fit_idx, y_dev, a.label, a.epochs, a.lr, a.bs, 1000 + k)
+        fit(model, tb, fit_idx, y_dev, a.label, a.epochs, a.lr, a.bs, 1000 + k, mdir / f"f{k}_ckpt.pt")
         torch.save(model.state_dict(), mdir / f"f{k}_model.pt")
+        (mdir / f"f{k}_ckpt.pt").unlink(missing_ok=True)
+        y_dev[:ntr] = torch.as_tensor(y, device=DEV)
         for r in reads:
             t1 = time.time()
             sv = score(model, tb, va_idx, r, a.k_val, k) + prior_fix
