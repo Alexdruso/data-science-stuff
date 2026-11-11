@@ -743,3 +743,12 @@ positions away from the front → weaker label-first conditional per epoch; 0.92
   memorisation). Same CV-free fidelity read and bar (AUC ≥ 0.935 on the 30k fold-1 rows). A clear gap between base
   models (≥ +0.005 at equal epochs) would also say which GPT-2 the organisers used.
 | 11-11 13:47 | **pool_v12** = pool_v11 sources with megayak's current LM file (`ext/ds29/s6e11-target-first-lm`) | 0.952705 (= v11) | test Spearman v11/v12 **0.99996** → the refresh changes nothing; not submitted. pool_v11 stays the submitted best |
+
+**PR-21 (11-11 13:55, before the number): label-free field reconstruction features** (`src/recon_leg.py`; Deotte s6e8's
+best channel, never tried here). For each of the 13 numeric fields: LightGBM (63 leaves, 300 trees) predicts the field
+from the other 23 on train+test (no label), 5-fold cross-fitted over all 1M rows; features = residual and |residual|/
+conditional-MAD per field (26 cols). Leg = XGB d3 (max_bin 2048) on raw + recon features, fold 1. Paired control: same
+XGB on raw only. Rationale: the generator writes each value conditioned on the others (+ label); fraud rows come from a
+339-positive fit, so their field-given-rest consistency may differ from negatives in a way trees on raw values cannot
+express cheaply. **Bar:** `fold_member_eval.py` delta ≥ +0.0001 → 5 folds. Expectation: solo +0.0005 over raw XGB,
+pool delta ≈ 0 (NB/LCM/PLL densities were absorbed). Prior 7%.
