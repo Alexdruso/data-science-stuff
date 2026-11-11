@@ -742,3 +742,4 @@ positions away from the front → weaker label-first conditional per epoch; 0.92
   same faithful protocol, 60 epochs, eval 20/40/60; **C** distilgpt2 lr 2e-4, 30 epochs, eval 10/20/30 (faster
   memorisation). Same CV-free fidelity read and bar (AUC ≥ 0.935 on the 30k fold-1 rows). A clear gap between base
   models (≥ +0.005 at equal epochs) would also say which GPT-2 the organisers used.
+| 11-11 13:47 | **pool_v12** = pool_v11 sources with megayak's current LM file (`ext/ds29/s6e11-target-first-lm`) | 0.952705 (= v11) | test Spearman v11/v12 **0.99996** → the refresh changes nothing; not submitted. pool_v11 stays the submitted best |
