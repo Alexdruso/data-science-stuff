@@ -49,15 +49,44 @@ def row_texts(fields: np.ndarray, rng: np.random.Generator, first: str | None = 
     return out
 
 
+class Used:
+    """Softmax over the tokens the rows can contain (+ EOS); a 50k-token softmax OOMs the 6 GB card."""
+
+    def __init__(self, tok: AutoTokenizer, frames: list[pl.DataFrame], cols: list[str]) -> None:
+        pieces = ["is_fraud is 0", "is_fraud is 1"]
+        for c in cols:
+            vals = np.unique(np.concatenate([np.char.strip(f[c].to_numpy().astype(str)) for f in frames]))
+            pieces += [f"{c} is {v}" for v in vals]
+        ids: set[int] = {tok.eos_token_id}
+        for i in range(0, len(pieces), 20000):
+            chunk = pieces[i : i + 20000]
+            for x in tok(chunk).input_ids + tok([", " + q for q in chunk]).input_ids:
+                ids.update(x)
+        self.ids = torch.tensor(sorted(ids)).cuda()
+        remap = torch.full((len(tok),), -1, dtype=torch.long)
+        remap[self.ids.cpu()] = torch.arange(len(ids))
+        self.remap = remap.cuda()
+
+    def logits(self, model: torch.nn.Module, ids: torch.Tensor, att: torch.Tensor | None = None) -> torch.Tensor:
+        with torch.autocast("cuda", dtype=torch.float16):
+            h = model.transformer(input_ids=ids, attention_mask=att).last_hidden_state[:, :-1]
+        return h.float() @ model.lm_head.weight[self.ids].T
+
+    def targets(self, ids: torch.Tensor) -> torch.Tensor:
+        t = self.remap[ids[:, 1:]]
+        assert (t >= 0).all()
+        return t
+
+
 @torch.no_grad()
-def bayes_llr(model: torch.nn.Module, tok: AutoTokenizer, fields: np.ndarray, k: int, bs: int,
-              temp: float, seed: int = 7) -> np.ndarray:
-    """log P(row | is_fraud 1) - log P(row | is_fraud 0), logsumexp over k orders (same order for both)."""
+def bayes_llr(model: torch.nn.Module, tok: AutoTokenizer, used: Used, fields: np.ndarray, k: int, bs: int,
+              temps: tuple[float, ...] = (1.0, 0.7), seed: int = 7) -> dict[float, np.ndarray]:
+    """log P(row | is_fraud 1) - log P(row | is_fraud 0) per temperature, logsumexp over k orders."""
     model.eval()
     rng = np.random.default_rng(seed)
     n1 = len(tok("is_fraud is 1,").input_ids)
     assert n1 == len(tok("is_fraud is 0,").input_ids)
-    lp = np.zeros((2, k, len(fields)))
+    lp = {t: np.zeros((2, k, len(fields))) for t in temps}
     for kk in range(k):
         bodies = row_texts(fields, rng)
         order = np.argsort([len(b) for b in bodies])
@@ -66,15 +95,19 @@ def bayes_llr(model: torch.nn.Module, tok: AutoTokenizer, fields: np.ndarray, k:
             for yy in (0, 1):
                 enc = tok([f"is_fraud is {yy}, {bodies[i]}" for i in sel], return_tensors="pt", padding=True)
                 ids, att = enc.input_ids.cuda(), enc.attention_mask.cuda()
-                with torch.autocast("cuda", dtype=torch.float16):
-                    lg = model(input_ids=ids, attention_mask=att).logits[:, :-1]
-                t = torch.log_softmax(lg.float() / temp, -1).gather(-1, ids[:, 1:, None])[..., 0]
+                lg = used.logits(model, ids, att)
                 m = att[:, 1:].float()
                 m[:, : n1 - 1] = 0  # score only what follows the label prompt
-                lp[yy, kk, sel] = (t * m).sum(1).cpu().numpy()
-                del ids, att, lg, t, m
-    lse = np.logaddexp.reduce(lp, axis=1)
-    return lse[1] - lse[0]
+                tg = used.targets(ids)[..., None]
+                for t in temps:
+                    tl = torch.log_softmax(lg / t, -1).gather(-1, tg)[..., 0]
+                    lp[t][yy, kk, sel] = (tl * m).sum(1).cpu().numpy()
+                del ids, att, lg, m, tg
+    out = {}
+    for t in temps:
+        lse = np.logaddexp.reduce(lp[t], axis=1)
+        out[t] = lse[1] - lse[0]
+    return out
 
 
 def main() -> None:
@@ -108,6 +141,9 @@ def main() -> None:
     print(f"{name}: {len(f_or)} original rows ({y_or.sum()} fraud); eval on {len(rows)} train rows; example:\n  "
           f"{row_texts(f_or[:1], np.random.default_rng(0))[0]}", flush=True)
 
+    te = pl.read_csv(DATA_DIR / "test.csv", infer_schema=False)
+    used = Used(tok, [tr, te, og], cols)
+    print(f"restricted softmax: {len(used.ids)} tokens", flush=True)
     model = AutoModelForCausalLM.from_pretrained(a.model, torch_dtype=torch.float32).cuda()
     opt = torch.optim.AdamW(model.parameters(), lr=a.lr, weight_decay=0.0)
     scaler = torch.amp.GradScaler()
@@ -139,10 +175,9 @@ def main() -> None:
                 texts = row_texts(f_or[sel], rng)
             enc = tok(texts, return_tensors="pt", padding=True)
             ids = enc.input_ids.cuda()
-            with torch.autocast("cuda", dtype=torch.float16):
-                lg = model(input_ids=ids).logits[:, :-1]
+            lg = used.logits(model, ids)
             # be_great's collator copies input_ids into labels: the EOS padding is a target too
-            loss = torch.nn.functional.cross_entropy(lg.float().reshape(-1, lg.shape[-1]), ids[:, 1:].reshape(-1))
+            loss = torch.nn.functional.cross_entropy(lg.reshape(-1, lg.shape[-1]), used.targets(ids).reshape(-1))
             scaler.scale(loss).backward()
             scaler.step(opt)
             scaler.update()
@@ -155,11 +190,12 @@ def main() -> None:
             torch.save({"model": model.state_dict(), "opt": opt.state_dict(), "scaler": scaler.state_dict()},
                        OUT / f"{name}_e{ep + 1}.pt")
             torch.cuda.empty_cache()
-            for temp in (1.0, 0.7):
-                s_ = bayes_llr(model, tok, f_tr, a.k, 128, temp)
+            t1 = time.time()
+            for temp, s_ in bayes_llr(model, tok, used, f_tr, a.k, 128).items():
                 print(f"  epoch {ep + 1} T={temp}: AUC {roc_auc_score(ys, s_):.5f}  LLR sd {s_.std():.2f}", flush=True)
                 if temp == 1.0:
                     np.save(OUT / f"{name}_e{ep + 1}_f1sub.npy", s_ + np.log(y_or.mean() / (1 - y_or.mean())))
+            print(f"  eval {time.time() - t1:.0f}s", flush=True)
             torch.cuda.empty_cache()
     del model, opt, scaler
     torch.cuda.empty_cache()
