@@ -752,3 +752,4 @@ XGB on raw only. Rationale: the generator writes each value conditioned on the o
 339-positive fit, so their field-given-rest consistency may differ from negatives in a way trees on raw values cannot
 express cheaply. **Bar:** `fold_member_eval.py` delta ≥ +0.0001 → 5 folds. Expectation: solo +0.0005 over raw XGB,
 pool delta ≈ 0 (NB/LCM/PLL densities were absorbed). Prior 7%.
+| 11-11 14:20 | **PR-21 label-free reconstruction features** (LGBM field-from-rest over train+test, cross-fitted; fold 1) | recon R² amount .50, txn_count .51, velocity .64, merchant_risk .35, hours .17, the other 8 fields ≈ 0 (independent of the rest); XGB d3 raw **0.94566** vs raw+recon **0.94355** | the recon features *hurt* solo (−0.0021: 26 noisy columns at colsample .5); fold_member delta −0.000052 (raw control −0.000016) → **FAIL**. 8 of 13 numerics are generated independently of everything else, and the 5 dependent ones carry no label-relevant inconsistency |
