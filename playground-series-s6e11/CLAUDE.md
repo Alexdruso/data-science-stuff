@@ -670,3 +670,29 @@ rank-logit members; outer 5-fold, inner 10% early stopping. Never tried at pool 
   updated`); measure with `src/pool_add_dir.py ext/ds23 <new dirs>` (subtract megayak's +0.000039). Kaggle GPU quota:
   ~7 h used this week (resets Sat). Run pool CPU jobs with OMP_NUM_THREADS=4.
 | 11-08 21:15 | harvest 28: areebbb wide-stack re-run, lucifer v22, parth catboost, kospintr/kiza baselines; no new datasets | — | stacks/submissions/known weak members only → nothing to add. LB top 0.95328 (unchanged since 12:03) |
+
+## Day 9 (2026-11-11)
+- Session 09:00 → 22:00 (3 days since the last one). LB top 0.95369 (tine.sh agent); the public board is now led by
+  **"ladders"** (goodpjw LM Ladder 0.95346, areebbb Three Ladders 0.95347): a 0.95340 file + LB-probed steps
+  `A + 0.6(A − F) + 0.12(megaLM − F) + 0.06(LM7 − F)` in logit ranks. Their own authors report every step **loses on
+  CV** (−1.5e-5 … −14.7e-5 on the wide-stack OOF) and tell readers to pair them with a CV-backed pick. Best public
+  CV-backed numbers: amanatar "sovereign" 0.952572, goodpjw wide stack 0.952565 — still below pool_v11 0.952705.
+| 11-11 09:30 | harvest 29 (datasets): megayak LM (OOF unchanged, only test re-scored), goodpjw `s6e11-oof-bank` (143 files) + sk20220623/alexchilton `s6e11-oof-predictions` + amanatar vault (`ext/ds29`, 51 new after dedup) | — | v7 + megayak + all new **−0.000020** (megayak alone +0.000039) → null. amanatar vault alone on v7+megayak (seed 7): s24 BPE-pair chain (solo .9434, maxcorr .944) −0.000010, trigen LM fusion −0.000069, 4 "control variates" −0.000087, 7 "vetoes" −0.000100 → null. goodpjw seed-7 compact LM: fold 0 only (f0 .947545) → not poolable yet; re-check |
+- Deotte's s6e10 table (`cdeotte/kaggle-playground-solutions`): GPT-2 small target-first 0.962425, medium 0.962370,
+  large 0.962360 → **a larger GPT-2 is not a lever**; label-anywhere small 24 ep 0.962452 was his best single, and the
+  *same* model read target-last scored 0.960961 (our pure label-last Detective: 0.943 vs 0.948 label-first).
+- Running downloaded scripts locally is blocked by the permission classifier (megayak's `lm_member.py`), so the
+  compact format is re-implemented in our own `src/clm_leg.py` (one learned token per column, softmax over the 1,372
+  used value tokens + END + 2 labels, rows assembled on the GPU; 67 tokens/row vs ~130 in `lm_leg.py`). Local RTX 2060:
+  distilgpt2 bs 64 451 rows/s fit, gpt2 bs 32 204 rows/s (bs 64 OOMs at 6 GB).
+
+**PR-18 (11-11 10:25, before the number): label-anywhere compact LM** (`src/clm_leg.py --label any`). The label is a
+25th field at a uniform random position during the fit, so one model learns p(y | any prefix) *and* p(fields | y, prefix).
+Three reads of the same fold-1 model, K=4 draws each: `first` (Storyteller LLR), `last` (Detective, a discriminative
+read that has seen the generative objective — Deotte's s6e10 version lost only 0.0015 to the Storyteller, ours pure
+label-last lost 0.005), `any` (label at a random position: prefix posterior + suffix LLR). distilgpt2, 25% negatives,
+ep10, lr 2e-4, bs 64 = the recipe of our `_lm_distilgpt2_ep10` (f1 0.9484, K=3) → paired reference.
+Read: `lm_pool_eval.py pool_v7 _clm_any_ep10_{first,last,any} _lm_distilgpt2_ep10`, plus first+last jointly.
+**Bar:** best single read, or first+last together, pool_v7 f1 gain − ep10 gain ≥ +0.0001 → 5-fold leg (Kaggle T4s,
+all negatives). Honest expectation: `first` ≈ 0.948, `last` ≈ 0.945-0.947, all three rho(masa) ≥ .96 and absorbed
+(17 LM variants so far were); the only new thing is the Detective read from a jointly trained model. Prior 7%.
