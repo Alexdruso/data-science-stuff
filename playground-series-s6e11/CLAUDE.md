@@ -707,3 +707,25 @@ all negatives). Honest expectation: `first` ≈ 0.948, `last` ≈ 0.945-0.947, a
   variants q1/q2/r40/PLL read −0.00004…−0.00008) → use it next to `lm_pool_eval.py`; a pass needs ≥ +0.0001 on it.
 | 11-11 | **public-LB noise for ladder-sized steps** (300 random 60k-row OOF samples ≈ the public 20%; paired AUC delta of two files) | sovereign + 0.12(megaLM − sov): full-OOF −0.000070, 60k sd **0.000069**; + 0.06: −0.000029, sd 0.000034; + 0.6(sov − newton) extrapolation: +0.000003, sd 0.000082; pool_v11 vs pool_v7: +0.000035, sd 0.000109; pool_v11 vs sovereign: +0.000133, sd **0.000237** (P(ours ahead on a public-size sample) 0.70); one file's AUC sd 0.0031 | every public ladder step (+0.00001…+0.00003 on the LB) is **< 1 sd** of its own public sampling noise → 0.95313 → 0.95347 is what ~10 accepted noise-selected steps look like; it is not evidence of signal. The public LB also cannot rank pool_v11 against the best public CV stack (0.6 sd); on the private 80% the same +0.00013 is ~1.1 sd. Finals stay CV-ranked |
 | 11-11 | **learning curve in positives vs negatives** (XGB d3 raw, max_bin 2048, fold 1, best of 300-1500 trees) | pos 100% / 50% / 25% (9.35k / 4.67k / 2.34k) with all negatives: **0.94663 / 0.94489 / 0.94278**; with 25% of the negatives: 0.94607 / 0.94491 / 0.94287 | each halving of the positives costs ~0.002; 4× the negatives buys ≤ 0.0006 (0 below 9k positives) → **the task is positive-limited** (9.35k per fold; the generator itself saw 339). Consequences: negative subsampling in LM fits is nearly free; whatever uses the positives more efficiently (generative or hybrid objectives, label-free structure from the 440k unlabeled val+test rows) is the class with headroom; "more members" of a discriminative kind is not |
+
+**PR-19 (11-11 10:15, before the number): label-anywhere LM + the unlabeled rows it will score** (`clm_leg.py --label any
+--unlab_val`). In a label-anywhere fit the fields *before* the label are modelled label-free, so rows without a label
+field are valid training sequences: no pseudo-labels (the 11-04 semi-supervised Storyteller sampled labels from a
+teacher and lost 0.0005). Pilot = PR-18 arm A's recipe (distilgpt2, 25% negatives, ep10, fold 1) + all 140k fold-1 val
+rows label-free (a full leg would add the test rows the same way). Rationale: the task is positive-limited (learning
+curve above); the only untapped rows are the 440k unlabeled ones, and a hybrid objective is the one place they enter
+without label noise. Paired reference: PR-18 arm A, same reads. **Bar:** any read's solo AUC ≥ arm A's same read
++ 0.0005, or `fold_member_eval.py` delta − arm A's delta ≥ +0.0001 → full leg. Honest expectation: the label-free
+density of val rows mostly cancels in the LLR; `last` could gain from a better representation; ≈ 0. Prior 10%.
+
+**PR-20 (11-11 10:15, before the number): faithful GReaT replica** (`src/replica_any.py`). The 11-04 replica was fit
+label-first with OneCycle/wd .01 and peaked at AUC **0.9278** (e40) on 30k fold-1 train rows. be_great trains
+differently: label = one more field at a random position, text `col is value, col is value`, HF-Trainer defaults
+(lr 5e-5 linear decay, no warmup, wd 0), loss on every token incl. EOS padding; only *sampling* is label-first. New
+script does exactly that on the 20k original rows (distilgpt2 = be_great's default, bs 16, 60 epochs, eval at 20/40/60;
+label written `0`/`1` as in the original CSV). No train label is used → the replica's Bayes AUC on train rows is a
+direct, CV-free fidelity measure (the true generator would be Bayes-optimal, ≥ 0.953). Same 30k rows as 11-04.
+**Bar:** AUC ≥ 0.935 at any eval epoch (≥ +0.007 over the label-first replica) → (a) init of a natural-format fold-1
+LM vs the r40-init arm (f1 0.94903), (b) its score as a pool member on the full fold. Below 0.935: replica fidelity is
+not limited by the training protocol; close. Honest expectation: label-anywhere training spends 24/25 of the label's
+positions away from the front → weaker label-first conditional per epoch; 0.92-0.93. Prior 15%.
