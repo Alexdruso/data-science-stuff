@@ -34,7 +34,7 @@ from features import TARGET, build_features
 from data_science_stuff.kaggle.cv import fold_assignment
 from data_science_stuff.kaggle.io import competition_dirs
 
-DATA_DIR, RESULTS_DIR, _ = competition_dirs(__file__)
+DATA_DIR, RESULTS_DIR, SUBMISSIONS_DIR = competition_dirs(__file__)
 DEV = "cuda"
 READS = ("first", "last", "any")
 

@@ -1,6 +1,6 @@
 """Package src/lm_leg.py as a single-file Kaggle GPU kernel that runs several jobs in parallel.
 
-    python src/kaggle_lm_build.py SLUG "ARGS FOR GPU0" ["ARGS FOR GPU1"] [--ds=owner/dataset]
+    python src/kaggle_lm_build.py SLUG "ARGS FOR GPU0" ["ARGS FOR GPU1"] [--ds=owner/dataset] [--src=clm_leg.py]
     kaggle kernels push -p kaggle_kernels/SLUG --accelerator NvidiaTeslaT4
 
 Each job is one `lm_leg.py` argument string run on its own GPU (CUDA_VISIBLE_DEVICES).
@@ -93,10 +93,11 @@ if __name__ == "__main__":
 
 def main() -> None:
     ds = [x.split("=", 1)[1] for x in sys.argv[1:] if x.startswith("--ds=")]
-    args = [x for x in sys.argv[1:] if not x.startswith(("--keep", "--ds="))]
+    args = [x for x in sys.argv[1:] if not x.startswith(("--keep", "--ds=", "--src="))]
+    srcs = [x.split("=", 1)[1] for x in sys.argv[1:] if x.startswith("--src=")]
     keep = "--keep_models" in sys.argv
     slug, jobs = args[0], args[1:]
-    src = (HERE / "lm_leg.py").read_text()
+    src = (HERE / (srcs[0] if srcs else "lm_leg.py")).read_text()
     # drop the repo imports and path setup; the shim defines the same names
     src = re.sub(r"sys\.path\.insert.*\n", "", src)
     src = re.sub(r"from features import .*\n", "", src)
