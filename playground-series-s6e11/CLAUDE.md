@@ -778,3 +778,4 @@ expectation: solo ≈ parent ± 0.0003, absorbed. Prior 5%.
   8 of 13 numerics are independent of all other fields (R² ≈ 0); compact LM format = +0.0005 solo but absorbed.
 - In flight: Kaggle `s6e11-replica-any` (PR-20 arms B gpt2-124M / C lr 2e-4) → download with
   `kaggle kernels output alessandrosanvito/s6e11-replica-any -p kaggle_out/replica_any` and grep "AUC" in job*.log.
+| 11-11 18:40 | harvest 31 (kernels 13:00-17:00): mzishran shallow trees + binned LR (6 members, .945-.947, maxcorr .980-.991, → `ext/ko31`); others no OOF | — | + megayak: **+0.000036** (megayak alone +0.000039) → null. LB top unchanged 0.95369 |
