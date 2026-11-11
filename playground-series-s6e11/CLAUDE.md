@@ -765,3 +765,16 @@ from `_lm_distilgpt2_ep10` f1; K=3. **Bar:** fold_member delta ≥ +0.0001 (ref:
 expectation: solo ≈ parent ± 0.0003, absorbed. Prior 5%.
 | 11-11 14:20 | harvest 30 (kernels since 08:05): nothing new with OOF. Read mathsonchain's "what worked" write-up: their finals = rank mean of two public wide stacks (CV .95262, "averages out the test-side variance of a single stack") | — | checked the same idea on ours: pool_v11 ⊕ goodpjw wide+LM stack (nested .952565, corr .9970) w .2/.3/.5 **+0.000008/+0.000005/−0.000013**; ⊕ sovereign +0.000019/+0.000019/+0.000004; ⊕ both +0.000014 → all < 1 sd → null. Our pool already contains their members; a mean of two stacks over the same members buys nothing on OOF. Keep as a possible finals hedge only (decide at the deadline) |
 | 11-11 14:25 | **PR-22 gentle-BCE child** (ep10 f1 + 1 pass, gen + 0.1·BCE, lr 2e-5) | f1 **0.94729** (parent 0.94846) | fold_member delta −0.000032 (parent −0.000017) → **FAIL**. Discriminative pressure on the LLR loses solo at every weight tried (1.0: −0.0005, 0.1: −0.0012); closed. (The result landed 14:25 but my wait loop grepped for "auc" and missed "disc 0.94729" → GPU idle until 16:05; wait loops must match the script's actual final line or the process exit) |
+
+### 11-11 status (16:10)
+- **Best OOF + submitted: pool_v11 0.952705** (unchanged; pool_v12 = v11 with megayak's refreshed test file, Spearman
+  .99996). Still above every public nested CV (best .952572). The public LB top (0.95369) is ladder-stepped files whose
+  steps are each < 1 sd of public sampling noise and lose on OOF → not a target.
+- Closed today: harvests 29-30 (65 new members, amanatar vault columns), ladder steps on our OOF, stack means with public
+  wide stacks, PR-18 (label-anywhere compact LM, 3 reads × 2 base models), PR-19 (+ unlabeled rows), PR-20 local
+  (faithful be_great replica .925), PR-21 (label-free reconstruction features), PR-22 (gentle BCE), pair memorisation,
+  full refit vs fold average.
+- Measured facts worth keeping: positive-limited task (−0.0013…−0.0017 per halving of positives, LM and trees alike);
+  8 of 13 numerics are independent of all other fields (R² ≈ 0); compact LM format = +0.0005 solo but absorbed.
+- In flight: Kaggle `s6e11-replica-any` (PR-20 arms B gpt2-124M / C lr 2e-4) → download with
+  `kaggle kernels output alessandrosanvito/s6e11-replica-any -p kaggle_out/replica_any` and grep "AUC" in job*.log.
