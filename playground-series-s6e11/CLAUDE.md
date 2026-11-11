@@ -729,3 +729,7 @@ direct, CV-free fidelity measure (the true generator would be Bayes-optimal, ≥
 LM vs the r40-init arm (f1 0.94903), (b) its score as a pool member on the full fold. Below 0.935: replica fidelity is
 not limited by the training protocol; close. Honest expectation: label-anywhere training spends 24/25 of the label's
 positions away from the front → weaker label-first conditional per epoch; 0.92-0.93. Prior 15%.
+| 11-11 | **fold-average vs full refit on the test side** (XGB d3 raw; hold out fold h, the other 4 folds play "train": 4 models on 75% each vs refits on 100%) | h=1: one 75% model 0.94564, avg of 4 **0.94627**, one refit 0.94608, 4-seed refit **0.94632**; h=2: 0.94859 / 0.94919 / 0.94900 / 0.94924 | one model gains +0.00044 from the extra 25% of the data (as the learning curve says), but averaging the fold models already recovers it (+0.00063); a seed-bagged full refit is only **+0.00005** above the fold average → test predictions = mean of the fold models lose nothing material; no refit pass over our legs |
+- PR-19 runs on Kaggle (kernel `s6e11-clm-pr19`, pushed 11:00, before any PR-19 number). Its second GPU carries an
+  LM learning-curve arm registered here: compact `--label first --pos_frac 0.5` (half the fold-1 positives, same
+  negatives) vs PR-18 arm B (all positives) → how positive-starved the Storyteller is (XGB loses 0.0017 per halving).
