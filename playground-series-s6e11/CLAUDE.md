@@ -756,3 +756,10 @@ pool delta ≈ 0 (NB/LCM/PLL densities were absorbed). Prior 7%.
 | 11-11 14:00 | **PR-19 label-anywhere + all 140k fold-1 val rows label-free** (Kaggle) | first **0.94766** / last 0.94471 / any 0.94769 (arm A without them: .94827 / .94477 / .94776) | every read slightly *lower*; fold_member deltas −0.000112 / −0.000022 / −0.000080, joint −0.000113 → **FAIL**. Label-free density of the scored rows adds nothing (the 11-04 pseudo-label version lost too): unlabeled rows are closed for the LM |
 | 11-11 | LM positives learning curve (compact label-first distilgpt2 ep10, fold 1): 50% of positives vs all | **0.94772** vs 0.94898 | −0.0013 per halving (XGB d3: −0.0017) → the Storyteller is as positive-starved as trees |
 | 11-11 14:00 | **PR-20 local** (distilgpt2 faithful replica) e45 | **0.92373** (T .7 .92324), down from e30 .92528 | peaked ≈ e30 at .925 < bar .935 → **FAIL** for distilgpt2 at lr 5e-5; stopped at e45. The be_great protocol reproduces the label-first replica's fidelity (.928) → protocol is not what limits it. Kaggle arms (gpt2-124M, lr 2e-4) still running |
+
+**PR-22 (11-11 14:10, before the number): "gentle BCE" child** (Deotte s6e10 `gpt_hybrid`: one more epoch with generative
+loss + 0.1 × BCE on the model's own Bayes readout; 0.962378 solo there, below its parent, but it earned stack weight).
+PR-10 was the same objective at BCE:gen = 1:1 and lost 0.0005 solo. Here `lm_disc.py --fit_on train --lam 10` (Adam is
+scale-invariant, so BCE + 10·gen ≡ gen + 0.1·BCE), 1 pass over the 9.3k fold-1 train positives, 1:3 negatives, lr 2e-5,
+from `_lm_distilgpt2_ep10` f1; K=3. **Bar:** fold_member delta ≥ +0.0001 (ref: ep10 parent read the same way). Honest
+expectation: solo ≈ parent ± 0.0003, absorbed. Prior 5%.
